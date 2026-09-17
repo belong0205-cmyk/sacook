@@ -1,0 +1,12 @@
+{
+  "rootBackdropAlpha": 0.02,
+  "dockBackdropAlpha": 0.10,
+  "readingBackdropAlpha": [0.14, 0.28, 0.46],
+  "autoAccent": "#AB8CFA",
+  "spaceAccent": "#5EE8D1",
+  "answerText": "#F7F7F8",
+  "readingFontDefault": 20,
+  "readingFontMinimum": 20,
+  "readingFontMaximum": 40,
+  "dockHeight": 54
+}

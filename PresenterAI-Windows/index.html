@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.openai.com; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self'; img-src 'self' data:; media-src blob:">
+  <title>SA Cook Assistant — Windows Preview 5.53</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-backdrop="1">
+  <div class="drag-strip" aria-hidden="true"></div>
+  <main class="conversation-grid">
+    <section class="lane auto-lane" aria-label="AUTO answers">
+      <div id="autoConversation" class="conversation-surface" role="log" aria-live="polite" tabindex="0">
+        <div id="autoQuestion" class="message question" lang="en">Waiting for a question…</div>
+        <div id="autoAnswer" class="message answer" lang="en">The AUTO answer will appear here.</div>
+        <div id="autoLive" class="live-text">Listening for the next question…</div>
+        <div id="autoHistory" class="history" lang="en"></div>
+      </div>
+    </section>
+    <section class="lane manual-lane" aria-label="SPACE answers">
+      <div id="manualConversation" class="conversation-surface" role="log" aria-live="polite" tabindex="0">
+        <div id="manualQuestion" class="message question" lang="en">Listen to the full question, then press Space.</div>
+        <div id="manualAnswer" class="message answer" lang="en">The SPACE answer will appear here.</div>
+        <div id="manualLive" class="live-text">Listening until you press Space…</div>
+        <div id="manualHistory" class="history" lang="en"></div>
+      </div>
+    </section>
+  </main>
+  <footer class="control-dock">
+    <button id="start" class="primary" type="button">▶ Bắt đầu nghe</button>
+    <label class="source-control" for="source"><span class="sr-only">Nguồn âm thanh</span><select id="source"><option value="system">Âm thanh hệ thống</option><option value="microphone">Micrô</option></select></label>
+    <label class="auto-toggle" title="Automatic question detection"><input id="autoEnabled" type="checkbox" checked><span>AUTO</span></label>
+    <button id="commit" class="commit" type="button" title="Chốt câu hỏi SPACE">Chốt câu</button>
+    <div class="listen-state"><span id="status" role="status" aria-live="polite">● Sẵn sàng</span><span id="level" aria-hidden="true">Âm thanh: chưa đo</span></div>
+    <button id="update" type="button" title="Kiểm tra và cài bản Windows mới">Update</button>
+    <details id="moreMenu" class="more-menu">
+      <summary aria-label="More options">•••</summary>
+      <div class="menu-popover">
+        <div class="menu-row"><span>AUTO</span><button id="retryAuto" type="button">Lại</button><button id="copyAuto" type="button">Chép</button><button id="clearAuto" type="button">Xoá</button></div>
+        <div class="menu-row"><span>SPACE</span><button id="retryManual" type="button">Lại</button><button id="copyManual" type="button">Chép</button><button id="clearManual" type="button">Xoá</button></div>
+        <div class="menu-row"><span>Chữ</span><button id="fontDown" type="button" aria-label="Chữ nhỏ hơn">A−</button><output id="fontValue">20</output><button id="fontUp" type="button" aria-label="Chữ lớn hơn">A+</button></div>
+        <div class="menu-row backdrop-row"><span>Nền</span><button type="button" data-backdrop-value="0">Nhẹ</button><button type="button" data-backdrop-value="1">Vừa</button><button type="button" data-backdrop-value="2">Đậm</button></div>
+        <div class="menu-row menu-wide"><button id="clearAll" type="button">Xoá tất cả</button><button id="settings" type="button">API key…</button></div>
+        <div class="menu-row menu-wide"><button id="minimizeWindow" type="button">Thu nhỏ</button><button id="closeWindow" type="button">Đóng ứng dụng</button></div>
+      </div>
+    </details>
+  </footer>
+  <dialog id="keyDialog" aria-labelledby="keyDialogTitle">
+    <form method="dialog">
+      <div class="dialog-heading"><div><h2 id="keyDialogTitle">OpenAI API key</h2><p>Key được Windows mã hoá và chỉ lưu trên máy này.</p></div><button class="close-button" value="cancel" aria-label="Đóng">×</button></div>
+      <label class="key-label" for="apiKey">API key</label>
+      <input id="apiKey" type="password" placeholder="sk-proj-…" autocomplete="off" spellcheck="false">
+      <p id="keyStatus" class="key-status" aria-live="polite"></p>
+      <div class="dialog-actions"><button value="cancel">Huỷ</button><button id="saveKey" value="default" class="primary">Lưu &amp; kiểm tra</button></div>
+    </form>
+  </dialog>
+  <script src="turn-policy.js"></script>
+  <script src="b1-policy.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

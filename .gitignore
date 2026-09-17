@@ -1,0 +1,39 @@
+.DS_Store
+*.swp
+*.tmp
+*.log
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.mobileprovision
+
+# Build artifacts
+output/
+outputs/
+tmp/
+work/
+PresenterAI/build/
+PresenterAI/dist/
+PresenterAI-Windows/dist/
+PresenterAI-Windows/stage/
+PrivateScreen/build/
+PrivateScreen/dist/
+
+# Dependencies and local caches
+node_modules/
+.pnpm-store/
+PresenterAI-Windows/.cache/
+PresenterAI-Windows/.home/
+PresenterAI-Windows/.sa-cook-portable-root
+__pycache__/
+*.py[cod]
+
+# Xcode/local IDE state
+DerivedData/
+xcuserdata/
+*.xcuserstate

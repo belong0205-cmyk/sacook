@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "featureVersion": "5.53.0",
+  "platforms": ["macOS", "Windows"],
+  "answerPolicy": {
+    "resource": "answer-policy.txt",
+    "language": "English",
+    "preferredCefr": "B2",
+    "maximumCefr": "B2",
+    "shortMaximumWords": 28,
+    "fullMaximumWords": 85,
+    "technicalTermsAllowed": true
+  },
+  "features": {
+    "independentAutoAndSpace": true,
+    "conversationContextPerLane": true,
+    "copyableConversation": true,
+    "compactTwoLaneOverlay": true,
+    "threeBackdropLevels": true,
+    "fontRange": [20, 40],
+    "inAppUpdate": true,
+    "enhancedAutoTranscription": true,
+    "dualAnswerVariants": true,
+    "keywordHighlighting": true
+  },
+  "release": {
+    "strategy": "macOS-stable-and-Windows-preview-until-legacy-macOS-retirement",
+    "stableTagPattern": "vX.Y.Z",
+    "macOSAssetPattern": "SA-Cook-Assistant-macOS-vX.Y.Z.zip",
+    "windowsAssetPattern": "SA-Cook-Assistant-Windows-x64-vX.Y.Z.zip",
+    "windowsLegacyPreviewAssetPattern": "SA-Cook-Assistant-Windows-x64-vX.Y.Z-preview.zip"
+  }
+}
