@@ -30,8 +30,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     [self addCursorRect:self.bounds cursor:NSCursor.arrowCursor];
 }
 - (void)mouseMoved:(NSEvent *)event {
-    [NSCursor.arrowCursor set];
     [super mouseMoved:event];
+    [NSCursor.arrowCursor set];
 }
 @end
 
@@ -441,8 +441,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     scroll.drawsBackground=NO; scroll.backgroundColor=NSColor.clearColor;
     scroll.contentView.drawsBackground=NO; scroll.contentView.backgroundColor=NSColor.clearColor;
     NSTextView *text=[[SCArrowTextView alloc] initWithFrame:NSMakeRect(0,0,400,100)];
-    text.editable=editable; text.selectable=YES; text.richText=NO;
-    text.automaticLinkDetectionEnabled=YES;
+    text.editable=editable; text.selectable=editable; text.richText=NO;
+    text.automaticLinkDetectionEnabled=NO;
     text.verticallyResizable=YES; text.horizontallyResizable=NO;
     text.minSize=NSMakeSize(0,0); text.maxSize=NSMakeSize(CGFLOAT_MAX,CGFLOAT_MAX);
     text.autoresizingMask=NSViewWidthSizable;
@@ -451,10 +451,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     text.font=[NSFont systemFontOfSize:16]; text.textContainerInset=NSMakeSize(14,12);
     text.drawsBackground=YES; text.backgroundColor=[self readingSurfaceColor];
     text.textColor=[NSColor colorWithWhite:0.94 alpha:1]; text.insertionPointColor=NSColor.whiteColor;
-    NSMenu *selectionMenu=[NSMenu new];
-    NSMenuItem *copy=[selectionMenu addItemWithTitle:@"Sao chép" action:@selector(copy:) keyEquivalent:@""]; copy.target=nil;
-    NSMenuItem *selectAll=[selectionMenu addItemWithTitle:@"Chọn tất cả" action:@selector(selectAll:) keyEquivalent:@""]; selectAll.target=nil;
-    text.menu=selectionMenu;
+    text.menu=nil;
     scroll.documentView=text; *out=text; return scroll;
 }
 - (NSView *)buildReadingLane:(BOOL)automatic {
@@ -593,8 +590,6 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     }
     backdropRoot.submenu=backdropMenu; self.backdropMenuItems=backdropItems; [secondary addItem:backdropRoot];
     [secondary addItem:[NSMenuItem separatorItem]];
-    [secondary addItem:[self secondaryMenuItem:@"Sao chép khung AUTO" action:@selector(copyAutoConversation:) tag:0]];
-    [secondary addItem:[self secondaryMenuItem:@"Sao chép khung SPACE" action:@selector(copyManualConversation:) tag:0]];
     [secondary addItem:[NSMenuItem separatorItem]];
     [secondary addItem:[self secondaryMenuItem:@"Trả lời lại AUTO" action:@selector(retryAutoAnswer:) tag:0]];
     [secondary addItem:[self secondaryMenuItem:@"Trả lời lại SPACE" action:@selector(retryManualAnswer:) tag:0]];
@@ -762,7 +757,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     self.listening=YES;
     [self beginSpeechTask];
     [self.autoTimer invalidate];
-    self.autoTimer=[NSTimer scheduledTimerWithTimeInterval:0.10 target:self selector:@selector(tickAutoRecognition:) userInfo:nil repeats:YES];
+    self.autoTimer=[NSTimer timerWithTimeInterval:0.10 target:self selector:@selector(tickAutoRecognition:) userInfo:nil repeats:YES];
+    [[NSRunLoop mainRunLoop] addTimer:self.autoTimer forMode:NSRunLoopCommonModes];
     CFAbsoluteTime started=CFAbsoluteTimeGetCurrent(); self.lastLevelUpdate=started;
     NSError *error; [self.audioEngine prepare];
     if (![self.audioEngine startAndReturnError:&error]) {
@@ -1038,6 +1034,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     if(!self.timeline) self.timeline=[SCSpeechTimeline new];
     if(!self.autoDetector) self.autoDetector=[SCAutoQuestionDetector new];
     NSString *heard=[self correctCulinaryTerms:text ?: @""];
+    self.lastRecognitionWasFinal=final;
     [self.manualUntimedBuffer updateText:heard];
     [self.enhancedAutoTranscriptBuffer updateText:heard];
     BOOL usable=SCUsableSpeechSegments(segments,self.audioTime);
@@ -1085,7 +1082,9 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     [self refreshManualTranscriptFinal:final];
 }
 - (void)refreshAutoLiveTranscript {
-    self.autoTranscript=[self enhancedAutoTranscriptionEnabled]?(self.enhancedAutoTranscriptBuffer.pendingText ?: @""):(self.autoDetector.pendingText ?: @"");
+    // Live recognition owns the endpoint clock in both modes. The cloud buffer
+    // can be consumed independently and must never reset that clock.
+    self.autoTranscript=self.autoDetector.pendingText ?: @"";
     if(![self.autoTranscript isEqualToString:self.autoPendingSnapshot ?: @""]) {
       self.autoPendingSnapshot=self.autoTranscript;
       self.autoPendingChangedAt=NSProcessInfo.processInfo.systemUptime;
@@ -1158,7 +1157,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     NSString *boundary=[@"PresenterAI-" stringByAppendingString:NSUUID.UUID.UUIDString];
     NSMutableData *body=[NSMutableData data];
     [self appendMultipartField:@"model" value:@"gpt-transcribe" boundary:boundary data:body];
-    [self appendMultipartField:@"language" value:@"en" boundary:boundary data:body];
+    [self appendMultipartField:@"languages[]" value:@"en" boundary:boundary data:body];
     [self appendMultipartField:@"response_format" value:@"json" boundary:boundary data:body];
     [self appendMultipartField:@"prompt" value:[self autoTranscriptionPrompt] boundary:boundary data:body];
     for(NSString *term in [self recognitionContextualStrings])
@@ -1194,14 +1193,12 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     return @"";
 }
 - (void)finishEnhancedAutoTranscriptionJob:(NSDictionary *)job transcript:(NSString *)transcript success:(BOOL)success {
+    if([job[@"generation"] unsignedIntegerValue]!=self.recognitionGeneration) return;
     if(!success) {
       self.autoEnhancedUnavailable=YES;
-      [self.autoTranscriptionQueue removeAllObjects]; [self.autoAudioBuffer reset]; [self.autoDetector reset];
-      NSString *alreadyHeard=[job[@"fallback"] isKindOfClass:NSString.class]?job[@"fallback"]:@"";
-      if(alreadyHeard.length) {
-        [self.autoDetector updateText:alreadyHeard now:NSProcessInfo.processInfo.systemUptime final:YES];
-        [self.autoDetector discardPendingText];
-      }
+      [self.autoTranscriptionQueue removeAllObjects]; [self.autoAudioBuffer reset];
+      // Keep the live detector and its consumed prefix intact: this response
+      // may belong to an older utterance than the one currently being heard.
     }
     if([job[@"generation"] unsignedIntegerValue]==self.recognitionGeneration && self.listening && self.autoButton.state==NSControlStateValueOn) {
       NSString *question=[self questionTurnFromTranscript:transcript];
@@ -1248,11 +1245,6 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
         NSString *fallback=[self.enhancedAutoTranscriptBuffer consume];
         if(wav.length) [self enqueueEnhancedAutoWAV:wav fallback:fallback];
       }
-      NSArray *ready=[self.autoDetector tickWithAudioTime:self.audioTime now:now];
-      [self consumeAutoCandidates:ready];
-      [self flushAutoQuestionTurnIfReadyAt:now force:NO];
-      [self refreshAutoLiveTranscript];
-      return;
     }
     NSArray *ready=[self.autoDetector tickWithAudioTime:self.audioTime now:now];
     [self consumeAutoCandidates:ready];
@@ -1262,7 +1254,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     // only commits a stable, clearly question-like pending turn.
     NSString *pending=self.autoDetector.pendingText ?: @"";
     NSTimeInterval stableFor=MAX(0,now-self.autoPendingChangedAt);
-    NSTimeInterval fallbackDelay=self.manualSnapshotFinal?0.16:0.90;
+    NSTimeInterval fallbackDelay=self.lastRecognitionWasFinal?0.16:0.90;
     if(!ready.count && pending.length>=8 && stableFor>=fallbackDelay && [self looksLikeQuestion:pending] && [self contentTerms:pending].count) {
       [self.autoDetector discardPendingText];
       self.autoPendingSnapshot=@""; self.autoPendingChangedAt=now;
@@ -1469,6 +1461,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 0.68;
     // for total sound silence or demand an exact database match a second time.
     NSString *q=[self primaryQuestionFromText:text];
     if(!q.length) return;
+    if([[self normalisedQuestion:q] isEqualToString:self.lastAutoAsked]) return;
     NSString *displayQuestion=[self displayQuestionForHeardQuestion:q];
     [self ensureAnswerState];
     BOOL multipart=[q containsString:@"\n"];

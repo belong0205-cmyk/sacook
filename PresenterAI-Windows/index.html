@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.openai.com; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self'; img-src 'self' data:; media-src blob:">
-  <title>SA Cook Assistant — Windows Preview 5.54</title>
+  <title>SA Cook Assistant — Windows Preview 5.55</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-backdrop="1">
@@ -38,8 +38,8 @@
     <details id="moreMenu" class="more-menu">
       <summary aria-label="More options">•••</summary>
       <div class="menu-popover">
-        <div class="menu-row"><span>AUTO</span><button id="retryAuto" type="button">Lại</button><button id="copyAuto" type="button">Chép</button><button id="clearAuto" type="button">Xoá</button></div>
-        <div class="menu-row"><span>SPACE</span><button id="retryManual" type="button">Lại</button><button id="copyManual" type="button">Chép</button><button id="clearManual" type="button">Xoá</button></div>
+        <div class="menu-row answer-actions"><span>AUTO</span><button id="retryAuto" type="button">Lại</button><button id="clearAuto" type="button">Xoá</button></div>
+        <div class="menu-row answer-actions"><span>SPACE</span><button id="retryManual" type="button">Lại</button><button id="clearManual" type="button">Xoá</button></div>
         <div class="menu-row"><span>Chữ</span><button id="fontDown" type="button" aria-label="Chữ nhỏ hơn">A−</button><output id="fontValue">20</output><button id="fontUp" type="button" aria-label="Chữ lớn hơn">A+</button></div>
         <div class="menu-row backdrop-row"><span>Nền</span><button type="button" data-backdrop-value="0">Nhẹ</button><button type="button" data-backdrop-value="1">Vừa</button><button type="button" data-backdrop-value="2">Đậm</button></div>
         <div class="menu-row menu-wide"><button id="clearAll" type="button">Xoá tất cả</button><button id="settings" type="button">API key…</button></div>

@@ -178,6 +178,36 @@ int main(void) {
         Equal(fallback.autoCandidates.firstObject,Joined(natural),@"AUTO safety net commits stable natural question phrasing missed by the grammar starter");
         Check(fallback.autoDetector.pendingText.length==0,@"AUTO safety net consumes its question exactly once"); CleanUp(fallback);
 
+        IndependentSpeechTestApp *enhancedFallback=[IndependentSpeechTestApp new];
+        NSMutableURLRequest *audioRequest=[enhancedFallback autoTranscriptionRequestForWAV:[@"fake-audio" dataUsingEncoding:NSUTF8StringEncoding]];
+        NSString *audioBody=[[NSString alloc] initWithData:audioRequest.HTTPBody encoding:NSUTF8StringEncoding];
+        Check([audioBody containsString:@"name=\"languages[]\"\r\n\r\nen"] && ![audioBody containsString:@"name=\"language\""],@"gpt-transcribe uses plural languages multipart field");
+        enhancedFallback.forceEnhancedAuto=YES;
+        enhancedFallback.enhancedAutoTranscriptBuffer=[SCUntimedTranscriptBuffer new];
+        Receive(enhancedFallback,natural,2.4,NO);
+        enhancedFallback.autoPendingChangedAt=NSProcessInfo.processInfo.systemUptime-2;
+        [enhancedFallback tickAutoRecognition:nil];
+        [enhancedFallback flushAutoQuestionTurnIfReadyAt:NSProcessInfo.processInfo.systemUptime+2 force:YES];
+        Equal(enhancedFallback.autoCandidates.firstObject,Joined(natural),@"Saving an API key cannot disable natural-question fallback");
+        CleanUp(enhancedFallback);
+
+        IndependentSpeechTestApp *networkFailure=[IndependentSpeechTestApp new];
+        Receive(networkFailure,complete,3,NO);
+        NSDictionary *failedJob=@{@"generation":@(networkFailure.recognitionGeneration),@"fallback":@"What is FIFO?"};
+        [networkFailure finishEnhancedAutoTranscriptionJob:failedJob transcript:@"" success:NO];
+        Equal(networkFailure.autoDetector.pendingText,first,@"Failed older network transcription preserves the current live question");
+        DrainAuto(networkFailure);
+        Check([networkFailure.autoCandidates.lastObject containsString:first],@"Live question is still answered after a network failure");
+        CleanUp(networkFailure);
+
+        IndependentSpeechTestApp *staleJob=[IndependentSpeechTestApp new];
+        staleJob.recognitionGeneration=2; staleJob.autoTranscriptionInFlight=YES;
+        Receive(staleJob,complete,3,NO);
+        [staleJob finishEnhancedAutoTranscriptionJob:@{@"generation":@1,@"fallback":@"What is FIFO?"} transcript:@"" success:NO];
+        Check(!staleJob.autoEnhancedUnavailable && staleJob.autoTranscriptionInFlight,@"Previous session callback cannot disable or unlock the new session");
+        Equal(staleJob.autoDetector.pendingText,first,@"Previous session callback cannot erase live words");
+        CleanUp(staleJob);
+
         IndependentSpeechTestApp *stockFix=[IndependentSpeechTestApp new];
         NSArray *misheardStock=@[Word(@"What",.1,.3),Word(@"is",.4,.5),Word(@"stuff",.6,.9),Word(@"in",1.0,1.1),Word(@"cooking?",1.2,1.6)];
         Receive(stockFix,misheardStock,1.8,YES);

@@ -1,4 +1,4 @@
-SA Cook Assistant — Windows Preview 5.54
+SA Cook Assistant — Windows Preview 5.55
 
 Yeu cau: Windows 10/11 64-bit, Internet va OpenAI API key dang hoat dong.
 

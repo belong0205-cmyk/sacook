@@ -3,12 +3,19 @@ set -eu
 
 # Block real API tokens while allowing harmless placeholders such as sk-proj-….
 pattern='sk-(proj|ant-api)[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}'
-if git grep --cached -n -I -E "$pattern" -- . >/tmp/sa-cook-secret-scan.$$ 2>/dev/null; then
-  echo "Commit blocked: a possible API key/token is staged:" >&2
-  sed -n '1,12p' /tmp/sa-cook-secret-scan.$$ >&2
-  rm -f /tmp/sa-cook-secret-scan.$$
-  echo "Remove the secret and store it in the app/Keychain instead." >&2
-  exit 1
+# Unchanged blobs were checked when committed. Read only added/modified blobs
+# so a source commit does not hydrate the entire study archive from File Provider.
+# Print filenames only: never expose a matching credential in terminal output.
+files=()
+while IFS= read -r -d '' file; do files+=("$file"); done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+if (( ${#files} )); then
+  result=0
+  git -c grep.threads=1 grep --cached -l -I -E "$pattern" -- "${files[@]}" || result=$?
+  if (( result == 0 )); then
+    echo "Commit blocked: possible API key/token in the staged files above. Store it in Keychain instead." >&2
+    exit 1
+  elif (( result != 1 )); then
+    echo "Commit blocked: secret scan could not complete." >&2
+    exit "$result"
+  fi
 fi
-rm -f /tmp/sa-cook-secret-scan.$$
-

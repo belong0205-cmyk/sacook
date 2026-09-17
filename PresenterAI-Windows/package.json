@@ -1,14 +1,14 @@
 {
   "name": "sa-cook-assistant-windows",
-  "version": "5.54.0",
+  "version": "5.55.0",
   "description": "SA Cook Assistant Windows Preview",
   "main": "main.js",
   "author": "SA Cook",
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/b1-policy.test.js && node tests/turn-policy.test.js && node tests/recognition-pipeline.test.js && node tests/update-source.test.js && node --check main.js && node --check preload.js && node --check b1-policy.js && node --check turn-policy.js && node --check app.js",
-    "package:win": "electron-packager . \"SA Cook Assistant\" --platform=win32 --arch=x64 --out=dist --overwrite --asar --prune=true --app-version=5.54.0 --ignore=\"^/(dist|stage|\\.cache|\\.home)($|/)\"",
+    "test": "node tests/b1-policy.test.js && node tests/turn-policy.test.js && node tests/recognition-pipeline.test.js && node tests/auto-runtime.test.js && node tests/update-source.test.js && node --check main.js && node --check preload.js && node --check b1-policy.js && node --check turn-policy.js && node --check app.js",
+    "package:win": "electron-packager . \"SA Cook Assistant\" --platform=win32 --arch=x64 --out=dist --overwrite --asar --prune=true --app-version=5.55.0 --ignore=\"^/(dist|stage|\\.cache|\\.home)($|/)\"",
     "package:win:x64": "pnpm run package:win"
   },
   "devDependencies": {

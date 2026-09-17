@@ -144,9 +144,8 @@ function appendPending(lane, piece) {
 
 function isLikelyCompleteQuestion(text) {
   const clean = cleanSpeech(text);
-  if (!looksLikeQuestion(clean) || wordCount(clean) < 4) return false;
-  if (/\b(?:yes|yeah|i|we)\s+(?:use|have|keep|make|prepare|cook|clean|store|check|follow|do|can|will|would)\b/i.test(clean)) return false;
-  if (/[?!.]$/.test(clean)) return true;
+  if (!looksLikeQuestion(clean) || wordCount(clean) < 3) return false;
+  if (looksLikeAnswerStart(clean)) return false;
   return !/\b(?:a|an|the|of|for|to|with|between|and|or|in|on|from|by|your|their|my|our|than|such|as|whether|how|what|which|is|are|do|does|can|could|would|should)$/i.test(clean);
 }
 
@@ -328,7 +327,7 @@ async function transcribeBlob(blob, kind, fast = false) {
     const form = new FormData();
     form.append('file', blob, blob.type.includes('wav') ? 'question.wav' : 'question.webm');
     form.append('model', model);
-    form.append('language', 'en');
+    form.append(model === 'gpt-transcribe' ? 'languages[]' : 'language', 'en');
     form.append('prompt', transcriptionPrompt(kind));
     if (model === 'gpt-transcribe') {
       const priority = ['grill', 'grilled', 'stock', 'mise en place', 'à la carte', 'roux', 'béchamel', 'velouté', 'hollandaise', 'béarnaise', 'mirepoix', 'julienne', 'brunoise', 'sous-vide', 'bain-marie', 'HACCP', 'FIFO', 'sanitising', 'cross-contamination', "chef's knife"];
@@ -478,10 +477,10 @@ function submitQuestion(kind, question) {
 
 function handleAutoPiece(piece, reason) {
   if (!$('autoEnabled').checked) return;
-  if (autoFlushTimer) { clearTimeout(autoFlushTimer); autoFlushTimer = null; }
   const lane = lanes.auto;
   const clean = cleanSpeech(piece);
   if (!clean) return;
+  if (autoFlushTimer) { clearTimeout(autoFlushTimer); autoFlushTimer = null; }
   let pending = '';
   if (!lane.pending) {
     const candidate = extractQuestionCandidate(clean);
@@ -517,7 +516,8 @@ function finishAutoTurn() {
   const pending = cleanSpeech(lane.pending);
   lane.pending = '';
   lane.pendingPieces = 0;
-  if (!pending || !looksLikeQuestion(pending) || wordCount(pending) < 3) {
+  if (!isLikelyCompleteQuestion(pending)) {
+    lane.pending = pending; // Keep incomplete tails for the next audio chunk.
     setLaneLive('auto', 'Đang nghe câu hỏi tiếp theo…');
     return;
   }
@@ -530,9 +530,12 @@ function submitAutoTurn(turn) {
 
 function scheduleAutoTurnFinish(delay = AUTO_TURN_GRACE_MS) {
   if (autoFlushTimer) clearTimeout(autoFlushTimer);
+  const generation = sessionId;
   autoFlushTimer = setTimeout(() => {
     autoFlushTimer = null;
+    if (generation !== sessionId || !$('autoEnabled').checked) return;
     if (!lanes.auto.transcribing && !lanes.auto.queue.length) finishAutoTurn();
+    else scheduleAutoTurnFinish(AUTO_TURN_GRACE_MS);
   }, delay);
 }
 
@@ -585,7 +588,9 @@ async function drainTranscriptionQueue(kind) {
     }
   }
   lane.transcribing = false;
-  if (kind === 'auto' && autoTurnEnded && !lane.queue.length) scheduleAutoTurnFinish();
+  if (kind === 'auto' && !lane.queue.length && isLikelyCompleteQuestion(lane.pending)) {
+    scheduleAutoTurnFinish(autoTurnEnded ? AUTO_TURN_GRACE_MS : AUTO_INTERVAL_GRACE_MS);
+  }
 }
 
 function pruneSegments() {
@@ -966,8 +971,6 @@ $('autoEnabled').onchange = () => {
 };
 $('retryAuto').onclick = () => retryLane('auto');
 $('retryManual').onclick = () => retryLane('manual');
-$('copyAuto').onclick = () => copyLane('auto');
-$('copyManual').onclick = () => copyLane('manual');
 $('clearAuto').onclick = () => clearLane('auto');
 $('clearManual').onclick = () => clearLane('manual');
 $('clearAll').onclick = () => { clearLane('auto'); clearLane('manual'); setStatus(recording ? 'Đang nghe…' : 'Sẵn sàng'); };

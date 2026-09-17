@@ -86,7 +86,7 @@ static void CheckText(NSTextView *view, CGFloat fontSize, NSString *question, NS
     Check([view.string hasPrefix:[question stringByAppendingString:@"\n"]] && [view.string containsString:@"\nLISTENING  •  "],@"Latest answer and live transcript share one continuous conversation surface without a heading");
     Check([view.string rangeOfString:@"CURRENT\n"].location==NSNotFound && [view.string rangeOfString:@"\nPREVIOUS\n"].location==NSNotFound,@"Conversation omits the CURRENT and PREVIOUS labels");
     Check([view.string rangeOfString:@"\nTHEM\n"].location==NSNotFound && [view.string rangeOfString:@"\nME\n"].location==NSNotFound,@"Question and answer use colour instead of THEM and ME rows");
-    Check(!view.editable && view.selectable,@"Reading content is read-only and can still be selected or copied");
+    Check(!view.editable && !view.selectable,@"Reading content does not enter text selection mode");
     NSRange answerRange=[view.string rangeOfString:answer];
     NSFont *font=answerRange.location!=NSNotFound?[view.textStorage attribute:NSFontAttributeName atIndex:answerRange.location effectiveRange:NULL]:nil;
     NSParagraphStyle *answerParagraph=answerRange.location!=NSNotFound?[view.textStorage attribute:NSParagraphStyleAttributeName atIndex:answerRange.location effectiveRange:NULL]:nil;
@@ -126,13 +126,13 @@ int main(int argc,const char *argv[]) {
         Check(app.listenButton.superview==dock && app.deviceButton.superview==dock && app.autoButton.superview==dock && app.commitButton.superview==dock,@"Listening, source, AUTO, and SPACE controls all live in the bottom dock");
         Check(app.status.superview==dock && app.levelLabel.superview==dock && app.moreButton.superview==dock,@"Status and one compact secondary-actions menu live in the bottom dock");
         Check(dock.subviews.count==7,@"Bottom dock exposes only four primary controls, two compact states, and one overflow menu");
-        for(NSString *selectorName in @[@"copyAutoConversation:",@"copyManualConversation:",@"retryAutoAnswer:",@"retryManualAnswer:",@"clearAutoHistory:",@"clearManualHistory:",@"checkForUpdates:",@"configureAI:",@"changeReadingFont:",@"changeBackdropStrength:"])
+        for(NSString *selectorName in @[@"retryAutoAnswer:",@"retryManualAnswer:",@"clearAutoHistory:",@"clearManualHistory:",@"checkForUpdates:",@"configureAI:",@"changeReadingFont:",@"changeBackdropStrength:"])
             Check(MenuHasAction(app.moreButton.menu,NSSelectorFromString(selectorName)),[NSString stringWithFormat:@"Secondary menu exposes %@",selectorName]);
         Check(app.backdropMenuItems.count==3 && app.backdropStrength==1,@"Background menu offers three levels and starts at the balanced level");
         for(NSUInteger i=0;i<app.backdropMenuItems.count;i++) Check(app.backdropMenuItems[i].tag==(NSInteger)i && app.backdropMenuItems[i].state==(i==1?NSControlStateValueOn:NSControlStateValueOff),@"Exactly the balanced background item starts checked");
         for(NSTextView *conversation in @[app.autoAnswerView,app.currentAnswerView]) {
-            Check(conversation.selectable && !conversation.editable,@"Conversation text can be selected without being edited");
-            Check(MenuHasAction(conversation.menu,@selector(copy:)) && MenuHasAction(conversation.menu,@selector(selectAll:)),@"Conversation right-click menu exposes Copy and Select All");
+            Check(!conversation.selectable && !conversation.editable,@"Conversation never enters text selection mode");
+            Check(!MenuHasAction(conversation.menu,@selector(copy:)) && !MenuHasAction(conversation.menu,@selector(selectAll:)),@"Conversation has no selection context menu");
         }
         BOOL globalCopy=NO,globalSelectAll=NO;
         for(NSMenuItem *rootItem in NSApp.mainMenu.itemArray) for(NSMenuItem *item in rootItem.submenu.itemArray) {

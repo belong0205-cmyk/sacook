@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT="${0:A:h}"
 OUTPUT="$ROOT/../outputs"
 VERSION="$(node -p "require('$ROOT/package.json').version")"
-export HOME="$ROOT/.home"
 export ELECTRON_CACHE="$ROOT/.home/Library/Caches/electron"
 
 APP="$ROOT/dist/SA Cook Assistant-win32-x64"
@@ -19,6 +18,7 @@ mkdir -p "$APP"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/sa-cook-win.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
 node "$ROOT/tests/b1-policy.test.js"
+node "$ROOT/tests/auto-runtime.test.js"
 node --check "$ROOT/main.js"
 node --check "$ROOT/preload.js"
 node --check "$ROOT/b1-policy.js"
