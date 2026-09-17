@@ -12,7 +12,9 @@ for (const leadIn of ['all right', 'let me ask', "i(?:'d| would) like to", "i(?:
 assert(source.includes('const SILENCE_MS = 900'), 'AUTO must close a finished question quickly without waiting too long');
 assert(source.includes('const AUTO_SEGMENT_MS = 2500'), 'AUTO must transcribe shorter rolling chunks so questions are not delayed by later speech');
 assert(source.includes('AUTO_TURN_GRACE_MS'), 'AUTO must wait briefly for connected fragments after silence');
-assert(source.includes("reason === 'silence' && isLikelyCompleteQuestion(pending)"), 'AUTO must only submit after a silence-ended turn to avoid treating short answers as questions');
+assert(source.includes('AUTO_INTERVAL_GRACE_MS'), 'AUTO must have a bounded endpoint when BlackHole background audio never becomes silent');
+assert(source.includes("reason === 'silence' ? AUTO_TURN_GRACE_MS : AUTO_INTERVAL_GRACE_MS"), 'AUTO must close complete interval questions more cautiously than silence-ended questions');
+assert(source.includes('looksLikeAnswerStart(clean)'), 'AUTO must close the pending question instead of appending the following answer');
 assert(source.includes("if (job.reason === 'silence') autoTurnEnded = true"), 'AUTO must wait for the complete silence-ended transcription queue');
 assert(source.includes("finishAutoTurn()"), 'AUTO must submit after the detected turn closes');
 assert(source.includes('submitAutoTurn(pending)'), 'AUTO must classify a full turn before creating answer records');

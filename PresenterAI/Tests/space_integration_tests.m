@@ -114,12 +114,11 @@ int main(void) {
         Receive(enhancedFast,complete,10,YES);
         NSArray *quickReady=[enhancedFast.autoDetector tickWithAudioTime:enhancedFast.audioTime now:NSProcessInfo.processInfo.systemUptime+1];
         [enhancedFast consumeAutoCandidates:quickReady];
-        enhancedFast.autoTurnChangedAt=NSProcessInfo.processInfo.systemUptime-1;
+        enhancedFast.autoTurnChangedAt=NSProcessInfo.processInfo.systemUptime-0.20;
         [enhancedFast flushAutoQuestionTurnIfReadyAt:NSProcessInfo.processInfo.systemUptime force:NO];
-        Check(enhancedFast.autoCandidates.count==0,@"Enhanced AUTO must not submit while audio is still active");
-        enhancedFast.lastVoiceAudioTime=8.9;
-        [enhancedFast flushAutoQuestionTurnIfReadyAt:NSProcessInfo.processInfo.systemUptime force:NO];
-        Equal(enhancedFast.autoCandidates.firstObject,first,@"Enhanced AUTO submits detector-ready questions after a short silence without waiting for transcription"); CleanUp(enhancedFast);
+        Check(enhancedFast.autoCandidates.count==0,@"Enhanced AUTO keeps a revision window while audio is still active");
+        [enhancedFast flushAutoQuestionTurnIfReadyAt:NSProcessInfo.processInfo.systemUptime+1 force:NO];
+        Equal(enhancedFast.autoCandidates.firstObject,first,@"Enhanced AUTO submits a stable detector-ready question even when BlackHole background audio never becomes silent"); CleanUp(enhancedFast);
 
         IndependentSpeechTestApp *rapid=[IndependentSpeechTestApp new];
         NSArray *fifo=@[Word(@"What",.1,.3),Word(@"is",.4,.5),Word(@"FIFO?",.6,.9)];

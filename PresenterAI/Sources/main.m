@@ -18,6 +18,22 @@
 static const NSTimeInterval SCAutoUtteranceSilence = 0.72;
 static const NSTimeInterval SCAutoTurnSilence = 0.82;
 static const NSTimeInterval SCAutoTurnSettle = 0.06;
+// BlackHole often carries room tone, music, or the beginning of an answer, so
+// acoustic silence is not a reliable endpoint by itself. A detector-approved
+// question may close after remaining unchanged for this bounded interval.
+static const NSTimeInterval SCAutoStableEndpoint = 0.68;
+
+@interface SCArrowTextView : NSTextView
+@end
+@implementation SCArrowTextView
+- (void)resetCursorRects {
+    [self addCursorRect:self.bounds cursor:NSCursor.arrowCursor];
+}
+- (void)mouseMoved:(NSEvent *)event {
+    [NSCursor.arrowCursor set];
+    [super mouseMoved:event];
+}
+@end
 
 @interface AppDelegate : NSObject <NSApplicationDelegate>
 @property NSWindow *window;
@@ -424,7 +440,7 @@ static const NSTimeInterval SCAutoTurnSettle = 0.06;
     // text view painted the same black tint, making each lane look heavy.
     scroll.drawsBackground=NO; scroll.backgroundColor=NSColor.clearColor;
     scroll.contentView.drawsBackground=NO; scroll.contentView.backgroundColor=NSColor.clearColor;
-    NSTextView *text=[[NSTextView alloc] initWithFrame:NSMakeRect(0,0,400,100)];
+    NSTextView *text=[[SCArrowTextView alloc] initWithFrame:NSMakeRect(0,0,400,100)];
     text.editable=editable; text.selectable=YES; text.richText=NO;
     text.automaticLinkDetectionEnabled=YES;
     text.verticallyResizable=YES; text.horizontallyResizable=NO;
@@ -1079,6 +1095,7 @@ static const NSTimeInterval SCAutoTurnSettle = 0.06;
 }
 - (void)stageAutoQuestionTurnText:(NSString *)text {
     if(!self.autoTurnParts) self.autoTurnParts=[NSMutableArray array];
+    BOOL changed=NO;
     for(NSString *raw in [text ?: @"" componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
       NSString *part=[self primaryQuestionFromText:raw];
       if(!part.length) continue;
@@ -1094,15 +1111,15 @@ static const NSTimeInterval SCAutoTurnSettle = 0.06;
         NSUInteger shorter=MIN(terms.count,existingTerms.count);
         BOOL extension=[normal containsString:existingNormal] || [existingNormal containsString:normal];
         if((common>=2 && shorter && (double)common/(double)shorter>=0.80) || extension) {
-          if(part.length>existing.length) self.autoTurnParts[index]=part;
+          if(part.length>existing.length) { self.autoTurnParts[index]=part; changed=YES; }
           merged=YES; break;
         }
       }
-      if(!merged) [self.autoTurnParts addObject:part];
+      if(!merged) { [self.autoTurnParts addObject:part]; changed=YES; }
     }
     if(self.autoTurnParts.count>8) [self.autoTurnParts removeObjectsInRange:NSMakeRange(0,self.autoTurnParts.count-8)];
     if(self.autoTurnParts.count) {
-      self.autoTurnChangedAt=NSProcessInfo.processInfo.systemUptime;
+      if(changed || self.autoTurnChangedAt<=0) self.autoTurnChangedAt=NSProcessInfo.processInfo.systemUptime;
       self.autoLiveLabel.stringValue=self.autoTurnParts.count>1?[NSString stringWithFormat:@"AUTO • Đang nối %lu phần của cùng lượt nói",(unsigned long)self.autoTurnParts.count]:@"AUTO • Đang chờ hết lượt nói";
     }
 }
@@ -1111,7 +1128,9 @@ static const NSTimeInterval SCAutoTurnSettle = 0.06;
     NSTimeInterval quietFor=MAX(0,self.audioTime-self.lastVoiceAudioTime);
     NSTimeInterval settledFor=MAX(0,now-self.autoTurnChangedAt);
     if(!force) {
-      if(quietFor<SCAutoTurnSilence || settledFor<SCAutoTurnSettle) return;
+      BOOL silenceEndpoint=quietFor>=SCAutoTurnSilence && settledFor>=SCAutoTurnSettle;
+      BOOL stableTranscriptEndpoint=settledFor>=SCAutoStableEndpoint;
+      if(!silenceEndpoint && !stableTranscriptEndpoint) return;
     }
     NSString *combined=[self.autoTurnParts componentsJoinedByString:@"\n"];
     [self.autoTurnParts removeAllObjects]; self.autoTurnChangedAt=0;

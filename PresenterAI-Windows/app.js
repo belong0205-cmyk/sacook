@@ -3,7 +3,8 @@ const $ = id => document.getElementById(id);
 const AUTO_SEGMENT_MS = 2500;
 const SPACE_TAIL_MS = 80;
 const SILENCE_MS = 900;
-const AUTO_TURN_GRACE_MS = 60;
+const AUTO_TURN_GRACE_MS = 80;
+const AUTO_INTERVAL_GRACE_MS = 520;
 const MAX_SAVED_SEGMENTS = 30;
 const MAX_SPACE_SECONDS = 90;
 const stopWords = new Set('what when where which would could should please your you about tell have with that this from they them think important does into are the and for um uh ah yeah okay'.split(' '));
@@ -147,6 +148,10 @@ function isLikelyCompleteQuestion(text) {
   if (/\b(?:yes|yeah|i|we)\s+(?:use|have|keep|make|prepare|cook|clean|store|check|follow|do|can|will|would)\b/i.test(clean)) return false;
   if (/[?!.]$/.test(clean)) return true;
   return !/\b(?:a|an|the|of|for|to|with|between|and|or|in|on|from|by|your|their|my|our|than|such|as|whether|how|what|which|is|are|do|does|can|could|would|should)$/i.test(clean);
+}
+
+function looksLikeAnswerStart(text) {
+  return /^(?:yes|yeah|correct|sure|okay[, ]+)?\s*(?:i|we)\s+(?:use|have|keep|make|prepare|cook|clean|store|check|follow|ensure|maintain|work|would|will|can|do)\b/i.test(cleanSpeech(text));
 }
 
 function editDistance(a, b) {
@@ -484,10 +489,26 @@ function handleAutoPiece(piece, reason) {
     lane.pending = candidate;
     lane.pendingPieces = 1;
     pending = candidate;
-  } else pending = appendPending(lane, clean);
+  } else {
+    // A following answer must not be appended to an already complete question.
+    // This also closes AUTO when BlackHole never reaches absolute silence.
+    if (isLikelyCompleteQuestion(lane.pending) && looksLikeAnswerStart(clean)) {
+      const completed = lane.pending;
+      lane.pending = '';
+      lane.pendingPieces = 0;
+      submitAutoTurn(completed);
+      return;
+    }
+    pending = appendPending(lane, clean);
+  }
   if (!pending) return;
   setLaneLive('auto', `Đang nghe: ${pending}`);
-  if (reason === 'silence' && isLikelyCompleteQuestion(pending)) scheduleAutoTurnFinish();
+  if (isLikelyCompleteQuestion(pending)) {
+    // Silence is fastest. Interval chunks still close a stable question after
+    // a short revision window, which prevents continuous background audio from
+    // leaving AUTO stuck forever.
+    scheduleAutoTurnFinish(reason === 'silence' ? AUTO_TURN_GRACE_MS : AUTO_INTERVAL_GRACE_MS);
+  }
 }
 
 function finishAutoTurn() {
@@ -507,12 +528,12 @@ function submitAutoTurn(turn) {
   submitQuestion('auto', turn);
 }
 
-function scheduleAutoTurnFinish() {
+function scheduleAutoTurnFinish(delay = AUTO_TURN_GRACE_MS) {
   if (autoFlushTimer) clearTimeout(autoFlushTimer);
   autoFlushTimer = setTimeout(() => {
     autoFlushTimer = null;
     if (!lanes.auto.transcribing && !lanes.auto.queue.length) finishAutoTurn();
-  }, AUTO_TURN_GRACE_MS);
+  }, delay);
 }
 
 function enqueueTranscription(kind, segments, reason = 'interval', generation = sessionId) {
