@@ -1,0 +1,14 @@
+#!/bin/zsh
+set -eu
+
+# Block real API tokens while allowing harmless placeholders such as sk-proj-….
+pattern='sk-(proj|ant-api)[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}'
+if git grep --cached -n -I -E "$pattern" -- . >/tmp/sa-cook-secret-scan.$$ 2>/dev/null; then
+  echo "Commit blocked: a possible API key/token is staged:" >&2
+  sed -n '1,12p' /tmp/sa-cook-secret-scan.$$ >&2
+  rm -f /tmp/sa-cook-secret-scan.$$
+  echo "Remove the secret and store it in the app/Keychain instead." >&2
+  exit 1
+fi
+rm -f /tmp/sa-cook-secret-scan.$$
+
