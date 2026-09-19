@@ -10,6 +10,7 @@ clang -fobjc-arc -framework Cocoa -framework AVFoundation -framework Speech -fra
   -mmacosx-version-min=13.0 "$ROOT/Sources/main.m" "$ROOT/Sources/SCSpeechTimeline.m" "$ROOT/Sources/SCAutoQuestionDetector.m" "$ROOT/Sources/SCAnswerLane.m" "$ROOT/Sources/SCUntimedTranscriptBuffer.m" "$ROOT/Sources/SCAudioUtteranceBuffer.m" -o "$ROOT/build/PresenterAI"
 cp "$ROOT/build/PresenterAI" "$APP/Contents/MacOS/PresenterAI"
 cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
+cp "$ROOT/Scripts/install-update.sh" "$APP/Contents/Resources/install-update.sh"
 cp "$ROOT/Data/internet-qa.json" "$APP/Contents/Resources/internet-qa.json"
 cp "$ROOT/Data/speech-hints.txt" "$APP/Contents/Resources/speech-hints.txt"
 for shared_resource in answer-policy.txt feature-manifest.json ui-tokens.json; do

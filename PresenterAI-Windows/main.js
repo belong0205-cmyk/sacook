@@ -1,4 +1,4 @@
-const { app, BrowserWindow, clipboard, ipcMain, desktopCapturer, session, safeStorage, net } = require('electron');
+const { app, BrowserWindow, clipboard, ipcMain, desktopCapturer, session, safeStorage, net, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const { Readable, Transform } = require('stream');
 const { pipeline } = require('stream/promises');
 const { fileURLToPath } = require('url');
+const { sanitizeProfile } = require('./presenter-profile');
 
 const KEY_FILE = '.openai-key.v2';
 const PORTABLE_DIR_NAME = 'SA Cook Assistant-win32-x64';
@@ -133,7 +134,13 @@ function isPortableRoot(targetDir, requireMarker = true) {
   if (!app.isPackaged || process.platform !== 'win32') return false;
   const resolved = path.resolve(targetDir);
   if (resolved.startsWith('\\\\') || path.parse(resolved).root === resolved) return false;
-  if (path.basename(resolved) !== PORTABLE_DIR_NAME || path.basename(process.execPath) !== PORTABLE_EXE_NAME) return false;
+  if (path.basename(process.execPath) !== PORTABLE_EXE_NAME) return false;
+  // Only bootstrap a marker in the known package folder. A renamed package
+  // remains updateable if it already carries our exact portable-root marker.
+  if (path.basename(resolved) !== PORTABLE_DIR_NAME) {
+    try { if (fs.readFileSync(path.join(resolved, PORTABLE_MARKER), 'utf8') !== PORTABLE_MARKER_VALUE) return false; }
+    catch (_) { return false; }
+  }
   if (!fs.existsSync(path.join(resolved, 'resources', 'app.asar'))) return false;
   if (!requireMarker) return true;
   try { return fs.readFileSync(path.join(resolved, PORTABLE_MARKER), 'utf8') === PORTABLE_MARKER_VALUE; }
@@ -168,7 +175,7 @@ async function expectedAssetDigest(release, asset) {
   const sidecar = (release.assets || []).find(item => item && sidecarNames.has(String(item.name || '')) && isTrustedDownloadUrl(item.browser_download_url));
   if (!sidecar || Number(sidecar.size || 0) > 64 * 1024) throw new Error('Bản cập nhật chưa có mã SHA-256 để xác minh an toàn.');
   const response = await fetchWithTimeout(sidecar.browser_download_url, { headers: githubHeaders() });
-  if (!response.ok || !isTrustedDownloadUrl(response.url)) throw new Error('Không tải được mã xác minh của bản cập nhật.');
+  if (!response.ok || (response.url && !isTrustedDownloadUrl(response.url))) throw new Error('Không tải được mã xác minh của bản cập nhật.');
   const match = (await response.text()).match(/\b([a-f0-9]{64})\b/i);
   if (!match) throw new Error('Mã xác minh SHA-256 không hợp lệ.');
   return match[1].toLowerCase();
@@ -203,8 +210,12 @@ async function downloadVerifiedUpdate(sender, release, asset) {
     }
   });
   try {
-    const response = await net.fetch(asset.browser_download_url, { headers: githubHeaders(), signal: controller.signal, redirect: 'follow' });
-    if (!response.ok || !isTrustedDownloadUrl(response.url)) throw new Error(`Không tải được bản cập nhật (HTTP ${response.status}).`);
+    if (!isTrustedDownloadUrl(asset.browser_download_url)) throw new Error('Địa chỉ tải bản cập nhật không được tin cậy.');
+    const response = await net.fetch(asset.browser_download_url, { headers: { ...githubHeaders(), Accept: 'application/octet-stream' }, signal: controller.signal, redirect: 'follow' });
+    if (!response.ok) throw new Error(`Máy chủ từ chối tải bản cập nhật (HTTP ${response.status}).`);
+    // Some Electron responses omit url even with HTTP 200. The requested URL
+    // is validated above and the exact release SHA-256 is mandatory below.
+    if (response.url && !isTrustedDownloadUrl(response.url)) throw new Error('Bản cập nhật chuyển hướng đến máy chủ không được tin cậy.');
     if (response.body) {
       await pipeline(Readable.fromWeb(response.body), meter, fs.createWriteStream(zipPath, { flags: 'wx', mode: 0o600 }));
     } else {
@@ -230,6 +241,7 @@ function updaterPowerShell() {
   [Parameter(Mandatory=$true)][int]$ProcessId,
   [Parameter(Mandatory=$true)][string]$ZipPath,
   [Parameter(Mandatory=$true)][string]$TargetDir,
+  [Parameter(Mandatory=$true)][string]$OriginalDir,
   [Parameter(Mandatory=$true)][string]$ExeName,
   [Parameter(Mandatory=$true)][string]$PortableDirName,
   [Parameter(Mandatory=$true)][string]$StageDir,
@@ -256,7 +268,7 @@ try {
   $payloadAsar = Join-Path $payloadDir 'resources\app.asar'
   if (-not (Test-Path -LiteralPath $payloadDir -PathType Container) -or -not (Test-Path -LiteralPath $payloadExe -PathType Leaf) -or -not (Test-Path -LiteralPath $payloadAsar -PathType Leaf)) { throw 'Updated portable package structure is invalid.' }
   if (Test-Path -LiteralPath $BackupDir) { Remove-Item -LiteralPath $BackupDir -Recurse -Force }
-  Invoke-WithRetry { Rename-Item -LiteralPath $TargetDir -NewName ([IO.Path]::GetFileName($BackupDir)) }
+  if (Test-Path -LiteralPath $TargetDir) { Invoke-WithRetry { Rename-Item -LiteralPath $TargetDir -NewName ([IO.Path]::GetFileName($BackupDir)) } }
   try {
     Move-Item -LiteralPath $payloadDir -Destination $TargetDir
     $newExe = Join-Path $TargetDir $ExeName
@@ -277,7 +289,7 @@ try {
   }
 } catch {
   $_ | Out-File -FilePath ($ZipPath + '.error.log') -Encoding utf8
-  $oldExe = Join-Path $TargetDir $ExeName
+  $oldExe = Join-Path $OriginalDir $ExeName
   if (Test-Path -LiteralPath $oldExe) { Start-Process -FilePath $oldExe -WorkingDirectory $TargetDir }
   exit 1
 }`;
@@ -285,15 +297,26 @@ try {
 
 async function launchPortableUpdater(download) {
   if (!app.isPackaged || process.platform !== 'win32') throw new Error('Update trực tiếp chỉ hoạt động trong bản Windows đã đóng gói.');
-  const targetDir = path.dirname(process.execPath);
+  const originalDir = path.dirname(process.execPath);
+  let targetDir = originalDir;
   if (!isPortableRoot(targetDir, true)) throw new Error(`Hãy giữ ứng dụng trong thư mục “${PORTABLE_DIR_NAME}” rồi thử Update lại.`);
-  const parentDir = path.dirname(targetDir);
   const suffix = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  const probeParent = async dir => {
+    const probe = path.join(dir, `.sa-cook-write-test-${suffix}`);
+    await fs.promises.writeFile(probe, 'ok', { flag: 'wx' });
+    await fs.promises.unlink(probe);
+  };
+  try { await probeParent(path.dirname(targetDir)); }
+  catch (_) {
+    const localRoot = path.join(app.getPath('appData'), 'SA Cook Assistant Install');
+    await fs.promises.mkdir(localRoot, { recursive: true });
+    targetDir = path.join(localRoot, PORTABLE_DIR_NAME);
+    if (fs.existsSync(targetDir) && !isPortableRoot(targetDir, true)) throw new Error('Thư mục cài riêng đã có dữ liệu khác; ứng dụng không ghi đè.');
+    await probeParent(localRoot);
+  }
+  const parentDir = path.dirname(targetDir);
   const stageDir = path.join(parentDir, `.sa-cook-stage-${suffix}`);
   const backupDir = path.join(parentDir, `.sa-cook-backup-${suffix}`);
-  const writeProbe = path.join(parentDir, `.sa-cook-write-test-${suffix}`);
-  await fs.promises.writeFile(writeProbe, 'ok', { flag: 'wx' });
-  await fs.promises.unlink(writeProbe);
   const scriptPath = path.join(download.updateDir, 'install-update.ps1');
   const healthPath = path.join(download.updateDir, 'ready');
   await fs.promises.writeFile(scriptPath, updaterPowerShell(), { encoding: 'utf8', mode: 0o600 });
@@ -306,6 +329,7 @@ async function launchPortableUpdater(download) {
     '-ProcessId', String(process.pid),
     '-ZipPath', download.zipPath,
     '-TargetDir', targetDir,
+    '-OriginalDir', originalDir,
     '-ExeName', path.basename(process.execPath),
     '-PortableDirName', PORTABLE_DIR_NAME,
     '-StageDir', stageDir,
@@ -329,7 +353,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1120, height: 700, minWidth: 780, minHeight: 480,
     transparent: true, frame: false, alwaysOnTop: true, hasShadow: true,
-    backgroundColor: '#00000000', title: 'SA Cook Assistant — Windows Preview 5.47', autoHideMenuBar: true,
+    backgroundColor: '#00000000', title: `SA Cook Assistant — Windows Preview ${app.getVersion()}`, autoHideMenuBar: true,
     skipTaskbar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, allowRunningInsecureContent: false, backgroundThrottling: false }
   });
@@ -461,8 +485,24 @@ ipcMain.handle('update:run', async event => {
     return { status: 'installing', version: candidate.release.tag_name };
   } catch (error) {
     sendUpdateStatus(sender, { phase: 'error', message: String(error && error.message || error) });
+    dialog.showErrorBox('Không thể cập nhật SA Cook', String(error && error.message || error));
     throw error;
   } finally {
     updateInProgress = false;
   }
+});
+
+ipcMain.handle('profile:get', event => {
+  if (!isTrustedIpc(event)) throw new Error('Yêu cầu hồ sơ không hợp lệ.');
+  try { return sanitizeProfile(JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'presenter-profile.json'), 'utf8'))); }
+  catch (error) { if (error.code === 'ENOENT') return sanitizeProfile({}); throw new Error('Không đọc được hồ sơ cá nhân. Dữ liệu cũ chưa bị thay đổi.'); }
+});
+ipcMain.handle('profile:set', (event, value) => {
+  if (!isTrustedIpc(event)) throw new Error('Yêu cầu hồ sơ không hợp lệ.');
+  const profile = sanitizeProfile(value);
+  const file = path.join(app.getPath('userData'), 'presenter-profile.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file + '.tmp', JSON.stringify(profile), { mode: 0o600 });
+  fs.renameSync(file + '.tmp', file);
+  return profile;
 });

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "featureVersion": "5.55.0",
+  "featureVersion": "5.56.0",
   "platforms": ["macOS", "Windows"],
   "answerPolicy": {
     "resource": "answer-policy.txt",
@@ -14,7 +14,9 @@
   "features": {
     "independentAutoAndSpace": true,
     "conversationContextPerLane": true,
-    "copyableConversation": true,
+    "copyableConversation": false,
+    "perInstallationPresenterProfile": true,
+    "linkedAutoTurnGrace": true,
     "compactTwoLaneOverlay": true,
     "threeBackdropLevels": true,
     "fontRange": [20, 40],

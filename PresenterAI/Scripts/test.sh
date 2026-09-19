@@ -17,10 +17,11 @@ for spec in 'SCAutoQuestionDetector:auto_detector_tests' 'SCAnswerLane:answer_la
   clang -fobjc-arc -framework Foundation -Wall -Wextra -Werror "$ROOT/Sources/$module.m" "$ROOT/Tests/$test.m" -o "$TEST_BUILD/$test"
   "$TEST_BUILD/$test"
 done
-for test in recognition_tests answer_queue_tests space_integration_tests; do
+for test in recognition_tests answer_queue_tests space_integration_tests profile_tests; do
   clang -fobjc-arc "${FRAMEWORKS[@]}" -mmacosx-version-min=13.0 "$ROOT/Tests/$test.m" "${SUPPORT[@]}" -o "$TEST_BUILD/$test"
   "$TEST_BUILD/$test" "$RESOURCES"
 done
 clang -fobjc-arc "${FRAMEWORKS[@]}" -mmacosx-version-min=13.0 "$ROOT/Tests/reading_ui_tests.m" "${SUPPORT[@]}" -o "$TEST_BUILD/reading_ui_tests"
 "$TEST_BUILD/reading_ui_tests" "$TEST_BUILD/reading-ui.png"
 python3 -m unittest discover -s "$ROOT/Tests" -p 'test_data_index.py' -v
+python3 -m unittest discover -s "$ROOT/Tests" -p 'test_update_helper.py' -v

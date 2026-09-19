@@ -9,6 +9,11 @@
 @end
 @implementation LaneTestText
 @end
+@interface LaneTestToggle : NSObject
+@property NSInteger state;
+@end
+@implementation LaneTestToggle
+@end
 
 @interface IndependentSpeechTestApp : AppDelegate
 @property NSMutableArray<NSString *> *committedQuestions;
@@ -117,8 +122,24 @@ int main(void) {
         enhancedFast.autoTurnChangedAt=NSProcessInfo.processInfo.systemUptime-0.20;
         [enhancedFast flushAutoQuestionTurnIfReadyAt:NSProcessInfo.processInfo.systemUptime force:NO];
         Check(enhancedFast.autoCandidates.count==0,@"Enhanced AUTO keeps a revision window while audio is still active");
-        [enhancedFast flushAutoQuestionTurnIfReadyAt:NSProcessInfo.processInfo.systemUptime+1 force:NO];
+        [enhancedFast flushAutoQuestionTurnIfReadyAt:NSProcessInfo.processInfo.systemUptime+1.5 force:NO];
         Equal(enhancedFast.autoCandidates.firstObject,first,@"Enhanced AUTO submits a stable detector-ready question even when BlackHole background audio never becomes silent"); CleanUp(enhancedFast);
+
+        IndependentSpeechTestApp *clarification=[IndependentSpeechTestApp new];
+        [clarification stageAutoQuestionTurnText:@"What are the ingredients?"];
+        NSTimeInterval turnStart=clarification.autoTurnChangedAt;
+        clarification.autoPendingChangedAt=turnStart+0.8;
+        [clarification flushAutoQuestionTurnIfReadyAt:turnStart+1.4 force:NO];
+        Check(clarification.autoCandidates.count==0,@"A new spoken fragment postpones the first candidate's endpoint");
+        [clarification stageAutoQuestionTurnText:@"In your Caesar dressing, what do you use?"];
+        clarification.autoTurnChangedAt=turnStart+1.1;
+        [clarification flushAutoQuestionTurnIfReadyAt:turnStart+2.5 force:NO];
+        Check(clarification.autoCandidates.count==1,@"Linked turn submits exactly once after its final fragment");
+        Check([clarification.autoCandidates.firstObject containsString:@"ingredients"] && [clarification.autoCandidates.firstObject containsString:@"Caesar dressing"],@"Final request retains initial question and later subject clarification");
+        [clarification stageAutoQuestionTurnText:@"What is the safe temperature for chicken?"];
+        [clarification stageAutoQuestionTurnText:@"What is the safe temperature for fish?"];
+        Check(clarification.autoTurnParts.count==2,@"Lexically similar questions must not erase a different subject");
+        CleanUp(clarification);
 
         IndependentSpeechTestApp *rapid=[IndependentSpeechTestApp new];
         NSArray *fifo=@[Word(@"What",.1,.3),Word(@"is",.4,.5),Word(@"FIFO?",.6,.9)];
@@ -207,6 +228,15 @@ int main(void) {
         Check(!staleJob.autoEnhancedUnavailable && staleJob.autoTranscriptionInFlight,@"Previous session callback cannot disable or unlock the new session");
         Equal(staleJob.autoDetector.pendingText,first,@"Previous session callback cannot erase live words");
         CleanUp(staleJob);
+
+        IndependentSpeechTestApp *lateCloud=[IndependentSpeechTestApp new];
+        LaneTestToggle *enabled=[LaneTestToggle new]; enabled.state=NSControlStateValueOn;
+        lateCloud.autoButton=(NSButton *)enabled; lateCloud.autoCommittedAudioTime=5;
+        [lateCloud finishEnhancedAutoTranscriptionJob:@{@"generation":@(lateCloud.recognitionGeneration),@"endAudioTime":@4} transcript:@"What is stock?" success:YES];
+        Check(lateCloud.autoTurnParts.count==0,@"Late cloud wording cannot reopen an already answered audio turn");
+        [lateCloud finishEnhancedAutoTranscriptionJob:@{@"generation":@(lateCloud.recognitionGeneration),@"endAudioTime":@8} transcript:@"What is FIFO?" success:YES];
+        Check(lateCloud.autoTurnParts.count==1,@"Cloud transcription for newer audio is still accepted");
+        CleanUp(lateCloud);
 
         IndependentSpeechTestApp *stockFix=[IndependentSpeechTestApp new];
         NSArray *misheardStock=@[Word(@"What",.1,.3),Word(@"is",.4,.5),Word(@"stuff",.6,.9),Word(@"in",1.0,1.1),Word(@"cooking?",1.2,1.6)];

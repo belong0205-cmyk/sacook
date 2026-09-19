@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.openai.com; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self'; img-src 'self' data:; media-src blob:">
-  <title>SA Cook Assistant — Windows Preview 5.55</title>
+  <title>SA Cook Assistant — Windows Preview 5.56</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-backdrop="1">
@@ -43,6 +43,7 @@
         <div class="menu-row"><span>Chữ</span><button id="fontDown" type="button" aria-label="Chữ nhỏ hơn">A−</button><output id="fontValue">20</output><button id="fontUp" type="button" aria-label="Chữ lớn hơn">A+</button></div>
         <div class="menu-row backdrop-row"><span>Nền</span><button type="button" data-backdrop-value="0">Nhẹ</button><button type="button" data-backdrop-value="1">Vừa</button><button type="button" data-backdrop-value="2">Đậm</button></div>
         <div class="menu-row menu-wide"><button id="clearAll" type="button">Xoá tất cả</button><button id="settings" type="button">API key…</button></div>
+        <div class="menu-row menu-wide"><button id="profileSettings" type="button">Hồ sơ &amp; menu riêng…</button></div>
         <div class="menu-row menu-wide"><button id="minimizeWindow" type="button">Thu nhỏ</button><button id="closeWindow" type="button">Đóng ứng dụng</button></div>
       </div>
     </details>
@@ -57,6 +58,19 @@
     </form>
   </dialog>
   <script src="turn-policy.js"></script>
+  <dialog id="profileDialog" aria-labelledby="profileTitle">
+    <form method="dialog">
+      <div class="dialog-heading"><div><h2 id="profileTitle">Hồ sơ riêng trên máy này</h2><p>Giữ nguyên khi Update, không đồng bộ sang máy khác. Nội dung được gửi cùng câu hỏi đến OpenAI để cá nhân hoá; không nhập mật khẩu hay API key ở đây.</p></div><button value="cancel" class="close-button">×</button></div>
+      <label class="key-label">Tên<input id="profileName" maxlength="200"></label>
+      <label class="key-label">Nhà hàng<input id="profileRestaurant" maxlength="300"></label>
+      <label class="key-label">Địa chỉ bạn muốn dùng trong câu trả lời<input id="profileAddress" maxlength="500"></label>
+      <label class="key-label">Menu — tên món, nguyên liệu, cách chế biến<textarea id="profileMenu" rows="5" maxlength="10000"></textarea></label>
+      <label class="key-label">Kinh nghiệm thực tế / ghi chú<textarea id="profileExperience" rows="3" maxlength="5000"></textarea></label>
+      <p id="profileStatus" class="key-status" aria-live="polite"></p>
+      <div class="dialog-actions"><button value="cancel">Huỷ</button><button id="saveProfile" type="button" class="primary">Lưu hồ sơ</button></div>
+    </form>
+  </dialog>
+  <script src="presenter-profile.js"></script>
   <script src="b1-policy.js"></script>
   <script src="app.js"></script>
 </body>

@@ -1,14 +1,15 @@
-SA Cook Assistant — Windows Preview 5.55
+SA Cook Assistant — Windows Preview 5.56
 
 Yeu cau: Windows 10/11 64-bit, Internet va OpenAI API key dang hoat dong.
 
-1. Giai nen TOAN BO file ZIP va giu nguyen ten thu muc "SA Cook Assistant-win32-x64".
+1. Giai nen TOAN BO file ZIP. Khong tach rieng file EXE khoi thu muc ung dung.
 2. Mo "SA Cook Assistant.exe" trong thu muc vua giai nen.
 3. Bam "AI key...", nhap key, roi bam "Luu & kiem tra".
 4. Chon "Am thanh he thong" de nghe video/cuoc goi, hoac "Microphone".
 5. Bam "Bat dau nghe". AUTO tu nhan dien; SPACE chi chot khi bam phim Space hoac nut "Chot cau".
 6. Dung nut A-/A+ va 3 muc do nen trong menu "..." de doc de hon.
 7. Bam "Update" de app tu tai, xac minh, thay ban moi va mo lai.
+8. Trong menu "...", mo "Ho so & menu rieng..." de nhap ten, nha hang, dia chi, menu va kinh nghiem. Du lieu luu rieng tren may nay va giu nguyen khi Update; noi dung duoc gui cho OpenAI de ca nhan hoa cau tra loi.
 
 Cau tra loi dung tieng Anh B2 tu nhien, gom ban ngan de noi ngay va ban day du hon.
 Tu chuyen nganh nau an va tu tieng Phap can thiet van duoc giu dung.
