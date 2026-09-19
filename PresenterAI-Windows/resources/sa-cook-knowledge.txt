@@ -79,9 +79,9 @@ GIẢI THÍCH: Liệt kê chi tiết các món ăn cụ thể (không chỉ nói
 
 CÂU HỎI EN: What culinary cuisine do you serve, how many guests do you serve, and how do you prepare during peak hours?
 CÂU HỎI VI: Bạn phục vụ ẩm thực gì, serve được bao nhiêu khách, bạn chuẩn bị như thế nào trong giờ cao điểm.
-TRẢ LỜI EN: 
+TRẢ LỜI EN: I mainly serve modern Australian and Asian-fusion cuisine, and on a busy night we serve around 150 to 200 guests. During peak hours I make sure all my mise en place is fully prepped beforehand, communicate clearly with my section and the pass, and prioritise dishes with the longest cooking time first to keep service running smoothly.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Câu hỏi này thường dùng để đánh giá kinh nghiệm thực tế: nên trả lời cụ thể bằng số liệu (loại ẩm thực, số khách) và mô tả chiến lược chuẩn bị cho giờ cao điểm để chứng minh khả năng quản lý áp lực thực tế.
 
 CÂU HỎI EN: How many maximum guests do you serve a day? How long does your customer wait to get the dish after they order?
 CÂU HỎI VI: 
@@ -338,57 +338,57 @@ GIẢI THÍCH: Hiểu biết về các mối nguy hại trong bếp có ba mục
 # CHỦ ĐỀ: Dịch vụ khách sạn trong môi trường đa văn hóa
 CÂU HỎI EN: Why is cultural awareness important to people working in the hospitality and tourism industries?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Cultural awareness helps staff communicate respectfully, avoid misunderstandings, and provide better service to guests and colleagues from different backgrounds, which is essential in Australia's multicultural hospitality industry.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Ngành hospitality ở Úc phục vụ khách và có đồng nghiệp từ rất nhiều nền văn hóa khác nhau, nên hiểu và tôn trọng sự khác biệt văn hóa giúp giao tiếp hiệu quả hơn và tránh xúc phạm không cố ý.
 
 CÂU HỎI EN: Identify four cultural factors that workers in the hospitality and tourism industries need to consider when dealing with customers or colleagues.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Language, religion, customs and traditions, and dietary requirements.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đây là bốn yếu tố văn hóa cơ bản cần lưu ý khi phục vụ khách hoặc làm việc với đồng nghiệp đa văn hóa trong ngành nhà hàng-khách sạn.
 
 CÂU HỎI EN: List three ways people may define their cultural identity.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: By their nationality, religion, and family or ethnic background.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Danh tính văn hóa của một người có thể được định hình bởi nhiều yếu tố khác nhau, không chỉ quốc tịch mà còn tôn giáo và nguồn gốc gia đình/dân tộc.
 
 CÂU HỎI EN: Why is it important to be sensitive to the needs and attitudes of different cultural groups?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Being sensitive helps avoid offending customers or colleagues, builds trust, and creates a welcoming environment where everyone feels respected and comfortable.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Sự nhạy cảm với nhu cầu văn hóa khác nhau giúp xây dựng lòng tin và tạo môi trường thân thiện, tránh gây hiểu lầm hoặc tổn thương không đáng có.
 
 CÂU HỎI EN: Give two ways you can communicate with colleagues or customers when language barriers may exist.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Use simple, clear language and speak slowly; use gestures, pictures, or a translation app to help get the message across.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Khi có rào cản ngôn ngữ, dùng ngôn ngữ đơn giản kết hợp cử chỉ hoặc công cụ hỗ trợ (hình ảnh, app dịch) là cách thực tế để vẫn giao tiếp hiệu quả.
 
 CÂU HỎI EN: What is meant by the term 'Stereotyping'?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Stereotyping means making a fixed, oversimplified assumption about a person or group based on their culture, race or background, rather than treating them as an individual.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Rập khuôn (stereotyping) là việc gán một đặc điểm chung cho cả một nhóm người mà không xét đến sự khác biệt cá nhân - đây là nguyên nhân phổ biến gây hiểu lầm và phân biệt đối xử trong công việc.
 
 CÂU HỎI EN: What are two things that can contribute to problems or misunderstandings with customers or colleagues from different cultural backgrounds?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Language barriers and differences in body language, customs or communication styles.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Ngoài rào cản ngôn ngữ, sự khác biệt về cách giao tiếp phi ngôn ngữ (ngôn ngữ cơ thể, phong tục) cũng dễ gây hiểu lầm giữa người từ các nền văn hóa khác nhau.
 
 CÂU HỎI EN: In what ways can problems or misunderstandings with customers or colleagues from different cultural backgrounds be avoided?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: By learning about different cultures, communicating clearly and patiently, asking questions if unsure, and treating everyone with respect.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Chủ động tìm hiểu văn hóa, giao tiếp kiên nhẫn và hỏi lại khi chưa chắc chắn là những cách thực tế để tránh và giải quyết hiểu lầm văn hóa tại nơi làm việc.
 
 CÂU HỎI EN: As an individual, what can happen to you if you discriminate against a colleague or customer?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: You could face disciplinary action, lose your job, or even face legal consequences, since discrimination breaches Equal Employment Opportunity and anti-discrimination laws in Australia.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Phân biệt đối xử tại nơi làm việc ở Úc vi phạm luật EEO (Equal Employment Opportunity), có thể dẫn đến hậu quả nghiêm trọng từ kỷ luật nội bộ đến pháp lý.
 
 CÂU HỎI EN: What is the basic principle of Equal Employment Opportunity (EEO)?
 CÂU HỎI VI: 
@@ -398,46 +398,46 @@ GIẢI THÍCH: EEO là nguyên tắc pháp lý cốt lõi trong ngành dịch v�
 
 CÂU HỎI EN: If you are a waiter in a restaurant and a guest arrives with a vision impairment, what can you do to assist them?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: I would introduce myself, offer my arm to guide them to their table, describe the layout of the table and menu items clearly, and ask if they need the menu read aloud or in large print.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Với khách khiếm thị, nên chủ động giới thiệu bản thân, dẫn đường bằng cách cho khách vịn tay, và mô tả rõ vị trí bàn/món ăn thay vì chỉ đưa thực đơn như bình thường.
 
 CÂU HỎI EN: If you are a waiter in a restaurant and a guest arrives with a person who needs a walking frame to assist them to walk, what can you do to assist them?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: I would offer a table that is easy to access with enough space to move around, help clear a path if needed, and offer to carry anything for them while they get seated.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Với khách dùng khung tập đi, ưu tiên chọn bàn dễ tiếp cận, đủ không gian di chuyển và sẵn sàng hỗ trợ mang đồ giúp khách - thể hiện sự chu đáo thực tế.
 
 CÂU HỎI EN: What does Harmony Day represent?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Harmony Day is an Australian day celebrated on 21 March that celebrates cultural diversity and promotes inclusiveness, respect and a sense of belonging for everyone, regardless of cultural or religious background.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Harmony Day là ngày lễ đặc trưng của Úc tôn vinh sự đa dạng văn hóa - biết về ngày này cho thấy ứng viên hiểu bối cảnh xã hội đa văn hóa của nước Úc.
 
 # CHỦ ĐỀ: An toàn và sức khỏe nghề nghiệp tại nơi làm việc
 CÂU HỎI EN: Briefly explain how floor spills could cause an injury to customers or staff members.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A wet or oily spill on the floor can make it very slippery, causing customers or staff to slip, trip and fall, which can lead to injuries like sprains, fractures or head injuries.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Sàn ướt/dính dầu là nguyên nhân tai nạn phổ biến nhất trong bếp và nhà hàng, nên cần lau dọn ngay và đặt biển cảnh báo khi sàn ướt.
 
 CÂU HỎI EN: Give two examples of how the following injuries might occur in a kitchen or hospitality workplace: burns and scalds, back injury, electric shock, cuts.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Burns and scalds can happen from touching a hot pan or spilling boiling liquid; back injuries can happen from lifting heavy boxes incorrectly; electric shock can happen from using faulty equipment with wet hands; cuts can happen from careless knife handling.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Mỗi loại chấn thương trong bếp thường gắn với một nguyên nhân cụ thể - nêu ví dụ rõ ràng cho từng loại giúp câu trả lời thuyết phục hơn là chỉ liệt kê chung chung.
 
 CÂU HỎI EN: Name two employers' 'Duties of Care'.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Provide a safe working environment and equipment, and provide proper training and information about workplace hazards.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: 'Duty of Care' là nghĩa vụ pháp lý của người sử dụng lao động phải đảm bảo an toàn cho nhân viên - gồm cả môi trường làm việc lẫn đào tạo đầy đủ.
 
 CÂU HỎI EN: What is a 'Code of Practice'?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A Code of Practice is a set of practical guidelines that explains how to meet the requirements of WHS law, giving detailed advice on how to manage specific risks.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Code of Practice cụ thể hóa luật WHS thành hướng dẫn thực tế, dễ áp dụng hơn cho từng loại rủi ro tại nơi làm việc.
 
 CÂU HỎI EN: What is the phone number in Australia for emergency services?
 CÂU HỎI VI: 
@@ -447,27 +447,27 @@ GIẢI THÍCH: Số 000 là số gọi khẩn cấp duy nhất ở Úc cho cả 
 
 CÂU HỎI EN: What is more important, an 'Act of Parliament' or a 'Regulation'?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: An Act of Parliament is more important - it is the primary law passed by parliament, while a Regulation is a more detailed rule made under that Act to support and explain how the law is applied.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Trong hệ thống pháp luật Úc, Act (đạo luật) có hiệu lực cao hơn Regulation (quy định chi tiết) vì Regulation chỉ là văn bản hướng dẫn thi hành đạo luật.
 
 CÂU HỎI EN: Give four safety rules for working in a dining room as a waiter.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Wear non-slip shoes, carry hot plates carefully and warn guests, clean up spills immediately, and never run in the dining room.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: An toàn phòng ăn tập trung vào phòng tránh trượt ngã và bỏng khi bưng bê đồ nóng giữa đông khách.
 
 CÂU HỎI EN: Give three reasons why key control is an important security issue for a hotel.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: It prevents unauthorised access to guest rooms and storage areas, protects guests' property and safety, and reduces the risk of theft.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Quản lý chìa khóa chặt chẽ là biện pháp bảo mật cơ bản để bảo vệ tài sản khách và ngăn ngừa trộm cắp trong khách sạn.
 
 CÂU HỎI EN: Handling cash in a business means we must consider security measures. Give three security measures for cash handling.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Use a locked cash register or safe, limit the number of staff with access to cash, and do regular reconciliation and banking of takings.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Kiểm soát tiền mặt cần cả biện pháp vật lý (khóa két) lẫn quy trình (giới hạn người tiếp cận, đối chiếu định kỳ) để giảm rủi ro thất thoát.
 
 CÂU HỎI EN: Give four procedures when evacuating a building.
 CÂU HỎI VI: 
@@ -501,33 +501,33 @@ GIẢI THÍCH: Hai biện pháp cơ bản nhất để giảm nguy cơ trượt 
 
 CÂU HỎI EN: Give four safety rules for working in a kitchen as a cook.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Wear non-slip shoes and PPE, use knives safely and carry them point-down, keep the floor clean and dry, and report any faulty equipment immediately.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: An toàn trong bếp gồm trang bị bảo hộ, kỹ năng dùng dao đúng cách và giữ khu vực làm việc sạch sẽ, khô ráo.
 
 CÂU HỎI EN: What is a Class A fire?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A Class A fire is a fire involving ordinary combustible materials such as paper, wood, cardboard or fabric.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Phân loại đám cháy (Class A, B, C, F...) giúp xác định đúng loại bình chữa cháy cần dùng - Class A dùng cho vật liệu rắn thông thường.
 
 CÂU HỎI EN: You work as a cook in a hotel kitchen and have been asked to contribute to a work health and safety meeting about the kitchen. Give two topics that would most likely be discussed.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Slip and fall hazards on wet floors, and safe use and maintenance of kitchen equipment like fryers and knives.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Các cuộc họp WHS trong bếp thường tập trung vào những rủi ro phổ biến nhất: trượt ngã và an toàn thiết bị.
 
 CÂU HỎI EN: You work as a waiter in a fast food outlet and have been asked to contribute to a work health and safety meeting about the outlet. Give two topics that would most likely be discussed.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Burns from hot equipment like grills and fryers, and manual handling when carrying trays or stock.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Với nhân viên phục vụ ở cửa hàng thức ăn nhanh, rủi ro chính đến từ thiết bị nóng và việc mang vác lặp đi lặp lại.
 
 CÂU HỎI EN: You work on the grill at a hamburger outlet and are concerned about sharp edges on the workbench beside the grill. Who would you report the matter to?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: I would report it to my supervisor or manager straight away.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Bất kỳ mối nguy nào phát hiện được cũng cần báo ngay cho quản lý trực tiếp để được xử lý kịp thời, không tự ý sửa chữa.
 
 CÂU HỎI EN: What do you do when there is a fire in your kitchen?
 CÂU HỎI VI: 
@@ -609,9 +609,9 @@ GIẢI THÍCH: Kỹ thuật nâng vật nặng an toàn dựa trên nguyên lý 
 
 CÂU HỎI EN: Describe how to safely lift items.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Bend your knees, keep your back straight, hold the item close to your body, and lift with your legs, not your back.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Kỹ thuật nâng đồ an toàn (bend knees, straight back) là kiến thức manual handling cơ bản để tránh chấn thương lưng.
 
 CÂU HỎI EN: What do you do when a machine is broken/breaks down?
 CÂU HỎI VI: 
@@ -645,9 +645,9 @@ GIẢI THÍCH: Bước đầu tiên quan trọng nhất là tắt nguồn lửa/
 
 CÂU HỎI EN: Explain the special dangers of a fire in the oil of a deep fryer.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Oil fires burn extremely hot and can reignite or spread quickly if water is used, since water causes the burning oil to splash and spread - a fire blanket or a Class F extinguisher must be used instead.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Cháy dầu (Class F) rất nguy hiểm vì tuyệt đối không được dùng nước để dập - nước làm dầu bắn tung tóe khiến lửa lan rộng hơn, phải dùng chăn chữa cháy hoặc bình chữa cháy chuyên dụng.
 
 CÂU HỎI EN: What happens if hot oil and water meet?
 CÂU HỎI VI: 
@@ -675,9 +675,9 @@ GIẢI THÍCH: Khăn ẩm/ướt dẫn nhiệt nhanh hơn khăn khô rất nhi�
 
 CÂU HỎI EN: Why should you only use a dry cloth to handle grill equipment?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Because a wet cloth can create steam when it touches hot metal, which can scald your hand, and water can also cause hot oil to splatter.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Khăn ướt gặp kim loại nóng sẽ bốc hơi ngay lập tức gây bỏng tay, nên luôn dùng khăn khô khi cầm nắm thiết bị nướng còn nóng.
 
 CÂU HỎI EN: What do you know about kitchen knife carrying and handling safety?
 CÂU HỎI VI: 
@@ -706,9 +706,9 @@ GIẢI THÍCH: Câu hỏi này có vẻ ít liên quan trực tiếp đến ngh�
 # CHỦ ĐỀ: Vệ sinh và an toàn thực phẩm tại nơi làm việc
 CÂU HỎI EN: List five major aspects of food safety.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Personal hygiene, temperature control, cross contamination prevention, cleaning and sanitising, and correct storage.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đây là năm trụ cột chính của an toàn thực phẩm - hầu hết các quy tắc khác trong ngành đều xoay quanh năm yếu tố này.
 
 CÂU HỎI EN: List four types of food contamination.
 CÂU HỎI VI: 
@@ -730,9 +730,9 @@ GIẢI THÍCH: Cross-contact là thuật ngữ chuyên dùng cho dị ứng th�
 
 CÂU HỎI EN: Give four symptoms of food poisoning.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Nausea, vomiting, diarrhoea, and stomach cramps.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đây là các triệu chứng điển hình của ngộ độc thực phẩm, thường xuất hiện vài giờ sau khi ăn phải thực phẩm nhiễm khuẩn.
 
 CÂU HỎI EN: List the four groups at risk of food poisoning.
 CÂU HỎI VI: 
@@ -754,9 +754,9 @@ GIẢI THÍCH: Bain marie dùng để giữ thức ăn nóng ở nhiệt độ t
 
 CÂU HỎI EN: Is coffee considered food under the law?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Yes, under the Food Standards Code, coffee is considered a food because it is intended for human consumption.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Theo luật thực phẩm Úc, bất kỳ thứ gì dùng để con người ăn/uống đều được coi là 'food', kể cả đồ uống như cà phê.
 
 CÂU HỎI EN: Is it true that an elderly man of 80 has a higher risk of food poisoning than a 25-year-old football player?
 CÂU HỎI VI: 
@@ -802,9 +802,9 @@ GIẢI THÍCH: Sanitising luôn diễn ra SAU bước cleaning, vì chất tẩy
 
 CÂU HỎI EN: Give a definition of Food Standards Code.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: The Food Standards Code is the set of legal food safety standards that applies across Australia and New Zealand, covering things like labelling, additives, and safe food handling practices.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Food Standards Code là bộ luật thực phẩm chung của Úc và New Zealand, bao trùm cả nhãn mác, phụ gia lẫn quy trình xử lý thực phẩm an toàn.
 
 CÂU HỎI EN: Give a definition of Salmonella.
 CÂU HỎI VI: 
@@ -814,9 +814,9 @@ GIẢI THÍCH: Salmonella là một trong những vi khuẩn gây ngộ độc t
 
 CÂU HỎI EN: Give a definition of Spores.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Spores are a dormant, protective form that some bacteria create to survive harsh conditions like heat or dryness; they can become active again when conditions are favourable.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Bào tử (spores) là 'lớp áo giáp' giúp một số vi khuẩn sống sót qua điều kiện khắc nghiệt như nhiệt độ cao, rồi hoạt động trở lại khi gặp môi trường thuận lợi - đây là lý do một số vi khuẩn khó bị tiêu diệt hoàn toàn dù đã nấu chín.
 
 CÂU HỎI EN: Give a definition of Stock rotation.
 CÂU HỎI VI: 
@@ -844,9 +844,9 @@ GIẢI THÍCH: Găng tay dùng một lần đặc biệt cần thiết khi chế
 
 CÂU HỎI EN: According to the food standards code, what is an appropriate hand washing facility?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: It must have warm running water, soap, a way to dry hands (like paper towel), and be located close to the food handling area, used only for hand washing.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Bồn rửa tay đạt chuẩn phải có đủ nước ấm, xà phòng và khăn lau, đặt gần khu chế biến, và chỉ dùng riêng cho việc rửa tay (không rửa dụng cụ ở đó).
 
 CÂU HỎI EN: What is contamination? How many ways can food be contaminated?
 CÂU HỎI VI: 
@@ -862,9 +862,9 @@ GIẢI THÍCH: Cross-contamination xảy ra khi vi khuẩn hoặc chất gây ô
 
 CÂU HỎI EN: Given the correct conditions, how long will it take food poisoning bacteria to double in number?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: As little as 10 to 20 minutes under the right conditions.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Trong điều kiện lý tưởng (vùng nguy hiểm 5-60°C, đủ ẩm và dinh dưỡng), vi khuẩn có thể nhân đôi cực nhanh - đây là lý do quy tắc 2 giờ/4 giờ rất quan trọng.
 
 CÂU HỎI EN: What is the temperature range known as the 'Danger Zone' and why is it called that?
 CÂU HỎI VI: 
@@ -988,9 +988,9 @@ GIẢI THÍCH: Mỗi loại thực phẩm có ngưỡng nhiệt độ an toàn k
 
 CÂU HỎI EN: Give an example of a Single Use Item used in a hospitality situation.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Disposable gloves, or single-use napkins/cutlery.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đồ dùng một lần giúp giảm nguy cơ lây nhiễm chéo giữa các lần sử dụng.
 
 CÂU HỎI EN: In HACCP, what is a Critical Control Point (CCP)? Give an example.
 CÂU HỎI VI: 
@@ -1060,9 +1060,9 @@ GIẢI THÍCH: Trước khi đặt vào bain marie, thực phẩm phải đã đ
 
 CÂU HỎI EN: A number of salads have been prepared and are not required for another four hours. How should they be stored during that time?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: They should be covered and stored in the fridge below 5 degrees Celsius until needed.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Thực phẩm chưa dùng ngay cần được đậy kín và bảo quản dưới 5°C để tránh vào vùng nguy hiểm (danger zone).
 
 CÂU HỎI EN: What is the difference between cleaning and sanitising in a kitchen/hospitality situation? How should chemicals be stored?
 CÂU HỎI VI: 
@@ -1072,9 +1072,9 @@ GIẢI THÍCH: Cleaning chỉ loại bỏ bụi bẩn và dầu mỡ bằng vậ
 
 CÂU HỎI EN: Give three basic rules for rubbish disposal.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Use a bin with a lid, empty bins regularly so they don't overflow, and keep the bin area clean to avoid attracting pests.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Xử lý rác đúng cách (thùng có nắp, đổ thường xuyên, khu vực sạch sẽ) giúp ngăn ngừa côn trùng, dịch hại xâm nhập bếp.
 
 CÂU HỎI EN: What is a Trade Food Recall?
 CÂU HỎI VI: 
@@ -1090,9 +1090,9 @@ GIẢI THÍCH: Consumer Food Recall xảy ra khi sản phẩm đã có mặt tr�
 
 CÂU HỎI EN: What procedures should you follow to safely dispose of foods identified as dangerous?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Clearly label it as unsafe, keep it separate from other food, and dispose of it in a sealed bag in the bin so it cannot be eaten or contaminate other food.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Thực phẩm nguy hiểm cần được cách ly, dán nhãn rõ ràng và niêm phong trước khi vứt bỏ để tránh bị ăn nhầm hoặc gây lây nhiễm chéo.
 
 CÂU HỎI EN: Give two practical examples each of Chemical Contamination, Physical Contamination and Microbiological Contamination.
 CÂU HỎI VI: 
@@ -1102,15 +1102,15 @@ GIẢI THÍCH: Có ba loại nhiễm bẩn chính trong bếp: hóa học (chemi
 
 CÂU HỎI EN: What steps can you take to minimise the risk of microbiological contamination, which causes food poisoning?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Follow good personal hygiene, use correct temperature control, avoid cross contamination with colour coded equipment, and clean and sanitise surfaces regularly.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đây là tổng hợp các biện pháp cốt lõi (vệ sinh cá nhân, nhiệt độ, chống nhiễm chéo, vệ sinh bề mặt) để giảm nguy cơ ngộ độc thực phẩm.
 
 CÂU HỎI EN: What are two monitoring procedures you could use to verify a delivery of fish is within the correct temperature?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Use a probe thermometer to check the internal temperature, or a laser thermometer to check the surface temperature of the fish on arrival.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đo nhiệt độ bằng nhiệt kế đầu dò hoặc hồng ngoại là quy trình giám sát bắt buộc khi nhận hàng để xác nhận thực phẩm đến trong ngưỡng an toàn.
 
 CÂU HỎI EN: What is the difference between Food Spoilage and Food Poisoning?
 CÂU HỎI VI: 
@@ -1264,15 +1264,15 @@ GIẢI THÍCH: Detergent (chất tẩy rửa) như nước rửa chén có nhi�
 
 CÂU HỎI EN: A common sanitiser used in the kitchen is a chlorine solution. At what strength should the concentration be?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Around 100 parts per million (ppm).
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Nồng độ dung dịch chlorine khử trùng cần đúng chuẩn (khoảng 100ppm) - quá loãng thì không đủ khử trùng, quá đậm thì gây hại/ăn mòn.
 
 CÂU HỎI EN: Name four pieces of equipment or work areas that would need to be sanitised in a kitchen.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Chopping boards, knives, food preparation benches, and the sink.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đây là những bề mặt và dụng cụ tiếp xúc trực tiếp với thực phẩm nhiều nhất, cần được khử trùng thường xuyên.
 
 CÂU HỎI EN: What safety precautions would you take when mopping a kitchen floor?
 CÂU HỎI VI: 
@@ -1300,9 +1300,9 @@ GIẢI THÍCH: Lịch trình vệ sinh đều đặn mang lại hai lợi ích c
 
 CÂU HỎI EN: What waste products from a kitchen or hospitality business can be recycled?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Used cooking oil, cardboard and paper packaging, glass bottles, and food scraps for compost.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Nhiều loại chất thải trong bếp có thể tái chế thay vì bỏ đi - vừa giảm rác thải vừa tiết kiệm chi phí xử lý.
 
 CÂU HỎI EN: List three rules you should follow when disposing of chemicals.
 CÂU HỎI VI: 
@@ -1379,9 +1379,9 @@ GIẢI THÍCH: Đây là hai bước khác nhau nhưng liên tiếp: cleaning ch
 
 CÂU HỎI EN: Give one example of preparing 'Mise en Place' for a poultry/seafood/sandwich dish.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: For a poultry dish, mise en place means trimming and portioning the chicken, preparing the marinade or seasoning, and having pans and trays ready before cooking starts.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Mise en place cho món gia cầm gồm sơ chế, cắt phần và chuẩn bị ướp trước khi bắt đầu nấu, đảm bảo tốc độ khi vào ca.
 
 CÂU HỎI EN: Which knife is the most versatile for slicing, chopping and dicing? What knife is best for cutting julienne or vegetables?
 CÂU HỎI VI: 
@@ -1391,9 +1391,9 @@ GIẢI THÍCH: Chef's knife (dao bếp đa năng) có thiết kế lưỡi rộn
 
 CÂU HỎI EN: Why is using the correct grip important?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: The correct grip gives better control and precision when cutting, which improves safety and reduces the risk of the knife slipping and causing an injury.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Cầm dao đúng cách (grip) giúp kiểm soát lực và hướng cắt tốt hơn, giảm nguy cơ dao trượt gây thương tích.
 
 CÂU HỎI EN: What is your free hand used for when using a knife? To protect your free hand from cuts, what should you do with your fingers?
 CÂU HỎI VI: 
@@ -1421,15 +1421,15 @@ GIẢI THÍCH: Lưu trữ dao đúng cách (khối gỗ, thanh nam châm hoặc 
 
 CÂU HỎI EN: Give two rules of knife safety.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Always carry a knife pointing down at your side, and never leave a knife in a sink full of water where someone could accidentally grab the blade.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Hai quy tắc an toàn dao cơ bản: luôn hướng mũi dao xuống khi di chuyển, và không bao giờ để dao lẫn trong bồn rửa đầy nước vì dễ gây tai nạn đứt tay.
 
 CÂU HỎI EN: How do you give a knife to another person?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Hold the blade pointing down, turn the handle towards the other person, and make sure they have a firm grip before you let go.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Khi đưa dao cho người khác, luôn chìa phần cán (không phải lưỡi dao) về phía họ và chắc chắn họ đã cầm chắc trước khi buông tay.
 
 CÂU HỎI EN: Which tool would you use for dicing an onion / peeling a potato / flipping pancakes / turning vegetables / securing meat for carving / spreading soft mixtures?
 CÂU HỎI VI: 
@@ -1439,21 +1439,21 @@ GIẢI THÍCH: Mỗi công cụ trong bếp được thiết kế cho một mụ
 
 CÂU HỎI EN: Why is it important to use the correct tool for the job being done?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Using the correct tool is safer, gives better results, and prevents damage to the tool, ingredients or yourself.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Dùng đúng dụng cụ cho đúng công việc vừa an toàn hơn, vừa cho kết quả tốt hơn và tránh làm hỏng dụng cụ hay nguyên liệu.
 
 CÂU HỎI EN: Why is it important to clean and sanitise all equipment properly between tasks? Describe how you would clean a piece of electrical/mechanical equipment.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: It prevents cross contamination between different foods. For electrical equipment, I switch it off and unplug it first, disassemble any removable parts, wash them separately, then wipe down the main unit with a damp cloth and sanitiser, making sure no water gets into the motor.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Vệ sinh thiết bị điện cần tắt nguồn/rút phích cắm trước, tháo các bộ phận tháo rời được để rửa riêng, và tuyệt đối tránh để nước vào motor.
 
 CÂU HỎI EN: Give two examples of preparing equipment ready for a service period.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Sharpening and sanitising knives before service, and preheating ovens or grills to the correct temperature.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Chuẩn bị thiết bị trước ca gồm cả việc mài/khử trùng dao và làm nóng lò/vỉ nướng để sẵn sàng khi bắt đầu phục vụ.
 
 CÂU HỎI EN: Briefly describe what a standard recipe is. What information is shown on it? What are the advantages of using a standard recipe?
 CÂU HỎI VI: What is standard recipe card?
@@ -1475,9 +1475,9 @@ GIẢI THÍCH: Câu trả lời này liên kết chặt với các câu hỏi v�
 
 CÂU HỎI EN: What type of method of cookery would use a Cryovac machine? Explain.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A Cryovac (vacuum sealing) machine is used for sous vide cooking, where food is vacuum-sealed in a bag and cooked slowly in a temperature-controlled water bath.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Máy Cryovac hút chân không gắn liền với kỹ thuật sous vide - nấu thực phẩm đã đóng gói kín trong bể nước kiểm soát nhiệt độ chính xác.
 
 CÂU HỎI EN: What is portion control? How and why do you need to control portion?
 CÂU HỎI VI: 
@@ -1487,15 +1487,15 @@ GIẢI THÍCH: Kiểm soát định lượng phần ăn không chỉ giúp quả
 
 CÂU HỎI EN: What waste products from a kitchen can be recycled?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Used cooking oil, cardboard packaging, glass, and food scraps for compost.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Nhiều chất thải bếp có thể tái chế được thay vì bỏ đi, giúp giảm chi phí xử lý rác và bảo vệ môi trường.
 
 CÂU HỎI EN: What can a mixer / stick blender / gas canister / whisk be used for?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A mixer is used for mixing dough or batter; a stick blender purees soups and sauces; a gas canister is used for blowtorches, for example caramelising a crème brûlée; a whisk is used for beating eggs or cream.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Mỗi thiết bị có công dụng riêng biệt trong bếp - nắm rõ chức năng từng loại giúp trả lời tự tin các câu hỏi về thiết bị.
 
 CÂU HỎI EN: Explain the Brunoise cut, the Julienne, the Turned, the Macedoine, and the Chiffonade.
 CÂU HỎI VI: 
@@ -1529,9 +1529,9 @@ GIẢI THÍCH: Trước khi báo hỏng thiết bị, nên tự kiểm tra các 
 
 CÂU HỎI EN: What do you use to clean equipment and tools? List four pieces of equipment or work areas that need to be sanitised.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: I use hot soapy water for cleaning and a chemical sanitiser or hot water above 77 degrees for sanitising. Equipment and areas that need sanitising include chopping boards, knives, benches and sinks.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Làm sạch dùng nước xà phòng nóng, còn khử trùng cần chất chuyên dụng hoặc nước rất nóng (trên 77°C) - hai bước này luôn tách biệt.
 
 CÂU HỎI EN: Give two examples each for Utensils, Mechanical Equipment, and Large Fixed Equipment.
 CÂU HỎI VI: 
@@ -1559,9 +1559,9 @@ GIẢI THÍCH: Quy trình xử lý thiết bị hỏng luôn theo thứ tự: ng
 
 CÂU HỎI EN: What is the relationship between portion size and profitability?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Portion size directly affects food cost - if portions are too large, food cost rises and profit falls; if portions are correctly controlled and consistent, the business can predict costs accurately and maintain a healthy profit margin.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Khẩu phần và lợi nhuận có quan hệ trực tiếp: khẩu phần không nhất quán làm chi phí thực phẩm khó kiểm soát và ảnh hưởng lợi nhuận.
 
 CÂU HỎI EN: What is a Par Level (Par Stock level)? What happens if there is too much stock? What methods are used to control par stock?
 CÂU HỎI VI: 
@@ -1571,16 +1571,16 @@ GIẢI THÍCH: Par level là mức tồn kho tối thiểu và tối đa đượ
 
 CÂU HỎI EN: Give the meaning of the culinary term Par Stock Level.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Par Stock Level is the minimum amount of an item that should always be kept in stock, used as a guide for reordering so the kitchen never runs out.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Par Stock Level là mức tồn kho tối thiểu cần duy trì, dùng làm chuẩn để biết khi nào cần đặt hàng thêm.
 
 # CHỦ ĐỀ: Bảo quản và nhận hàng cung cấp cho nhà bếp
 CÂU HỎI EN: List five stock items you would expect to take delivery of for the kitchen of a small cafe / the banquet department of a large hotel / the housekeeping department of a large hotel.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Fresh milk, bread, fruit and vegetables, coffee beans, and eggs.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Một quán cà phê nhỏ chủ yếu cần các nguyên liệu tươi dùng hàng ngày và nguyên liệu cho đồ uống.
 
 CÂU HỎI EN: List five different points that need to be inspected when receiving deliveries. What do you do when you receive delivery?
 CÂU HỎI VI: 
@@ -1608,9 +1608,9 @@ GIẢI THÍCH: 10°C vượt quá ngưỡng an toàn 5°C nên đầu bếp ph�
 
 CÂU HỎI EN: Give three indicators for quality fresh whole fish when it arrives at the kitchen from the seafood supplier.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Bright, clear eyes; firm flesh that springs back when pressed; and a fresh, mild sea smell, not a strong fishy or ammonia smell.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Ba dấu hiệu kiểm tra cá tươi kinh điển: mắt, độ đàn hồi của thịt, và mùi - đây là kiến thức thực hành quan trọng khi nhận hàng hải sản.
 
 CÂU HỎI EN: When checking a store room for evidence of pests such as mice, give three things you may find that would suggest mice or rats have been in the storeroom.
 CÂU HỎI VI: 
@@ -1620,15 +1620,15 @@ GIẢI THÍCH: Phát hiện sớm dấu hiệu côn trùng/loài gây hại giú
 
 CÂU HỎI EN: Name two beverage products which may be affected by heat during transportation or storage.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Wine and beer can spoil or lose quality if stored in heat.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đồ uống có cồn dễ bị ảnh hưởng chất lượng bởi nhiệt độ cao trong quá trình vận chuyển hoặc lưu kho.
 
 CÂU HỎI EN: Name two food products which may emit strong odours and flavours that may be absorbed into other foods.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Onions and garlic, and strong cheeses like blue cheese.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Thực phẩm có mùi mạnh cần bảo quản riêng biệt vì có thể làm ám mùi sang các thực phẩm khác gần đó.
 
 CÂU HỎI EN: How should chemicals be stored in a hospitality business?
 CÂU HỎI VI: 
@@ -1644,21 +1644,21 @@ GIẢI THÍCH: Food recall xảy ra khi nhà cung cấp phát hiện sản phẩ
 
 CÂU HỎI EN: How would you store 2kg foil vacuum packed bags of coffee beans used to make espresso coffee?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: In a cool, dry place away from direct sunlight, in the sealed vacuum bag until opened, then in an airtight container.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Cà phê hạt cần tránh ánh sáng, nhiệt và không khí để giữ hương vị - túi hút chân không giúp bảo quản tốt trước khi mở.
 
 CÂU HỎI EN: Give two examples of each type of Chemical, Physical, and Biological contamination.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Chemical: cleaning detergent residue, pesticide residue on vegetables. Physical: glass fragments, hair. Biological: salmonella bacteria, mould.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Ba loại nhiễm bẩn (hóa học, vật lý, sinh học) cần ví dụ cụ thể cho từng loại để chứng minh hiểu rõ bản chất, không chỉ học thuộc tên gọi.
 
 CÂU HỎI EN: All storage areas should be inspected on a periodic and planned basis. List four things you should monitor and look for.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Temperature of fridges and freezers, cleanliness and signs of pests, stock rotation and expiry dates, and any damage to packaging or shelving.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Kiểm tra định kỳ khu vực kho cần bao quát cả nhiệt độ, vệ sinh, hạn sử dụng và tình trạng vật lý của kho/kệ.
 
 CÂU HỎI EN: What does FIFO refer to? Describe this method of stock rotation. How do you recognise old vs new items in your storage area?
 CÂU HỎI VI: Fifo? Nếu bạn nhìn vào shelf or cool room / containers làm sao bạn nhận ra được?
@@ -1674,9 +1674,9 @@ GIẢI THÍCH: Dán nhãn ngày nhận hàng hoặc ngày hết hạn giúp nhâ
 
 CÂU HỎI EN: Give an example of when you would complete a breakage report document.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: When equipment or stock, like glassware or crockery, is damaged or broken, to keep a record for insurance, replacement and stocktake purposes.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Biên bản báo hỏng giúp doanh nghiệp theo dõi thiệt hại, phục vụ bảo hiểm, thay thế thiết bị và kiểm kê chính xác.
 
 CÂU HỎI EN: Give one way you can prevent loss of goods. How do you secure your storage?
 CÂU HỎI VI: 
@@ -1813,9 +1813,9 @@ GIẢI THÍCH: Mỗi loại batter sử dụng nguyên liệu khác nhau để t
 
 CÂU HỎI EN: Name four kinds of food suitable for baking.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Bread, cakes, pastries, and baked vegetables like potatoes.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Baking là phương pháp nấu bằng nhiệt khô trong lò, phù hợp với nhiều loại thực phẩm từ bột nhào đến rau củ.
 
 CÂU HỎI EN: What is meant by 'blind baking'? What do you put on top when blind baking an apple tart?
 CÂU HỎI VI: 
@@ -1837,9 +1837,9 @@ GIẢI THÍCH: Câu hỏi này lặp lại nội dung đã có ở phần Mise e
 
 CÂU HỎI EN: Where do you confirm food production requirements from?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: From the head chef, the function or banquet event order, or the standard recipe and menu.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Yêu cầu sản xuất món ăn thường xác nhận qua chỉ đạo của bếp trưởng, phiếu sự kiện (cho tiệc) hoặc công thức chuẩn của nhà hàng.
 
 CÂU HỎI EN: You are checking perishable supplies before use. What are some signs that they are spoilt?
 CÂU HỎI VI: 
@@ -2138,9 +2138,9 @@ GIẢI THÍCH: Để giảm lãng phí, đầu bếp tận dụng phần vụn r
 
 CÂU HỎI EN: List four reasons for having a standard recipe (for sandwiches).
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: It keeps taste and quality consistent, controls portion size and cost, makes training new staff easier, and ensures the dish always looks the same to customers.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Công thức chuẩn cho sandwich cũng phục vụ mục đích như mọi công thức chuẩn khác: nhất quán vị, chi phí và hình thức.
 
 CÂU HỎI EN: What are the correct storage conditions for mayonnaise-based salad dressings?
 CÂU HỎI VI: 
@@ -2493,9 +2493,9 @@ GIẢI THÍCH: Khi Hollandaise quá đặc, chỉ cần thêm vài giọt nướ
 
 CÂU HỎI EN: Give three examples of 'Convenience Food Products' used in a modern kitchen for stocks, soups or sauces.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Stock powder or cubes, ready-made stock paste, and canned or packet soup bases.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Sản phẩm tiện lợi giúp bếp tiết kiệm thời gian sản xuất nhưng thường được dùng bổ trợ chứ không thay thế hoàn toàn stock nấu từ đầu.
 
 CÂU HỎI EN: You have stored bulk premade Pumpkin Soup in the coolroom. How do you reconstitute five litres for service in a hot bain marie?
 CÂU HỎI VI: 
@@ -2505,15 +2505,15 @@ GIẢI THÍCH: Khi hâm lại súp đã làm sẵn từ phòng lạnh, cần đu
 
 CÂU HỎI EN: Describe why it is necessary to clean and sanitise the work area after use.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: To prevent cross contamination and bacteria growth, and to keep the area ready and safe for the next task.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Vệ sinh khu vực làm việc sau khi dùng là bước bắt buộc để tránh lây nhiễm chéo cho công việc tiếp theo.
 
 CÂU HỎI EN: As a guide to production, how many serves of entrée-size soup would be gained from 1 litre of soup?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: About 4 to 5 serves.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đây là ước lượng định lượng thực tế để tính toán sản lượng khi lên kế hoạch nấu súp cho số lượng khách nhất định.
 
 CÂU HỎI EN: Describe one use for a Meat Glaze in a kitchen.
 CÂU HỎI VI: 
@@ -2584,15 +2584,15 @@ GIẢI THÍCH: An toàn thực phẩm với trứng gồm 5 nguyên tắc chính
 # CHỦ ĐỀ: Chuẩn bị rau, củ, quả, trứng và món bột
 CÂU HỎI EN: The flour used in pasta making should be?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A high-protein flour, such as durum wheat semolina or '00' flour, which gives the pasta dough strength and elasticity.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Bột làm mì Ý cần hàm lượng protein/gluten cao để bột dai và giữ hình dạng khi luộc, khác với bột mì thường dùng cho bánh mì.
 
 CÂU HỎI EN: What type of rice would be used to make a milk rice pudding?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A short-grain or medium-grain rice, such as arborio rice, because it releases starch and becomes creamy.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Gạo hạt ngắn tiết ra nhiều tinh bột khi nấu, tạo độ sánh đặc trưng cho món pudding sữa gạo.
 
 CÂU HỎI EN: What other liquid is often added to water when poaching eggs?
 CÂU HỎI VI: 
@@ -2650,9 +2650,9 @@ GIẢI THÍCH: Mỗi loại thực phẩm có điều kiện bảo quản riêng
 
 CÂU HỎI EN: Which fruit deteriorates more rapidly?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Soft, delicate fruits like berries and bananas deteriorate more rapidly than harder fruits like apples.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Trái cây mềm, mỏng vỏ (dâu, chuối) hư hỏng nhanh hơn nhiều so với trái cây cứng vỏ dày, cần ưu tiên dùng trước.
 
 CÂU HỎI EN: What does the abbreviation 'FIFO' refer to? Give an example.
 CÂU HỎI VI: 
@@ -2806,27 +2806,27 @@ GIẢI THÍCH: Chế độ ăn ít calo tập trung vào thực phẩm giàu din
 
 CÂU HỎI EN: A customer is asking for medical advice about medications and the fish meal they ordered. How would you respond?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: I would politely explain that I am not qualified to give medical advice, and recommend they speak to their doctor or pharmacist.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đầu bếp không được tư vấn y tế chuyên môn - luôn hướng khách tới bác sĩ/dược sĩ khi họ hỏi về tương tác thuốc-thực phẩm.
 
 CÂU HỎI EN: Name two food ingredients that must be mentioned on the product labelling.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Allergens such as nuts and gluten must be clearly mentioned on the labelling.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Luật thực phẩm Úc bắt buộc công bố rõ dị nguyên phổ biến trên nhãn để bảo vệ khách hàng có dị ứng.
 
 CÂU HỎI EN: A customer has explained they have a fructose malabsorption. What does this mean?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: It means the customer's body has difficulty absorbing fructose, a natural sugar found in fruit and some vegetables, which can cause digestive discomfort, so I would avoid high-fructose ingredients in their dish.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Kém hấp thu fructose là tình trạng cơ thể khó tiêu hóa loại đường tự nhiên trong trái cây - đầu bếp cần điều chỉnh món ăn tránh dùng nhiều nguyên liệu giàu fructose.
 
 CÂU HỎI EN: Explain the basic principles of a Keto diet.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A Keto diet is very low in carbohydrates and high in fat and moderate protein, which puts the body into a state called ketosis, where it burns fat for energy instead of carbohydrates.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Chế độ Keto giảm tối đa tinh bột, tăng chất béo để cơ thể chuyển sang đốt mỡ làm năng lượng thay vì glucose từ carb.
 
 CÂU HỎI EN: What does the term Kosher mean? Name four foods forbidden in a Kosher diet.
 CÂU HỎI VI: 
@@ -2915,15 +2915,15 @@ GIẢI THÍCH: Câu hỏi này kiểm tra kiến thức tổng quan về các lo
 
 CÂU HỎI EN: Name four birds that fall into both categories of poultry and game.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Duck, quail, pheasant, and guinea fowl.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Một số loài chim vừa được nuôi thương mại (poultry) vừa có thể săn bắt tự nhiên (game), như vịt và chim trĩ.
 
 CÂU HỎI EN: What is the weight difference between a size 10 chicken and a size 12 chicken? What are the weights of size 17 chicken, size 55 turkey, size 22 duck, size 3 spatchcock?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A size 10 chicken is about 1.0kg and a size 12 is about 1.2kg - chicken sizes generally correspond to their weight in hundreds of grams. A size 17 chicken is about 1.7kg, a size 55 turkey is about 5.5kg, a size 22 duck is about 2.2kg, and a size 3 spatchcock is about 300 to 400g.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Quy ước đánh số size gia cầm ở Úc thường tương ứng trực tiếp với trọng lượng (size x100g), giúp đầu bếp ước lượng nhanh khi đặt hàng.
 
 CÂU HỎI EN: What quality points should you look for when preparing to use fresh/frozen poultry?
 CÂU HỎI VI: 
@@ -2957,9 +2957,9 @@ GIẢI THÍCH: Confit là kỹ thuật nấu chậm trong mỡ ở nhiệt thấ
 
 CÂU HỎI EN: Describe the term 'mise en place' and give an example for poultry dishes.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Mise en place means having everything prepared and in place before cooking starts. For poultry, this means trimming, portioning and marinating the chicken, and having pans, trays and seasonings ready.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Mise en place cho gia cầm tập trung vào sơ chế, cắt phần và ướp sẵn để tiết kiệm thời gian khi vào ca phục vụ.
 
 CÂU HỎI EN: Which method of cookery would be suitable for chicken drumsticks / whole chicken / sliced chicken fillets / duck legs?
 CÂU HỎI VI: 
@@ -2987,9 +2987,9 @@ GIẢI THÍCH: Gia cầm, đặc biệt là phần ngực, được xem là ngu�
 
 CÂU HỎI EN: How would you present a dish consisting of poached chicken in coconut milk? You have an oven roasted chicken breast with a filling - recommend suitable accompaniments and garnishes.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Poached chicken in coconut milk can be presented in a shallow bowl with the sauce ladled around it, garnished with fresh coriander and a wedge of lime. An oven roasted chicken breast with a filling pairs well with roasted seasonal vegetables, a light jus, and a simple herb garnish.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Cách trình bày món cần phù hợp với dạng nước sốt (súp/sốt lỏng dùng bát nông) và gia vị đi kèm để tôn lên hương vị chính của món ăn.
 
 CÂU HỎI EN: What do you stuff inside a chicken? What do you stuff inside a turkey?
 CÂU HỎI VI: 
@@ -3119,16 +3119,16 @@ GIẢI THÍCH: Đây là câu hỏi tổng hợp toàn bộ quy trình từ A-Z,
 
 CÂU HỎI EN: What kinds of bread/sauces would you stuff/serve with chicken or turkey?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Sage and onion stuffing or breadcrumb stuffing, and cranberry sauce or gravy.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Nhân nhồi thảo mộc và các loại sốt trái cây/nước thịt là combo truyền thống đi kèm gà/gà tây quay kiểu phương Tây.
 
 # CHỦ ĐỀ: Chuẩn bị và nấu hải sản
 CÂU HỎI EN: List three types of fish and three types of shellfish commonly used in a commercial kitchen and briefly describe their characteristics.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Fish: salmon (oily, rich flavour), snapper (firm white flesh, mild flavour), barramundi (firm, moist, mild flavour). Shellfish: prawns (sweet, firm texture), oysters (soft, briny flavour), mussels (tender, slightly sweet).
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Nêu rõ đặc điểm hương vị/kết cấu của từng loại cá và hải sản có vỏ giúp câu trả lời cụ thể và thể hiện kinh nghiệm thực tế.
 
 CÂU HỎI EN: What are the three classifications of fish? Name two classifications of shellfish.
 CÂU HỎI VI: 
@@ -3138,15 +3138,15 @@ GIẢI THÍCH: Phân loại cá theo hình dáng (flat/round) ảnh hưởng đ�
 
 CÂU HỎI EN: What classifications are there for Scallops, Oysters, Yabbies, Prawns?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Scallops and oysters are molluscs; yabbies and prawns are crustaceans.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Hải sản có vỏ chia thành hai nhóm chính: giáp xác (crustaceans) và thân mềm (molluscs) - phân loại đúng giúp xử lý và bảo quản phù hợp.
 
 CÂU HỎI EN: What health problems could occur if you eat molluscs collected from polluted waters?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: They can cause food poisoning or shellfish toxin poisoning, since molluscs filter water and can absorb bacteria, viruses or toxins from polluted water.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Động vật thân mềm ăn lọc nước nên dễ tích tụ độc tố/vi khuẩn từ vùng nước ô nhiễm, gây ngộ độc nghiêm trọng nếu ăn phải.
 
 CÂU HỎI EN: Briefly describe five quality indicators you need to look for when selecting fresh whole fish. How do you choose fresh fish?
 CÂU HỎI VI: 
@@ -3156,9 +3156,9 @@ GIẢI THÍCH: Năm chỉ số này (mắt, mang, thịt, mùi, vảy) là bộ 
 
 CÂU HỎI EN: Give an example of preparing 'Mise en Place' for a seafood dish.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: For a seafood dish, mise en place means scaling and filleting the fish, deveining prawns, and preparing sauces and garnishes ahead of service.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Mise en place hải sản gồm các bước sơ chế đặc thù như đánh vảy, phi lê cá và lấy chỉ tôm trước khi vào bếp.
 
 CÂU HỎI EN: You order 10kg of fish fillets from your seafood supplier. What temperature should the fillets be when they arrive?
 CÂU HỎI VI: 
@@ -3174,9 +3174,9 @@ GIẢI THÍCH: Bảo quản cá/hải sản tươi trên đá vừa giữ nhiệ
 
 CÂU HỎI EN: Describe the use of FIFO with fresh seafood.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: I label seafood with the date it arrived, store the oldest stock at the front, and use it first before newer stock, to make sure nothing is kept past its use-by date.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Nguyên tắc FIFO áp dụng cho hải sản giúp đảm bảo hàng cũ luôn được dùng trước, tránh để quá hạn gây lãng phí và rủi ro an toàn.
 
 CÂU HỎI EN: How can we humanely kill live crustaceans? How do you kill crabs and make sure they don't suffer?
 CÂU HỎI VI: 
@@ -3216,9 +3216,9 @@ GIẢI THÍCH: Rã đông ở nhiệt độ phòng tạo điều kiện cho lớ
 
 CÂU HỎI EN: Name two important points when filleting whole fish.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Keep the knife close to the bones to avoid wasting flesh, and use smooth, long strokes rather than sawing.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Phi lê cá hiệu quả cần giữ dao sát xương để tận dụng tối đa phần thịt và dùng đường cắt dài, dứt khoát thay vì cưa qua lại.
 
 CÂU HỎI EN: A customer is on a weight loss diet. What method of cookery would be appropriate for a fish dish for this client?
 CÂU HỎI VI: 
@@ -3385,9 +3385,9 @@ GIẢI THÍCH: Secondary/restaurant cuts là bước tiếp theo sau primal cuts
 
 CÂU HỎI EN: What are 'AUSMEAT' specifications? Give two elements of AUSMEAT specifications for lamb.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: AUSMEAT specifications are the official Australian standards that describe and name meat cuts consistently across the industry. For lamb, two elements are the cut code or name, such as lamb leg or lamb rack, and the trim specification, which shows how much fat is left on the cut.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: AUSMEAT là hệ thống tiêu chuẩn hóa tên gọi và quy cách cắt thịt của Úc, giúp thống nhất cách gọi tên và chất lượng giữa các nhà cung cấp.
 
 CÂU HỎI EN: What are the two methods commonly used to age meat? Why do we age meat?
 CÂU HỎI VI: 
@@ -3397,9 +3397,9 @@ GIẢI THÍCH: Ủ thịt (aging) là kỹ thuật để thịt mềm và đậm
 
 CÂU HỎI EN: How can fat colour vary between Grass fed beef and Grain fed beef?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Grass fed beef usually has more yellow-tinted fat because of the beta-carotene in grass, while grain fed beef has whiter fat.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Màu mỡ bò là dấu hiệu giúp phân biệt bò ăn cỏ (mỡ vàng hơn do beta-carotene) và bò ăn ngũ cốc (mỡ trắng hơn).
 
 CÂU HỎI EN: You have portioned a Striploin into 300g steaks and have 2kg of beef trimmings left over. How can you use these trimmings?
 CÂU HỎI VI: 
@@ -3415,9 +3415,9 @@ GIẢI THÍCH: Xương bò sau khi cắt phần thịt có thể rang vàng rồ
 
 CÂU HỎI EN: List two dishes for pork meat and two dishes for lamb meat where trimmings can be used profitably.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Pork trimmings can be used in sausages or a pork ragu; lamb trimmings can be used in a lamb curry or shepherd's pie.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Tận dụng phần thịt thừa vào các món băm/hầm giúp giảm lãng phí và tăng lợi nhuận cho nhà bếp.
 
 CÂU HỎI EN: Briefly describe what is meant by the term Offal or Fancy Meats. List four common types of offal used on Australian menus and a suitable cookery method for each.
 CÂU HỎI VI: 
@@ -3463,9 +3463,9 @@ GIẢI THÍCH: Nhiệt độ bảo quản thịt là một trong những tiêu c
 
 CÂU HỎI EN: Recommend a sauce to go with crumbed and deep fried lamb's brains.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A tartare sauce or a lemon-caper brown butter sauce.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Sốt chua nhẹ (tartare, chanh-bơ) giúp cân bằng vị béo ngậy đặc trưng của óc cừu chiên giòn.
 
 CÂU HỎI EN: Explain good principles to thaw frozen meats.
 CÂU HỎI VI: 
@@ -3475,9 +3475,9 @@ GIẢI THÍCH: Rã đông đúng cách là yếu tố quan trọng để đảm 
 
 CÂU HỎI EN: You have a 200g grilled fillet steak on the menu. Recommend suitable accompaniments and garnishes.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Suitable accompaniments include roasted potatoes or chips, seasonal vegetables, and a red wine jus, garnished with fresh herbs like parsley or thyme.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Món bít tết grill kinh điển thường đi kèm khoai tây, rau theo mùa và một loại sốt nhẹ để tôn vị thịt mà không lấn át.
 
 CÂU HỎI EN: A customer has asked for their steak to be cooked blue. What is this?
 CÂU HỎI VI: 
@@ -3843,9 +3843,9 @@ GIẢI THÍCH: Mỗi kỹ thuật làm bánh tráng miệng cần dụng cụ ch
 
 CÂU HỎI EN: When portioning desserts, what considerations must you take into account when deciding on serve size?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Consider the cost of ingredients, the richness of the dessert since rich desserts need smaller portions, the type of service such as plated or buffet, and customer expectations.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Khẩu phần tráng miệng cần cân bằng giữa chi phí, độ ngậy của món (món càng béo thì khẩu phần càng nhỏ) và hình thức phục vụ.
 
 CÂU HỎI EN: Give three quality aspects of a good dessert sauce.
 CÂU HỎI VI: 
@@ -4090,9 +4090,9 @@ GIẢI THÍCH: Câu trả lời liệt kê các loại bánh mì cụ thể mà 
 
 CÂU HỎI EN: How many products (breads, cakes, dishes) have you made daily in your kitchen?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: In a busy bakery section, I usually prepare around 15 to 20 different bread and pastry products each day, depending on the day's menu and events.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Câu hỏi này kiểm tra kinh nghiệm thực tế - nên trả lời bằng con số cụ thể để chứng minh khối lượng công việc đã từng đảm nhận.
 
 CÂU HỎI EN: How would you store fresh poultry, bread, etc - what happens to bread if stored in a refrigerator?
 CÂU HỎI VI: 
@@ -4103,9 +4103,9 @@ GIẢI THÍCH: Bảo quản bánh mì trong tủ lạnh thực ra làm bánh nha
 # CHỦ ĐỀ: Chuẩn bị, bảo quản và phục vụ phô mai
 CÂU HỎI EN: What are the five stages of cheese making?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Curdling, which means adding rennet or acid to separate curds from whey, cutting the curd, cooking or draining the whey, pressing and shaping the curd, and ageing or ripening.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Năm giai đoạn làm phô mai (đông sữa, cắt, xử lý whey, ép định hình, ủ chín) là quy trình chung áp dụng cho hầu hết các loại phô mai, dù mỗi loại có biến thể riêng.
 
 CÂU HỎI EN: Is it true that sheep's milk does not contain enough fat to make cheese from?
 CÂU HỎI VI: 
@@ -4332,15 +4332,15 @@ GIẢI THÍCH: Crouton là giải pháp ẩm thực thông minh để tái sử 
 # CHỦ ĐỀ: Lập kế hoạch và chuẩn bị tiệc buffet
 CÂU HỎI EN: Name five hot food items suitable for a large buffet.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Roast beef, baked salmon, chicken curry, roasted vegetables, and pasta bake.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Món nóng buffet cần dễ giữ nhiệt lâu và bày biện đẹp trong số lượng lớn - thịt nướng, cà ri và rau nướng là lựa chọn phổ biến.
 
 CÂU HỎI EN: Name five food items suitable for a cocktail party.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Mini quiches, spring rolls, canapés with smoked salmon, cheese and crackers, and stuffed mushrooms.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đồ ăn tiệc cocktail cần nhỏ gọn, ăn bằng tay dễ dàng vì khách thường đứng và di chuyển trong bữa tiệc.
 
 CÂU HỎI EN: Name five food items suitable for a breakfast buffet.
 CÂU HỎI VI: 
@@ -4350,15 +4350,15 @@ GIẢI THÍCH: Một buffet sáng tiêu chuẩn cần đa dạng từ món nóng
 
 CÂU HỎI EN: Briefly describe a buffet dish using roasting / stewing / deep frying / boiling / grilling technique and a suitable garnish.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A roasted dish example is slow-roasted beef sirloin, carved to order, garnished with fresh rosemary and a red wine jus.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Món roasting trên buffet thường được cắt trực tiếp theo yêu cầu khách tại quầy carving, kèm garnish và sốt phù hợp.
 
 CÂU HỎI EN: What garnishes and accompaniments would be suitable for roast turkey / roast pork / roast beef / cold cooked prawns / smoked salmon / steamed mixed vegetables / fresh fruit salad / chocolate gateaux?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Roast turkey: cranberry sauce and gravy. Roast pork: apple sauce and crackling. Roast beef: horseradish cream and red wine jus. Cold cooked prawns: cocktail sauce and lemon wedges. Smoked salmon: capers, dill and lemon. Steamed mixed vegetables: a herb butter. Fresh fruit salad: a mint garnish. Chocolate gateaux: chocolate shavings and fresh berries.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Mỗi món chính buffet có bộ garnish/sốt đi kèm truyền thống riêng - nắm được các cặp món-sốt kinh điển này rất hữu ích khi lên thực đơn buffet.
 
 CÂU HỎI EN: Explain the vegetarian diet, vegan diet, coeliac diet, lactose diet, diabetic diet.
 CÂU HỎI VI: 
@@ -4404,9 +4404,9 @@ GIẢI THÍCH: Tương tự cách tính khẩu phần salad, ta nhân lượng h
 
 CÂU HỎI EN: Give four examples of centrepieces you could use to enhance the display of a buffet.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: An ice carving, a fruit or vegetable carving, a floral arrangement, or a chocolate showpiece.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Centrepiece giúp tạo điểm nhấn thị giác thu hút khách tới bàn buffet, thường làm từ đá, hoa quả chạm khắc hoặc chocolate.
 
 CÂU HỎI EN: If it is not possible to display cold foods below 5°C, what is the longest period the food can be safely displayed for?
 CÂU HỎI VI: 
@@ -4422,9 +4422,9 @@ GIẢI THÍCH: Buffet hiện đại ưu tiên khay nhỏ bổ sung thường xuy
 
 CÂU HỎI EN: What is a Buffet Service Point?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A Buffet Service Point is a designated station on the buffet where a chef actively cooks, carves or serves a dish to order in front of guests, such as a carving station.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Buffet Service Point là nơi đầu bếp thao tác trực tiếp trước mặt khách (như trạm carving thịt), tạo trải nghiệm tương tác và món ăn tươi nóng.
 
 CÂU HỎI EN: Salads are normally presented packed in ice, but the ice machine has broken down. How can you solve this problem?
 CÂU HỎI VI: 
@@ -4446,9 +4446,9 @@ GIẢI THÍCH: Để thịt nghỉ sau khi nấu cho phép nước thịt phân 
 
 CÂU HỎI EN: Explain how buffets changed in recent years following the pandemic/COVID.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Many buffets moved away from open, self-service trays to more staff-served or individually portioned items, with better hygiene measures like sneeze guards, hand sanitiser stations, and single-use serving utensils.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Sau đại dịch, buffet chuyển hướng sang phục vụ có nhân viên hoặc khẩu phần đóng gói riêng để tăng an toàn vệ sinh thay vì để khách tự lấy đồ ăn mở hoàn toàn.
 
 CÂU HỎI EN: What canapés have you got that are cold?
 CÂU HỎI VI: 
@@ -4531,9 +4531,9 @@ GIẢI THÍCH: Dị ứng thực phẩm là phản ứng của hệ miễn dịc
 
 CÂU HỎI EN: Explain the basic principles of a Keto diet.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: A Keto diet is very low in carbohydrates and high in fat, which puts the body into ketosis so it burns fat for energy instead of glucose.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Chế độ Keto giảm mạnh tinh bột để buộc cơ thể chuyển sang dùng mỡ làm nguồn năng lượng chính.
 
 CÂU HỎI EN: Explain the basic principles of a Vegan diet.
 CÂU HỎI VI: 
@@ -4549,9 +4549,9 @@ GIẢI THÍCH: Kosher là thực phẩm được chế biến tuân theo luật 
 
 CÂU HỎI EN: A customer is asking for medical advice about medications and the fish meal they have ordered. How would you respond?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: I would politely explain I'm not qualified to give medical advice and suggest they check with their doctor or pharmacist before eating.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đầu bếp không được đưa lời khuyên y tế - luôn từ chối lịch sự và hướng khách tới chuyên gia y tế phù hợp.
 
 CÂU HỎI EN: Name two food ingredients that must be mentioned on product labelling.
 CÂU HỎI VI: 
@@ -4580,9 +4580,9 @@ GIẢI THÍCH: À la carte cho phép khách chọn từng món và trả tiền 
 
 CÂU HỎI EN: Identify three factors that will influence the basic structure of a menu.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Customer profile and expectations, cost and profitability, and the kitchen's equipment and staff skill level.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Cấu trúc thực đơn phụ thuộc vào việc phục vụ ai (khách hàng), chi phí/lợi nhuận, và khả năng thực tế của bếp (thiết bị, tay nghề).
 
 CÂU HỎI EN: The price of tomatoes has risen dramatically due to storm damage. What action can you take to adjust the menu to reduce costs?
 CÂU HỎI VI: 
@@ -4616,9 +4616,9 @@ GIẢI THÍCH: Các món bán chậm vẫn chiếm chỗ trong kho, vốn lưu �
 
 CÂU HỎI EN: List three types of customer profiles.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Families, business or corporate customers, and tourists.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Xác định đúng nhóm khách hàng chính giúp thiết kế thực đơn và mức giá phù hợp với nhu cầu từng đối tượng.
 
 CÂU HỎI EN: How do you create a new menu?
 CÂU HỎI VI: 
@@ -4635,21 +4635,21 @@ GIẢI THÍCH: Đây là câu trả lời mang tính thực tế cho vị trí �
 # CHỦ ĐỀ: Giải quyết xung đột, đào tạo và phát triển nhóm
 CÂU HỎI EN: Give four signals that you can look for to identify a possible conflict situation.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Raised voices or tense body language, avoidance or reduced communication between colleagues, a drop in team morale or productivity, and increased complaints or mistakes.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Nhận biết sớm dấu hiệu xung đột (thái độ, giao tiếp, hiệu suất) giúp can thiệp trước khi vấn đề trở nên nghiêm trọng hơn.
 
 CÂU HỎI EN: What barriers to communication can lead to an escalating conflict? Give three ways these barriers can be overcome.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Barriers include language differences, poor listening, and assumptions or stereotyping. These can be overcome by speaking clearly and simply, actively listening, and asking questions to check understanding.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Rào cản giao tiếp (ngôn ngữ, không lắng nghe, định kiến) là nguyên nhân gốc rễ khiến xung đột leo thang, cần chủ động khắc phục bằng giao tiếp rõ ràng và lắng nghe tích cực.
 
 CÂU HỎI EN: In what ways can conflict occur between two staff members in your workplace?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Conflict can occur from personality clashes, unclear roles or unfair workload, miscommunication, or competition over responsibilities.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Xung đột giữa đồng nghiệp thường xuất phát từ khác biệt tính cách, phân công không rõ ràng hoặc hiểu lầm trong giao tiếp.
 
 CÂU HỎI EN: Why is it important to deal with conflict situations quickly?
 CÂU HỎI VI: 
@@ -4659,9 +4659,9 @@ GIẢI THÍCH: Trong bếp, một mâu thuẫn nhỏ nếu không xử lý ngay 
 
 CÂU HỎI EN: Give two possible consequences of not dealing with conflict situations in a professional and timely manner.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: It can lower team morale and productivity, and it can escalate into a bigger dispute or lead to staff resigning.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Xung đột không được giải quyết kịp thời có thể ảnh hưởng tới cả tinh thần đội nhóm lẫn giữ chân nhân viên.
 
 CÂU HỎI EN: Why do you need to consider each party's point of view when resolving a conflict situation? How would you do this?
 CÂU HỎI VI: 
@@ -4671,15 +4671,15 @@ GIẢI THÍCH: Khi giải quyết xung đột, nếu chỉ nghe một phía sẽ
 
 CÂU HỎI EN: What are the six steps in handling a conflict resolution?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Identify the problem, listen to both sides, identify the cause, discuss possible solutions, agree on a solution, and follow up to make sure it worked.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Sáu bước xử lý xung đột theo trình tự logic: từ xác định vấn đề đến theo dõi kết quả sau khi giải quyết - đây là quy trình chuẩn được dùng trong đào tạo quản lý.
 
 CÂU HỎI EN: What information would you need to record the details of a customer complaint?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: The customer's name and contact details, the date and time, details of the complaint, and the action taken to resolve it.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Ghi chép đầy đủ thông tin khiếu nại giúp theo dõi, xử lý và tránh lặp lại vấn đề tương tự trong tương lai.
 
 CÂU HỎI EN: What is meant by the term 'win-win' and 'win-lose' when resolving conflict situations?
 CÂU HỎI VI: 
@@ -4689,9 +4689,9 @@ GIẢI THÍCH: Trong giải quyết xung đột, mục tiêu lý tưởng là 'w
 
 CÂU HỎI EN: Why is it important to evaluate the solutions to conflict situations? Why is it important to identify the causes of a conflict situation?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Evaluating solutions ensures the conflict is really resolved and doesn't happen again. Identifying the causes helps prevent the same conflict from happening again in the future.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Chỉ giải quyết bề mặt xung đột chưa đủ - cần đánh giá lại hiệu quả và tìm ra nguyên nhân gốc để ngăn tái diễn.
 
 CÂU HỎI EN: Why should you follow up with all parties involved after resolving a conflict situation?
 CÂU HỎI VI: 
@@ -4713,99 +4713,99 @@ GIẢI THÍCH: Quy trình xử lý phàn nàn khách hàng gồm 7 bước: bìn
 
 CÂU HỎI EN: Identify three things to take into account when planning a coaching session.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: The trainee's current skill level, clear learning objectives, and the time and resources needed.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Lên kế hoạch coaching hiệu quả cần đánh giá trình độ hiện tại, đặt mục tiêu rõ ràng và chuẩn bị đủ thời gian/nguồn lực.
 
 CÂU HỎI EN: You notice the standard of coffee made by a waiter is poor and there's been a complaint. You take them off the machine and replace with an experienced barista. Outline two coaching methods you could use.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Demonstrate the correct technique step by step, then supervise them practising with feedback, or pair them with an experienced staff member for on-the-job mentoring.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Coaching hiệu quả kết hợp làm mẫu, giám sát thực hành có phản hồi, hoặc ghép cặp với người có kinh nghiệm hơn.
 
 CÂU HỎI EN: Describe two business situations where a supervisor may be required to give a team member coaching.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: When a new staff member starts and needs training on procedures, and when a new piece of equipment or menu item is introduced.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Coaching thường cần thiết nhất khi có nhân viên mới hoặc khi có thay đổi trong quy trình/thiết bị/thực đơn.
 
 CÂU HỎI EN: What are the basic principles of Equal Employment Opportunity in training?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Everyone should have equal access to training opportunities, regardless of their race, gender, age, disability or background, and training decisions should be based on merit and need, not discrimination.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Nguyên tắc EEO trong đào tạo đảm bảo mọi nhân viên đều có cơ hội học tập công bằng, không phân biệt đối xử.
 
 CÂU HỎI EN: Why is it important to establish the 'base knowledge' with the colleague you are coaching?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: It helps you understand what they already know, so you can tailor the training to their level instead of repeating things they already know or skipping important basics.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Hiểu 'nền kiến thức' sẵn có của người được đào tạo giúp buổi coaching hiệu quả hơn, tránh dạy lại điều đã biết hoặc bỏ sót kiến thức nền.
 
 CÂU HỎI EN: List the 7 steps used to deliver a training session.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Prepare, explain the purpose, demonstrate, let the trainee practise, give feedback, check understanding, and follow up.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: 7 bước đào tạo theo trình tự logic từ chuẩn bị, làm mẫu, thực hành đến theo dõi sau đào tạo.
 
 CÂU HỎI EN: The cash register has not been reconciled with sales and some transactions were processed wrong. You decide to plan a training session. Outline the purpose of the coaching and the benefits.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: The purpose is to correct the mistakes in processing transactions. The benefits are more accurate sales records, less cash discrepancy, and increased confidence for the staff member.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Đào tạo lại quy trình thu ngân giúp giảm sai sót, đảm bảo số liệu chính xác và tăng sự tự tin cho nhân viên.
 
 CÂU HỎI EN: Give three important points for good clear communication.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Use simple and clear language, listen actively, and check the other person has understood.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Giao tiếp rõ ràng cần cả nói dễ hiểu, lắng nghe chủ động và xác nhận lại để chắc chắn thông điệp được hiểu đúng.
 
 CÂU HỎI EN: How can safety issues be included in the coaching?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: By explaining the safety reason behind each correct procedure, and including a practical demonstration of safe practices as part of the training.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Lồng ghép lý do an toàn vào mỗi bước hướng dẫn giúp nhân viên hiểu và ghi nhớ lâu hơn là chỉ ra lệnh làm theo.
 
 CÂU HỎI EN: You have finished coaching a staff member on stocktaking and order forms. How could they practice this skill?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: They could practise by completing a real or mock stocktake and order form under supervision, then have it checked for accuracy.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Thực hành có giám sát rồi kiểm tra lại là cách hiệu quả để củng cố kỹ năng vừa được coaching.
 
 CÂU HỎI EN: A staff member completes two practice orders, 95% correct with minor issues. How do you give feedback and what feedback do you give?
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: I would give positive feedback on what they did well, then clearly explain the minor issues and how to fix them, so they feel encouraged but know exactly what to improve.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Phản hồi tốt luôn kết hợp khen điểm mạnh trước rồi mới chỉ ra điểm cần cải thiện, giúp người nhận không nản lòng.
 
 CÂU HỎI EN: You recently coached a staff member on new customer service procedures. Outline two methods for monitoring their progress.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Direct observation during service, and regular check-ins or short feedback sessions with the staff member.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Theo dõi tiến độ sau coaching cần kết hợp quan sát trực tiếp và trao đổi định kỳ với nhân viên.
 
 CÂU HỎI EN: The staff member is progressing well implementing the newly coached procedures. Give one example of reporting their progress to others in the venue.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Mentioning their improvement in a team meeting, or giving a short written update to the manager.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Báo cáo tiến bộ của nhân viên giúp ghi nhận nỗ lực của họ và giữ cho quản lý cấp trên nắm được tình hình đào tạo.
 
 CÂU HỎI EN: Give three examples of open questions and three examples of closed questions that could be used in a training situation.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Open questions: 'How do you think that went?', 'What would you do differently next time?', 'Why is this step important?'. Closed questions: 'Did you understand that step?', 'Is the station ready?', 'Have you used this equipment before?'
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Câu hỏi mở khuyến khích trả lời chi tiết, dùng để đánh giá hiểu biết sâu; câu hỏi đóng dùng để xác nhận nhanh thông tin cụ thể.
 
 CÂU HỎI EN: Give three interpersonal skills that are good for a trainer to have.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Patience, clear communication, and active listening.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Một người đào tạo giỏi cần kỹ năng mềm về giao tiếp và kiên nhẫn, không chỉ giỏi chuyên môn kỹ thuật.
 
 CÂU HỎI EN: Give three methods to follow up after the coaching has been completed.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Observe the staff member's work over the following days, ask for their feedback on the training, and do a follow-up check-in after a set period.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Theo dõi sau coaching cần có kế hoạch cụ thể (quan sát, xin phản hồi, hẹn kiểm tra lại) chứ không chỉ dừng ở buổi đào tạo.
 
 CÂU HỎI EN: List eight pieces of information you need to include on a standard recipe card.
 CÂU HỎI VI: 
@@ -4863,9 +4863,9 @@ GIẢI THÍCH: Tôn trọng đồng nghiệp trong môi trường bếp đa văn
 
 CÂU HỎI EN: Give one way you can be inclusive to everyone in the kitchen team.
 CÂU HỎI VI: 
-TRẢ LỜI EN: 
+TRẢ LỜI EN: Make sure everyone is invited to team discussions and their opinions are listened to, regardless of their background or experience level.
 TRẢ LỜI VI: 
-GIẢI THÍCH: 
+GIẢI THÍCH: Tính hòa nhập trong đội bếp thể hiện qua việc đảm bảo mọi thành viên đều được lắng nghe và tham gia, bất kể vị trí hay kinh nghiệm.
 
 CÂU HỎI EN: What is the difference between Food Spoilage and Food Poisoning?
 CÂU HỎI VI: 
