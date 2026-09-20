@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('saCook', Object.freeze({
   loadResources: () => ipcRenderer.invoke('resources:get'),
   getProfile: () => ipcRenderer.invoke('profile:get'),
   setProfile: profile => ipcRenderer.invoke('profile:set', profile),
+  importProfile: () => ipcRenderer.invoke('profile:import'),
   copyText: text => ipcRenderer.invoke('clipboard:write', String(text || '').slice(0, 200000)),
   installUpdate: () => ipcRenderer.invoke('update:run'),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),

@@ -20,14 +20,17 @@ trap 'rm -rf "$STAGE"' EXIT
 node "$ROOT/tests/b1-policy.test.js"
 node "$ROOT/tests/auto-runtime.test.js"
 node "$ROOT/tests/profile-update-runtime.test.js"
+node "$ROOT/tests/profile-document.test.js"
 node --check "$ROOT/main.js"
 node --check "$ROOT/preload.js"
 node --check "$ROOT/b1-policy.js"
 node --check "$ROOT/app.js"
 cp "$ROOT/package.json" "$ROOT/main.js" "$ROOT/preload.js" "$ROOT/index.html" "$ROOT/style.css" "$ROOT/b1-policy.js" "$ROOT/turn-policy.js" "$ROOT/app.js" "$STAGE/"
 cp "$ROOT/presenter-profile.js" "$STAGE/"
+cp "$ROOT/profile-document.js" "$STAGE/"
+node "$ROOT/copy-runtime-deps.js" "$STAGE"
 cp -R "$ROOT/resources" "$STAGE/resources"
-for SHARED_RESOURCE in answer-policy.txt feature-manifest.json ui-tokens.json; do
+for SHARED_RESOURCE in answer-policy.txt feature-manifest.json ui-tokens.json profile-extraction.json; do
   [[ -f "$ROOT/../Shared/$SHARED_RESOURCE" ]] || { echo "Thieu Shared/$SHARED_RESOURCE" >&2; exit 1; }
   cp "$ROOT/../Shared/$SHARED_RESOURCE" "$STAGE/resources/$SHARED_RESOURCE"
 done

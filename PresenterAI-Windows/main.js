@@ -7,6 +7,7 @@ const { Readable, Transform } = require('stream');
 const { pipeline } = require('stream/promises');
 const { fileURLToPath } = require('url');
 const { sanitizeProfile } = require('./presenter-profile');
+const { readProfileDocument } = require('./profile-document');
 
 const KEY_FILE = '.openai-key.v2';
 const PORTABLE_DIR_NAME = 'SA Cook Assistant-win32-x64';
@@ -435,7 +436,8 @@ ipcMain.handle('resources:get', event => {
       hints: readResource('speech-hints.txt'),
       answerPolicy: readResource('answer-policy.txt'),
       knowledge: readResource('sa-cook-knowledge.txt'),
-      handbook: readResource('sa-cook-handbook.txt')
+      handbook: readResource('sa-cook-handbook.txt'),
+      profileExtraction: JSON.parse(readResource('profile-extraction.json', '{}'))
     };
   } catch (_) { throw new Error('Không đọc được dữ liệu SA Cook.'); }
 });
@@ -496,6 +498,15 @@ ipcMain.handle('profile:get', event => {
   if (!isTrustedIpc(event)) throw new Error('Yêu cầu hồ sơ không hợp lệ.');
   try { return sanitizeProfile(JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'presenter-profile.json'), 'utf8'))); }
   catch (error) { if (error.code === 'ENOENT') return sanitizeProfile({}); throw new Error('Không đọc được hồ sơ cá nhân. Dữ liệu cũ chưa bị thay đổi.'); }
+});
+ipcMain.handle('profile:import', async event => {
+  if (!isTrustedIpc(event)) throw new Error('Yêu cầu nhập Word không hợp lệ.');
+  const result = await dialog.showOpenDialog(mainWindow, {title: 'Chọn Word hoặc văn bản', properties: ['openFile'], filters: [{name: 'Word / văn bản', extensions: ['docx', 'txt', 'md']}]});
+  if (result.canceled || !result.filePaths.length) return null;
+  const file = result.filePaths[0];
+  const stat = await fs.promises.stat(file);
+  if (!stat.isFile() || stat.size > 10 * 1024 * 1024) throw new Error('Hãy chọn file nhỏ hơn 10 MB.');
+  return {name: path.basename(file), text: await readProfileDocument(await fs.promises.readFile(file), path.extname(file).toLowerCase())};
 });
 ipcMain.handle('profile:set', (event, value) => {
   if (!isTrustedIpc(event)) throw new Error('Yêu cầu hồ sơ không hợp lệ.');

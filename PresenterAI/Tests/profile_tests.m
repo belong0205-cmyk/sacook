@@ -30,6 +30,15 @@ int main(void) { @autoreleasepool {
   Check([request containsString:@"Restaurant A"],@"Previously queued request is an immutable snapshot");
   app.testProfile=@{};
   Check(![[app requestWithPresenterProfile:requestB] containsString:@"presenter_profile"],@"Clearing profile removes it from future requests");
-  fprintf(stdout,"Profile snapshot and answer isolation: 10 checks, %d failures\n",failures);
+  NSDictionary *facts=@{@"name":@"Test Cook",@"restaurant":@"Test Bistro",@"address":@"",@"menu":@"Lemon tart",@"experience":@"",@"details":@"",@"warnings":@""};
+  NSError *error=nil;
+  NSDictionary *saved=[app validatedProfileExtraction:facts source:@"Original source" error:&error];
+  Check(saved && !error && [saved[@"sourceText"] isEqual:@"Original source"],@"Valid extraction preserves the editable source");
+  Check(![app validatedProfileExtraction:@{@"name":@"partial"} source:@"Original source" error:&error],@"Incomplete AI output is not saved");
+  app.testProfile=saved;
+  Check([[app profileSourceForEditor:saved] isEqual:@"Original source"],@"Editor shows the original document");
+  Check([[app profileSourceForEditor:facts] containsString:@"Test Bistro"],@"Old structured profiles migrate into the one-box editor");
+  Check(![[app requestWithPresenterProfile:@"What is your menu?"] containsString:@"Original source"],@"Answer requests exclude the raw document");
+  fprintf(stdout,"Profile snapshot and answer isolation: 15 checks, %d failures\n",failures);
   return failures?1:0;
 } }

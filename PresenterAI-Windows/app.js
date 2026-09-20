@@ -45,6 +45,8 @@ let sessionId = 0;
 let starting = false;
 let autoFlushTimer = null;
 let presenterProfile = {};
+let profileExtractionTemplate = null;
+let profileProcessingController = null;
 const profileReady = window.saCook.getProfile().then(value => { presenterProfile = window.SACookProfile.sanitizeProfile(value); });
 profileReady.catch(error => setStatus(error.message, true));
 
@@ -301,12 +303,12 @@ function responseText(data) {
   return pieces.join('\n').trim();
 }
 
-async function api(path, body, isForm = false) {
+async function api(path, body, isForm = false, signal) {
   const key = await window.saCook.getKey();
   if (!key) throw new ApiError('Hãy nhập OpenAI API key trong mục “AI key…”.');
   const headers = { Authorization: `Bearer ${key}` };
   if (!isForm) headers['Content-Type'] = 'application/json';
-  const response = await fetch(`https://api.openai.com/v1/${path}`, { method: 'POST', headers, body: isForm ? body : JSON.stringify(body) });
+  const response = await fetch(`https://api.openai.com/v1/${path}`, { method: 'POST', headers, body: isForm ? body : JSON.stringify(body), signal });
   let data = null;
   try { data = await response.json(); } catch (_) { data = {}; }
   if (!response.ok) throw new ApiError(data?.error?.message || `HTTP ${response.status}`, response.status, data?.error?.code || '');
@@ -376,7 +378,7 @@ function requiresBehavioralSynthesis(question) {
 
 async function answerQuestion(question, kind, forceAI = false) {
   await profileReady;
-  const profile = { ...presenterProfile }; // Immutable snapshot for this answer.
+  const profile = window.SACookProfile.answerFacts(presenterProfile); // Exclude the raw document from answers.
   const matches = rankMatches(question);
   const best = matches[0];
   const parts = questionParts(question);
@@ -1054,24 +1056,52 @@ setBackdrop(savedBackdrop);
 $('profileSettings').addEventListener('click', async () => {
   try {
     await profileReady;
-    for (const key of ['name', 'restaurant', 'address', 'menu', 'experience']) $('profile' + key[0].toUpperCase() + key.slice(1)).value = presenterProfile[key] || '';
+    $('profileSource').value = window.SACookProfile.sourceForEditor(presenterProfile);
     $('profileStatus').textContent = '';
+    $('profilePreview').hidden = true;
     $('moreMenu').open = false;
     $('profileDialog').showModal();
   } catch (error) { setStatus(error.message, true); }
 });
-$('saveProfile').addEventListener('click', async () => {
+$('importProfile').addEventListener('click', async () => {
   try {
-    const profile = {};
-    for (const key of ['name', 'restaurant', 'address', 'menu', 'experience']) profile[key] = $('profile' + key[0].toUpperCase() + key.slice(1)).value;
-    presenterProfile = await window.saCook.setProfile(profile);
-    lanes.auto.lastAnswered = ''; lanes.manual.lastAnswered = '';
-    $('profileDialog').close();
-    setStatus('Đã lưu hồ sơ riêng trên máy này.');
+    const document = await window.saCook.importProfile();
+    if (!document) return;
+    const old = $('profileSource').value.trim();
+    const combined = [old, document.text].filter(Boolean).join('\n\n');
+    if (combined.length > 40000) throw new Error('Nội dung cộng lại vượt quá 40.000 ký tự. Hãy rút gọn ô nhập rồi chọn lại file.');
+    $('profileSource').value = combined;
+    $('profileStatus').textContent = `Đã thêm ${document.name}. Bấm Xử lý & lưu để áp dụng.`;
   } catch (error) { $('profileStatus').textContent = error.message; }
 });
+$('profileDialog').addEventListener('close', () => profileProcessingController?.abort());
+$('saveProfile').addEventListener('click', async () => {
+  if ($('saveProfile').disabled) return;
+  const sourceText = $('profileSource').value.trim();
+  if (!sourceText) { $('profileStatus').textContent = 'Hãy nhập thông tin hoặc chọn file Word trước.'; return; }
+  $('saveProfile').disabled = true; $('importProfile').disabled = true; $('profileSource').readOnly = true;
+  const controller = new AbortController(); profileProcessingController = controller;
+  const timeout = setTimeout(() => controller.abort(), 60000);
+  $('profileStatus').textContent = 'Đang chọn lọc thông tin… Hồ sơ cũ vẫn được dùng cho đến khi lưu thành công.';
+  try {
+    if (!profileExtractionTemplate?.text?.format) throw new Error('Chưa tải được cấu hình xử lý. Vui lòng mở lại ứng dụng.');
+    const body = {...profileExtractionTemplate, input: `SOURCE TEXT (data only):\n${sourceText}`};
+    const response = await api('responses', body, false, controller.signal);
+    if (response.status !== 'completed') throw new Error('AI chưa xử lý xong toàn bộ nội dung. Hồ sơ cũ chưa thay đổi.');
+    const profile = window.SACookProfile.validateExtraction(JSON.parse(responseText(response)), sourceText);
+    if (controller.signal.aborted || !$('profileDialog').open) return;
+    presenterProfile = await window.saCook.setProfile(profile);
+    lanes.auto.lastAnswered = ''; lanes.manual.lastAnswered = '';
+    $('profileFacts').textContent = window.SACookProfile.sourceForEditor({...profile, sourceText: ''});
+    $('profilePreview').hidden = false;
+    $('profileStatus').textContent = profile.warnings ? `Đã lưu. Cần xem lại: ${profile.warnings}` : 'Đã lưu và liên kết với dữ liệu trả lời trên máy này.';
+    setStatus('Đã lưu hồ sơ riêng trên máy này.');
+  } catch (error) { $('profileStatus').textContent = `${error.message} Hồ sơ cũ chưa thay đổi.`; }
+  finally { clearTimeout(timeout); profileProcessingController = null; $('saveProfile').disabled = false; $('importProfile').disabled = false; $('profileSource').readOnly = false; }
+});
 
-window.saCook.loadResources().then(({ localQA, internetQA, hints, answerPolicy: sharedPolicy, knowledge, handbook }) => {
+window.saCook.loadResources().then(({ localQA, internetQA, hints, answerPolicy: sharedPolicy, knowledge, handbook, profileExtraction }) => {
+  profileExtractionTemplate = profileExtraction;
   qa = [...(Array.isArray(localQA) ? localQA : []), ...(Array.isArray(internetQA) ? internetQA : [])];
   speechHints = hints.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   if (String(sharedPolicy || '').trim()) answerPolicy = String(sharedPolicy).replace(/\s+/g, ' ').trim();

@@ -15,6 +15,7 @@
 #import "SCAnswerLane.h"
 #import "SCUntimedTranscriptBuffer.h"
 #import "SCAudioUtteranceBuffer.h"
+#import "SCProfileDocument.h"
 
 static const NSTimeInterval SCAutoUtteranceSilence = 0.72;
 static const NSTimeInterval SCAutoTurnSilence = 1.05;
@@ -36,7 +37,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 }
 @end
 
-@interface AppDelegate : NSObject <NSApplicationDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 @property NSWindow *window;
 @property NSSecureTextField *keyField;
 @property NSTextField *topicField;
@@ -145,6 +146,12 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 @property NSMutableArray<NSString *> *autoTurnParts;
 @property NSTimeInterval autoTurnChangedAt;
 @property NSTimeInterval autoCommittedAudioTime;
+@property NSWindow *profileWindow;
+@property NSTextView *profileSourceView;
+@property NSTextField *profileStatusLabel;
+@property NSButton *profileSaveButton;
+@property NSButton *profileImportButton;
+@property NSURLSessionDataTask *profileExtractionTask;
 - (void)stageAutoQuestionTurnText:(NSString *)text;
 - (void)flushAutoQuestionTurnIfReadyAt:(NSTimeInterval)now force:(BOOL)force;
 - (NSArray<NSString *> *)questionPartsForSynthesis:(NSString *)question;
@@ -224,7 +231,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 - (NSDictionary *)presenterProfile {
     NSDictionary *stored=[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"PresenterAI.presenterProfile.v1"];
     NSMutableDictionary *profile=[NSMutableDictionary dictionary];
-    NSDictionary *limits=@{@"name":@200,@"restaurant":@300,@"address":@500,@"menu":@10000,@"experience":@5000};
+    NSDictionary *limits=[self profileFieldLimits];
     for(NSString *key in limits) {
       NSString *value=[stored[key] isKindOfClass:NSString.class]?stored[key]:@"";
       value=[value stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
@@ -236,38 +243,107 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     NSDictionary *profile=[self presenterProfile];
     if(![[profile.allValues componentsJoinedByString:@""] length]) return NO;
     if([question rangeOfString:@"\\b(you|your|yours|restaurant|menu|workplace|employer|address|live|experience)\\b" options:NSRegularExpressionSearch|NSCaseInsensitiveSearch].location!=NSNotFound) return YES;
-    NSSet *menuTerms=[self contentTerms:profile[@"menu"]];
+    NSSet *menuTerms=[self contentTerms:[NSString stringWithFormat:@"%@ %@",profile[@"menu"] ?: @"",profile[@"details"] ?: @""]];
     for(NSString *term in [self contentTerms:question]) if(term.length>=4 && [menuTerms containsObject:term]) return YES;
     return NO;
 }
 - (void)configurePresenterProfile:(id)sender {
-    NSAlert *alert=[NSAlert new]; alert.messageText=@"Hồ sơ & menu riêng trên máy này";
-    alert.informativeText=@"Giữ nguyên khi Update; không đồng bộ sang máy khác. Nội dung được gửi cùng câu hỏi đến OpenAI để cá nhân hoá. Không nhập mật khẩu hay API key ở đây.";
-    NSView *form=[[NSView alloc] initWithFrame:NSMakeRect(0,0,480,380)];
-    NSArray *keys=@[@"name",@"restaurant",@"address",@"menu",@"experience"];
-    NSArray *labels=@[@"Tên",@"Nhà hàng",@"Địa chỉ muốn dùng trong câu trả lời",@"Menu: tên món, nguyên liệu, cách chế biến",@"Kinh nghiệm thực tế / ghi chú"];
-    NSDictionary *profile=[self presenterProfile]; NSMutableDictionary *fields=[NSMutableDictionary dictionary];
-    CGFloat y=380;
-    for(NSUInteger i=0;i<keys.count;i++) {
-      y-=20; NSTextField *label=[NSTextField labelWithString:labels[i]]; label.frame=NSMakeRect(0,y,480,18); label.font=[NSFont systemFontOfSize:12]; [form addSubview:label];
-      CGFloat height=i<3?26:(i==3?84:66); y-=height;
-      if(i<3) { NSTextField *field=[[NSTextField alloc] initWithFrame:NSMakeRect(0,y,480,height)]; field.stringValue=profile[keys[i]]; fields[keys[i]]=field; [form addSubview:field]; }
-      else { NSScrollView *scroll=[[NSScrollView alloc] initWithFrame:NSMakeRect(0,y,480,height)]; scroll.hasVerticalScroller=YES; scroll.borderType=NSBezelBorder; NSTextView *text=[[NSTextView alloc] initWithFrame:NSMakeRect(0,0,460,height)]; text.richText=NO; text.font=[NSFont systemFontOfSize:13]; text.string=profile[keys[i]]; scroll.documentView=text; fields[keys[i]]=text; [form addSubview:scroll]; }
-      y-=5;
+    if(self.profileWindow.visible) { [self.profileWindow makeKeyAndOrderFront:nil]; return; }
+    self.profileWindow=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,620,530) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable backing:NSBackingStoreBuffered defer:NO];
+    self.profileWindow.releasedWhenClosed=NO; self.profileWindow.delegate=self; self.profileWindow.title=@"Thông tin của bạn"; self.profileWindow.level=self.window.level;
+    self.profileWindow.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]; self.profileWindow.sharingType=self.window.sharingType;
+    NSView *root=self.profileWindow.contentView;
+    root.wantsLayer=YES; root.layer.backgroundColor=[NSColor colorWithWhite:0.10 alpha:1].CGColor;
+    NSTextField *intro=[NSTextField wrappingLabelWithString:@"Dán thông tin hoặc chọn Word (.docx). Bấm Xử lý & lưu để gửi nội dung tới OpenAI và tự chọn lọc. Hồ sơ lưu riêng trên máy này, giữ nguyên khi Update. Không nhập mật khẩu hay API key."];
+    intro.frame=NSMakeRect(20,440,580,70); intro.font=[NSFont systemFontOfSize:13]; intro.textColor=[NSColor colorWithWhite:.88 alpha:1]; [root addSubview:intro];
+    NSScrollView *scroll=[[NSScrollView alloc] initWithFrame:NSMakeRect(20,115,580,315)]; scroll.hasVerticalScroller=YES; scroll.borderType=NSBezelBorder;
+    self.profileSourceView=[[NSTextView alloc] initWithFrame:NSMakeRect(0,0,558,315)]; self.profileSourceView.richText=NO; self.profileSourceView.font=[NSFont systemFontOfSize:14];
+    self.profileSourceView.textContainerInset=NSMakeSize(10,10); self.profileSourceView.string=[self profileSourceForEditor:[self presenterProfile]];
+    self.profileSourceView.backgroundColor=[NSColor colorWithWhite:.055 alpha:1]; self.profileSourceView.textColor=NSColor.whiteColor; self.profileSourceView.insertionPointColor=NSColor.whiteColor;
+    scroll.documentView=self.profileSourceView; [root addSubview:scroll];
+    self.profileStatusLabel=[NSTextField wrappingLabelWithString:@"Giới thiệu, nhà hàng, menu, nguyên liệu, kinh nghiệm… Tối đa 40.000 ký tự."];
+    self.profileStatusLabel.frame=NSMakeRect(20,55,580,50); self.profileStatusLabel.font=[NSFont systemFontOfSize:12]; self.profileStatusLabel.textColor=[NSColor colorWithWhite:.8 alpha:1]; [root addSubview:self.profileStatusLabel];
+    self.profileImportButton=[NSButton buttonWithTitle:@"Chọn Word…" target:self action:@selector(importPresenterDocument:)]; self.profileImportButton.frame=NSMakeRect(20,15,125,32); [root addSubview:self.profileImportButton];
+    NSButton *preview=[NSButton buttonWithTitle:@"Xem dữ liệu đã chọn" target:self action:@selector(previewPresenterProfile:)]; preview.frame=NSMakeRect(160,15,190,32); [root addSubview:preview];
+    self.profileSaveButton=[NSButton buttonWithTitle:@"Xử lý & lưu" target:self action:@selector(extractPresenterProfile:)]; self.profileSaveButton.frame=NSMakeRect(450,15,150,32); [root addSubview:self.profileSaveButton];
+    [self.profileWindow center]; [self.profileWindow makeKeyAndOrderFront:nil];
+}
+- (NSDictionary *)profileFieldLimits { return @{@"name":@200,@"restaurant":@300,@"address":@500,@"menu":@10000,@"experience":@5000,@"details":@5000,@"warnings":@2000,@"sourceText":@40000}; }
+- (NSString *)profileSourceForEditor:(NSDictionary *)profile {
+    if([profile[@"sourceText"] length]) return profile[@"sourceText"];
+    NSArray *keys=@[@"name",@"restaurant",@"address",@"menu",@"experience",@"details"];
+    NSMutableArray *parts=[NSMutableArray array]; for(NSString *key in keys) if([profile[key] length]) [parts addObject:[NSString stringWithFormat:@"%@: %@",key.capitalizedString,profile[key]]];
+    return [parts componentsJoinedByString:@"\n\n"];
+}
+- (void)windowWillClose:(NSNotification *)notification {
+    if(notification.object==self.profileWindow) { [self.profileExtractionTask cancel]; self.profileExtractionTask=nil; }
+}
+- (void)previewPresenterProfile:(id)sender {
+    NSMutableDictionary *profile=[[self presenterProfile] mutableCopy]; [profile removeObjectForKey:@"sourceText"];
+    NSAlert *alert=[NSAlert new]; alert.messageText=@"Thông tin đã chọn lọc"; alert.informativeText=profile[@"warnings"] ?: @"";
+    NSScrollView *scroll=[[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,500,300)]; scroll.hasVerticalScroller=YES;
+    NSTextView *text=[[NSTextView alloc] initWithFrame:NSMakeRect(0,0,480,300)]; text.editable=NO; text.font=[NSFont systemFontOfSize:13]; text.string=[self profileSourceForEditor:profile]; scroll.documentView=text; alert.accessoryView=scroll;
+    [alert beginSheetModalForWindow:self.profileWindow completionHandler:nil];
+}
+- (void)importPresenterDocument:(id)sender {
+    NSOpenPanel *panel=[NSOpenPanel openPanel]; panel.allowedFileTypes=@[@"docx",@"txt",@"md"]; panel.allowsMultipleSelection=NO; panel.canChooseDirectories=NO;
+    [panel beginSheetModalForWindow:self.profileWindow completionHandler:^(NSModalResponse result) {
+      if(result!=NSModalResponseOK) return;
+      NSError *error=nil; NSString *text=SCReadProfileDocument(panel.URL,&error);
+      if(!text) { self.profileStatusLabel.stringValue=error.localizedDescription; return; }
+      NSString *old=[self.profileSourceView.string stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+      NSString *combined=old.length?[old stringByAppendingFormat:@"\n\n%@",text]:text;
+      if(combined.length>40000) { self.profileStatusLabel.stringValue=@"Nội dung cộng lại vượt 40.000 ký tự. Hãy rút gọn ô nhập rồi chọn lại file."; return; }
+      self.profileSourceView.string=combined; self.profileStatusLabel.stringValue=[NSString stringWithFormat:@"Đã thêm %@. Bấm Xử lý & lưu để áp dụng.",panel.URL.lastPathComponent];
+    }];
+}
+- (NSDictionary *)validatedProfileExtraction:(NSDictionary *)value source:(NSString *)source error:(NSError **)error {
+    NSDictionary *limits=[self profileFieldLimits]; BOOL valid=[value isKindOfClass:NSDictionary.class] && source.length<=40000, hasFacts=NO;
+    if(valid) for(NSString *key in value) if(!limits[key] || [key isEqual:@"sourceText"]) valid=NO;
+    if(valid) for(NSString *key in limits) {
+      if([key isEqual:@"sourceText"]) continue;
+      if(![value[key] isKindOfClass:NSString.class] || [value[key] length]>[limits[key] unsignedIntegerValue]) { valid=NO; break; }
+      if(![key isEqual:@"warnings"] && [[value[key] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] length]) hasFacts=YES;
     }
-    alert.accessoryView=form; [alert addButtonWithTitle:@"Lưu hồ sơ"]; [alert addButtonWithTitle:@"Huỷ"];
-    if([alert runModal]!=NSAlertFirstButtonReturn) return;
-    NSMutableDictionary *saved=[NSMutableDictionary dictionary];
-    for(NSString *key in keys) saved[key]=[fields[key] isKindOfClass:NSTextView.class]?[fields[key] string]:[fields[key] stringValue];
-    [[NSUserDefaults standardUserDefaults] setObject:saved forKey:@"PresenterAI.presenterProfile.v1"];
-    [[NSUserDefaults standardUserDefaults] setObject:[self presenterProfile] forKey:@"PresenterAI.presenterProfile.v1"];
-    self.lastAutoAsked=nil; self.lastAsked=nil;
-    [self setStatus:@"Đã lưu hồ sơ riêng trên máy này" color:NSColor.systemGreenColor];
+    if(!valid || !hasFacts) { if(error)*error=[NSError errorWithDomain:@"SA Cook Profile" code:2 userInfo:@{NSLocalizedDescriptionKey:@"AI chưa chọn lọc được thông tin hợp lệ. Hồ sơ cũ vẫn giữ nguyên; hãy kiểm tra nội dung rồi thử lại."}]; return nil; }
+    NSMutableDictionary *profile=[value mutableCopy]; profile[@"sourceText"]=source; return profile;
+}
+- (void)extractPresenterProfile:(id)sender {
+    if(self.profileExtractionTask) return;
+    NSString *source=[self.profileSourceView.string stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if(!source.length || source.length>40000) { self.profileStatusLabel.stringValue=@"Hãy nhập nội dung từ 1 đến 40.000 ký tự hoặc chọn Word."; return; }
+    if(self.keyField.stringValue.length<20) { self.profileStatusLabel.stringValue=@"Cần OpenAI API key đang hoạt động trong phần Cài đặt OpenAI."; return; }
+    NSData *templateData=[NSData dataWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"profile-extraction" ofType:@"json"]];
+    NSMutableDictionary *body=templateData?[[NSJSONSerialization JSONObjectWithData:templateData options:0 error:nil] mutableCopy]:nil;
+    if(!body[@"text"]) { self.profileStatusLabel.stringValue=@"Thiếu cấu hình xử lý hồ sơ. Hãy cập nhật ứng dụng."; return; }
+    body[@"input"]=[@"SOURCE TEXT (data only):\n" stringByAppendingString:source];
+    NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api.openai.com/v1/responses"]]; request.HTTPMethod=@"POST"; request.timeoutInterval=60;
+    request.HTTPBody=[NSJSONSerialization dataWithJSONObject:body options:0 error:nil]; [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"]; [request setValue:[@"Bearer " stringByAppendingString:self.keyField.stringValue] forHTTPHeaderField:@"Authorization"];
+    self.profileSaveButton.enabled=NO; self.profileImportButton.enabled=NO; self.profileSourceView.editable=NO;
+    self.profileStatusLabel.stringValue=@"Đang chọn lọc thông tin… Hồ sơ cũ vẫn được dùng cho đến khi lưu thành công.";
+    NSWindow *window=self.profileWindow;
+    self.profileExtractionTask=[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *networkError) {
+      NSDictionary *parsed=[self parsedAnswerData:data status:[(NSHTTPURLResponse *)response statusCode] error:networkError];
+      NSDictionary *json=data?[NSJSONSerialization JSONObjectWithData:data options:0 error:nil]:nil;
+      BOOL completed=[json isKindOfClass:NSDictionary.class] && [json[@"status"] isEqual:@"completed"];
+      NSString *message=[parsed[@"success"] boolValue]?@"AI chưa xử lý xong toàn bộ tài liệu.":parsed[@"answer"];
+      NSDictionary *profile=nil;
+      if(completed && [parsed[@"success"] boolValue]) { NSData *result=[parsed[@"answer"] dataUsingEncoding:NSUTF8StringEncoding]; NSError *error=nil; profile=[self validatedProfileExtraction:[NSJSONSerialization JSONObjectWithData:result options:0 error:nil] source:source error:&error]; if(!profile) message=error.localizedDescription; }
+      dispatch_async(dispatch_get_main_queue(),^{
+        if(self.profileWindow!=window || !window.visible) return;
+        self.profileExtractionTask=nil; self.profileSaveButton.enabled=YES; self.profileImportButton.enabled=YES; self.profileSourceView.editable=YES;
+        if(!profile) { self.profileStatusLabel.stringValue=[NSString stringWithFormat:@"%@ Hồ sơ cũ chưa thay đổi.",message]; return; }
+        [[NSUserDefaults standardUserDefaults] setObject:profile forKey:@"PresenterAI.presenterProfile.v1"];
+        self.lastAutoAsked=nil; self.lastAsked=nil;
+        self.profileStatusLabel.stringValue=[profile[@"warnings"] length]?[@"Đã lưu. Cần xem lại: " stringByAppendingString:profile[@"warnings"]]:@"Đã lưu và liên kết với dữ liệu trả lời trên máy này.";
+        [self setStatus:@"Đã cập nhật hồ sơ riêng" color:NSColor.systemGreenColor];
+      });
+    }]; [self.profileExtractionTask resume];
 }
 - (NSString *)requestWithPresenterProfile:(NSString *)request {
     // Snapshot into the queued request; changing a profile cannot change a
     // pending answer or accidentally reuse an answer from another profile.
-    NSDictionary *profile=[self presenterProfile];
+    NSMutableDictionary *profile=[[self presenterProfile] mutableCopy]; [profile removeObjectForKey:@"sourceText"];
     NSString *base=[self contextualRequestForQuestion:[self heardQuestionFromRequest:request] recentQuestions:[self recentQuestionsFromRequest:request]];
     NSData *json=[NSJSONSerialization dataWithJSONObject:profile options:NSJSONWritingSortedKeys error:nil];
     NSString *text=[[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding];

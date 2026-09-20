@@ -8,6 +8,7 @@
 @end
 @implementation ReadingUITestApp
 - (NSInteger)initialBackdropStrength { return 1; }
+- (NSDictionary *)presenterProfile { return @{@"sourceText":@"Tôi tên Alex. Tôi làm việc tại nhà hàng Test Bistro.\n\nMenu gồm: grilled salmon, Caesar salad và crème brûlée.\nCaesar dressing dùng egg yolks, oil, lemon juice, mustard và anchovies.\n\nTôi phụ trách mise en place và khu vực bếp nóng."}; }
 @end
 
 static NSUInteger assertions=0, failures=0;
@@ -293,6 +294,19 @@ int main(int argc,const char *argv[]) {
             [app.currentAnswerView scrollPoint:NSZeroPoint]; [app.autoAnswerView scrollPoint:NSZeroPoint];
             Render(app,[[path stringByDeletingPathExtension] stringByAppendingString:@"-minimum-histories.png"]);
         }
+        [app configurePresenterProfile:nil];
+        Check(app.profileSourceView.editable && !app.profileSourceView.richText,@"Profile editor has one plain-text input");
+        Check([app.profileImportButton.title isEqual:@"Chọn Word…"] && [app.profileSaveButton.title isEqual:@"Xử lý & lưu"],@"Profile supports document import and automatic extraction");
+        Check(NSContainsRect(app.profileWindow.contentView.bounds,app.profileSaveButton.frame),@"Profile save button remains inside the compact window");
+        if(argc>1) {
+            [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+            [app.profileWindow displayIfNeeded];
+            NSView *root=app.profileWindow.contentView; [root layoutSubtreeIfNeeded];
+            NSBitmapImageRep *rep=[root bitmapImageRepForCachingDisplayInRect:root.bounds]; [root cacheDisplayInRect:root.bounds toBitmapImageRep:rep];
+            NSString *path=[NSString stringWithUTF8String:argv[1]];
+            [[rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:[[path stringByDeletingPathExtension] stringByAppendingString:@"-profile.png"] atomically:YES];
+        }
+        [app.profileWindow close];
         Check(!app.listening && app.audioEngine==nil && app.recognizer==nil,@"UI test never starts audio or speech recognition");
         printf("Reading UI: %lu assertions, %lu failures\n",(unsigned long)assertions,(unsigned long)failures);
         return failures?1:0;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.openai.com; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self'; img-src 'self' data:; media-src blob:">
-  <title>SA Cook Assistant — Windows Preview 5.56</title>
+  <title>SA Cook Assistant — Windows Preview 5.57</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-backdrop="1">
@@ -60,14 +60,12 @@
   <script src="turn-policy.js"></script>
   <dialog id="profileDialog" aria-labelledby="profileTitle">
     <form method="dialog">
-      <div class="dialog-heading"><div><h2 id="profileTitle">Hồ sơ riêng trên máy này</h2><p>Giữ nguyên khi Update, không đồng bộ sang máy khác. Nội dung được gửi cùng câu hỏi đến OpenAI để cá nhân hoá; không nhập mật khẩu hay API key ở đây.</p></div><button value="cancel" class="close-button">×</button></div>
-      <label class="key-label">Tên<input id="profileName" maxlength="200"></label>
-      <label class="key-label">Nhà hàng<input id="profileRestaurant" maxlength="300"></label>
-      <label class="key-label">Địa chỉ bạn muốn dùng trong câu trả lời<input id="profileAddress" maxlength="500"></label>
-      <label class="key-label">Menu — tên món, nguyên liệu, cách chế biến<textarea id="profileMenu" rows="5" maxlength="10000"></textarea></label>
-      <label class="key-label">Kinh nghiệm thực tế / ghi chú<textarea id="profileExperience" rows="3" maxlength="5000"></textarea></label>
+      <div class="dialog-heading"><div><h2 id="profileTitle">Thông tin của bạn</h2><p>Dán nội dung hoặc chọn Word (.docx). Khi bấm Xử lý &amp; lưu, nội dung được gửi đến OpenAI để chọn lọc. Hồ sơ lưu riêng trên máy này, giữ nguyên khi Update. Không nhập mật khẩu hay API key.</p></div><button value="cancel" class="close-button">×</button></div>
+      <label class="key-label" for="profileSource">Giới thiệu, nơi làm việc, menu, nguyên liệu, kinh nghiệm…</label>
+      <textarea id="profileSource" rows="12" maxlength="40000" placeholder="Ví dụ: Tôi tên… Tôi làm tại… Nhà hàng phục vụ… Các món trong menu gồm…"></textarea>
       <p id="profileStatus" class="key-status" aria-live="polite"></p>
-      <div class="dialog-actions"><button value="cancel">Huỷ</button><button id="saveProfile" type="button" class="primary">Lưu hồ sơ</button></div>
+      <details id="profilePreview" hidden><summary>Thông tin đã chọn lọc</summary><pre id="profileFacts"></pre></details>
+      <div class="dialog-actions"><button id="importProfile" type="button">Chọn Word…</button><button value="cancel">Đóng</button><button id="saveProfile" type="button" class="primary">Xử lý &amp; lưu</button></div>
     </form>
   </dialog>
   <script src="presenter-profile.js"></script>

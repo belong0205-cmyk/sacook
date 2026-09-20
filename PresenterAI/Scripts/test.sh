@@ -4,7 +4,7 @@ ROOT="${0:A:h:h}"
 RESOURCES="${1:-$ROOT/dist/Presenter AI.app/Contents/Resources}"
 TEST_BUILD="$(mktemp -d /private/tmp/sa-cook-tests.XXXXXX)"
 FRAMEWORKS=(-framework Cocoa -framework AVFoundation -framework Speech -framework PDFKit -framework Security -framework CoreAudio -framework AudioToolbox -framework NaturalLanguage)
-SUPPORT=("$ROOT/Sources/SCSpeechTimeline.m" "$ROOT/Sources/SCAutoQuestionDetector.m" "$ROOT/Sources/SCAnswerLane.m" "$ROOT/Sources/SCUntimedTranscriptBuffer.m" "$ROOT/Sources/SCAudioUtteranceBuffer.m")
+SUPPORT=("$ROOT/Sources/SCProfileDocument.m" "$ROOT/Sources/SCSpeechTimeline.m" "$ROOT/Sources/SCAutoQuestionDetector.m" "$ROOT/Sources/SCAnswerLane.m" "$ROOT/Sources/SCUntimedTranscriptBuffer.m" "$ROOT/Sources/SCAudioUtteranceBuffer.m")
 for shared_resource in answer-policy.txt feature-manifest.json ui-tokens.json; do
   test -s "$RESOURCES/$shared_resource"
 done
@@ -25,3 +25,6 @@ clang -fobjc-arc "${FRAMEWORKS[@]}" -mmacosx-version-min=13.0 "$ROOT/Tests/readi
 "$TEST_BUILD/reading_ui_tests" "$TEST_BUILD/reading-ui.png"
 python3 -m unittest discover -s "$ROOT/Tests" -p 'test_data_index.py' -v
 python3 -m unittest discover -s "$ROOT/Tests" -p 'test_update_helper.py' -v
+python3 "$ROOT/../Scripts/create-profile-fixtures.py" "$TEST_BUILD/profile-fixtures"
+clang -fobjc-arc -framework Foundation "$ROOT/Sources/SCProfileDocument.m" "$ROOT/Tests/profile_document_tests.m" -o "$TEST_BUILD/profile_document_tests"
+"$TEST_BUILD/profile_document_tests" "$TEST_BUILD/profile-fixtures"

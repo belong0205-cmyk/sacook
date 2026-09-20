@@ -6,5 +6,6 @@ dialog{width:min(440px,calc(100vw - 32px));padding:0;color:#f3f5f8;background:#1
 body{background:rgba(0,0,0,.02)}
 dialog{max-height:calc(100vh - 24px);overflow:auto}#profileDialog{width:min(560px,calc(100vw - 32px))}#profileDialog input{height:30px;margin:4px 0 6px}#profileDialog textarea{display:block;width:100%;padding:8px;margin:4px 0 8px;font:13px/1.4 inherit;color:#fff;background:#080a0d;border:1px solid #ffffff24;border-radius:8px;resize:vertical;user-select:text;cursor:text}
 .conversation-surface,.conversation-surface *{user-select:none;-webkit-user-select:none;cursor:default}
+#profilePreview{margin:8px 0 12px;color:#ccd5de;font-size:12px}#profileFacts{white-space:pre-wrap;max-height:150px;overflow:auto;line-height:1.5}#profileSource{font:14px/1.5 "Segoe UI",sans-serif;min-height:230px}#profileDialog .dialog-actions{flex-wrap:wrap}
 .menu-row.answer-actions{grid-template-columns:55px repeat(2,minmax(0,1fr))}
 .answer-label{display:inline-block;margin:3px 6px 2px 0;color:#aeb6c2;font-size:.62em;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.message.answer strong,.past-answer strong{color:#fff;font-weight:850;text-shadow:0 0 10px #ffffff22}.past-answer .answer-label{font-size:.64em}

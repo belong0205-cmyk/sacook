@@ -1,4 +1,4 @@
-SA Cook Assistant — Windows Preview 5.56
+SA Cook Assistant — Windows Preview 5.57
 
 Yeu cau: Windows 10/11 64-bit, Internet va OpenAI API key dang hoat dong.
 
@@ -9,7 +9,7 @@ Yeu cau: Windows 10/11 64-bit, Internet va OpenAI API key dang hoat dong.
 5. Bam "Bat dau nghe". AUTO tu nhan dien; SPACE chi chot khi bam phim Space hoac nut "Chot cau".
 6. Dung nut A-/A+ va 3 muc do nen trong menu "..." de doc de hon.
 7. Bam "Update" de app tu tai, xac minh, thay ban moi va mo lai.
-8. Trong menu "...", mo "Ho so & menu rieng..." de nhap ten, nha hang, dia chi, menu va kinh nghiem. Du lieu luu rieng tren may nay va giu nguyen khi Update; noi dung duoc gui cho OpenAI de ca nhan hoa cau tra loi.
+8. Trong menu "...", mo "Ho so & menu rieng...". Dan noi dung vao mot o hoac bam "Chon Word..." (.docx, toi da 10 MB/40.000 ky tu), roi "Xu ly & luu". AI tu chon loc thong tin; du lieu luu rieng tren may va giu nguyen khi Update. Can OpenAI API key de xu ly. Word chi co anh hoac .doc cu can chuyen thanh van ban/.docx truoc. Chon Word se them noi dung vao o, khong tu xoa noi dung cu.
 
 Cau tra loi dung tieng Anh B2 tu nhien, gom ban ngan de noi ngay va ban day du hon.
 Tu chuyen nganh nau an va tu tieng Phap can thiet van duoc giu dung.
