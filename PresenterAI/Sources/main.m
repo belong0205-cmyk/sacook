@@ -152,6 +152,12 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 @property NSButton *profileSaveButton;
 @property NSButton *profileImportButton;
 @property NSURLSessionDataTask *profileExtractionTask;
+@property NSTextField *webProfileEmailField;
+@property NSSecureTextField *webProfilePasswordField;
+@property NSButton *webProfileLoginButton;
+@property NSButton *webProfileSyncButton;
+@property NSButton *webProfileLogoutButton;
+@property NSURLSessionDataTask *webProfileTask;
 - (void)stageAutoQuestionTurnText:(NSString *)text;
 - (void)flushAutoQuestionTurnIfReadyAt:(NSTimeInterval)now force:(BOOL)force;
 - (NSArray<NSString *> *)questionPartsForSynthesis:(NSString *)question;
@@ -249,24 +255,63 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 }
 - (void)configurePresenterProfile:(id)sender {
     if(self.profileWindow.visible) { [self.profileWindow makeKeyAndOrderFront:nil]; return; }
-    self.profileWindow=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,620,530) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable backing:NSBackingStoreBuffered defer:NO];
+    self.profileWindow=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,620,650) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable backing:NSBackingStoreBuffered defer:NO];
     self.profileWindow.releasedWhenClosed=NO; self.profileWindow.delegate=self; self.profileWindow.title=@"Thông tin của bạn"; self.profileWindow.level=self.window.level;
     self.profileWindow.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]; self.profileWindow.sharingType=self.window.sharingType;
     NSView *root=self.profileWindow.contentView;
     root.wantsLayer=YES; root.layer.backgroundColor=[NSColor colorWithWhite:0.10 alpha:1].CGColor;
-    NSTextField *intro=[NSTextField wrappingLabelWithString:@"Dán thông tin hoặc chọn Word (.docx). Bấm Xử lý & lưu để gửi nội dung tới OpenAI và tự chọn lọc. Hồ sơ lưu riêng trên máy này, giữ nguyên khi Update. Không nhập mật khẩu hay API key."];
-    intro.frame=NSMakeRect(20,440,580,70); intro.font=[NSFont systemFontOfSize:13]; intro.textColor=[NSColor colorWithWhite:.88 alpha:1]; [root addSubview:intro];
-    NSScrollView *scroll=[[NSScrollView alloc] initWithFrame:NSMakeRect(20,115,580,315)]; scroll.hasVerticalScroller=YES; scroll.borderType=NSBezelBorder;
-    self.profileSourceView=[[NSTextView alloc] initWithFrame:NSMakeRect(0,0,558,315)]; self.profileSourceView.richText=NO; self.profileSourceView.font=[NSFont systemFontOfSize:14];
+    NSTextField *intro=[NSTextField wrappingLabelWithString:@"Đồng bộ hồ sơ từ thiladau.com hoặc nhập riêng trên máy. Mật khẩu chỉ dùng để đăng nhập và không được lưu."];
+    intro.frame=NSMakeRect(20,595,580,38); intro.font=[NSFont systemFontOfSize:13]; intro.textColor=[NSColor colorWithWhite:.88 alpha:1]; [root addSubview:intro];
+    self.webProfileEmailField=[[NSTextField alloc] initWithFrame:NSMakeRect(20,552,250,28)]; self.webProfileEmailField.placeholderString=@"Email tài khoản thiladau.com"; self.webProfileEmailField.stringValue=[[NSUserDefaults standardUserDefaults] stringForKey:@"PresenterAI.webProfileEmail.v1"] ?: @""; [root addSubview:self.webProfileEmailField];
+    self.webProfilePasswordField=[[NSSecureTextField alloc] initWithFrame:NSMakeRect(280,552,160,28)]; self.webProfilePasswordField.placeholderString=@"Mật khẩu"; [root addSubview:self.webProfilePasswordField];
+    self.webProfileLoginButton=[NSButton buttonWithTitle:@"Đăng nhập & đồng bộ" target:self action:@selector(loginAndSyncWebProfile:)]; self.webProfileLoginButton.frame=NSMakeRect(450,550,150,32); [root addSubview:self.webProfileLoginButton];
+    self.webProfileSyncButton=[NSButton buttonWithTitle:@"Đồng bộ lại" target:self action:@selector(syncWebProfile:)]; self.webProfileSyncButton.frame=NSMakeRect(20,512,125,30); [root addSubview:self.webProfileSyncButton];
+    self.webProfileLogoutButton=[NSButton buttonWithTitle:@"Ngắt liên kết" target:self action:@selector(logoutWebProfile:)]; self.webProfileLogoutButton.frame=NSMakeRect(155,512,125,30); [root addSubview:self.webProfileLogoutButton];
+    BOOL linked=[[[NSUserDefaults standardUserDefaults] stringForKey:@"PresenterAI.webProfileToken.v1"] length]==64; self.webProfileSyncButton.enabled=linked; self.webProfileLogoutButton.enabled=linked;
+    NSScrollView *scroll=[[NSScrollView alloc] initWithFrame:NSMakeRect(20,145,580,355)]; scroll.hasVerticalScroller=YES; scroll.borderType=NSBezelBorder;
+    self.profileSourceView=[[NSTextView alloc] initWithFrame:NSMakeRect(0,0,558,355)]; self.profileSourceView.richText=NO; self.profileSourceView.font=[NSFont systemFontOfSize:14];
     self.profileSourceView.textContainerInset=NSMakeSize(10,10); self.profileSourceView.string=[self profileSourceForEditor:[self presenterProfile]];
     self.profileSourceView.backgroundColor=[NSColor colorWithWhite:.055 alpha:1]; self.profileSourceView.textColor=NSColor.whiteColor; self.profileSourceView.insertionPointColor=NSColor.whiteColor;
     scroll.documentView=self.profileSourceView; [root addSubview:scroll];
     self.profileStatusLabel=[NSTextField wrappingLabelWithString:@"Giới thiệu, nhà hàng, menu, nguyên liệu, kinh nghiệm… Tối đa 40.000 ký tự."];
-    self.profileStatusLabel.frame=NSMakeRect(20,55,580,50); self.profileStatusLabel.font=[NSFont systemFontOfSize:12]; self.profileStatusLabel.textColor=[NSColor colorWithWhite:.8 alpha:1]; [root addSubview:self.profileStatusLabel];
-    self.profileImportButton=[NSButton buttonWithTitle:@"Chọn Word…" target:self action:@selector(importPresenterDocument:)]; self.profileImportButton.frame=NSMakeRect(20,15,125,32); [root addSubview:self.profileImportButton];
-    NSButton *preview=[NSButton buttonWithTitle:@"Xem dữ liệu đã chọn" target:self action:@selector(previewPresenterProfile:)]; preview.frame=NSMakeRect(160,15,190,32); [root addSubview:preview];
-    self.profileSaveButton=[NSButton buttonWithTitle:@"Xử lý & lưu" target:self action:@selector(extractPresenterProfile:)]; self.profileSaveButton.frame=NSMakeRect(450,15,150,32); [root addSubview:self.profileSaveButton];
+    self.profileStatusLabel.frame=NSMakeRect(20,70,580,62); self.profileStatusLabel.font=[NSFont systemFontOfSize:12]; self.profileStatusLabel.textColor=[NSColor colorWithWhite:.8 alpha:1]; self.profileStatusLabel.stringValue=linked?@"Đã liên kết hồ sơ web. Bấm Đồng bộ lại sau khi cập nhật thông tin trên thiladau.com.":@"Bạn cũng có thể dán nội dung hoặc chọn Word ở đây. Tối đa 40.000 ký tự."; [root addSubview:self.profileStatusLabel];
+    self.profileImportButton=[NSButton buttonWithTitle:@"Chọn Word…" target:self action:@selector(importPresenterDocument:)]; self.profileImportButton.frame=NSMakeRect(20,22,125,32); [root addSubview:self.profileImportButton];
+    NSButton *preview=[NSButton buttonWithTitle:@"Xem dữ liệu đã chọn" target:self action:@selector(previewPresenterProfile:)]; preview.frame=NSMakeRect(160,22,190,32); [root addSubview:preview];
+    self.profileSaveButton=[NSButton buttonWithTitle:@"Xử lý & lưu" target:self action:@selector(extractPresenterProfile:)]; self.profileSaveButton.frame=NSMakeRect(450,22,150,32); [root addSubview:self.profileSaveButton];
     [self.profileWindow center]; [self.profileWindow makeKeyAndOrderFront:nil];
+}
+- (NSMutableURLRequest *)webProfileRequest:(NSString *)path method:(NSString *)method token:(NSString *)token body:(NSDictionary *)body {
+    NSURL *url=[NSURL URLWithString:[@"https://thiladau.com/cook1/api" stringByAppendingString:path]]; NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:url];
+    request.HTTPMethod=method; request.timeoutInterval=20; [request setValue:@"presenter-ai://desktop" forHTTPHeaderField:@"Origin"]; [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    if(token.length) [request setValue:[@"Bearer " stringByAppendingString:token] forHTTPHeaderField:@"Authorization"];
+    if(body) request.HTTPBody=[NSJSONSerialization dataWithJSONObject:body options:0 error:nil]; return request;
+}
+- (NSString *)webProfileError:(NSData *)data response:(NSURLResponse *)response error:(NSError *)error {
+    if(error) return error.localizedDescription; NSInteger status=[(NSHTTPURLResponse *)response statusCode]; NSDictionary *json=data?[NSJSONSerialization JSONObjectWithData:data options:0 error:nil]:nil;
+    NSString *message=[json[@"error"] isKindOfClass:NSString.class]?json[@"error"]:nil; return message.length?message:[NSString stringWithFormat:@"Không thể đồng bộ hồ sơ (HTTP %ld).",(long)status];
+}
+- (BOOL)applyWebProfilePayload:(NSDictionary *)payload token:(NSString *)token error:(NSString **)message {
+    NSDictionary *raw=[payload[@"profile"] isKindOfClass:NSDictionary.class]?payload[@"profile"]:nil; NSString *source=[raw[@"sourceText"] isKindOfClass:NSString.class]?raw[@"sourceText"]:@"";
+    NSMutableDictionary *facts=[raw mutableCopy]; [facts removeObjectForKey:@"sourceText"]; NSError *validationError=nil; NSDictionary *profile=[self validatedProfileExtraction:facts source:source error:&validationError];
+    if(!profile){if(message)*message=validationError.localizedDescription;return NO;} NSUserDefaults *defaults=[NSUserDefaults standardUserDefaults]; [defaults setObject:profile forKey:@"PresenterAI.presenterProfile.v1"];
+    NSString *email=[payload[@"email"] isKindOfClass:NSString.class]?payload[@"email"]:@""; if(email.length)[defaults setObject:email forKey:@"PresenterAI.webProfileEmail.v1"]; if(token.length)[defaults setObject:token forKey:@"PresenterAI.webProfileToken.v1"]; [defaults synchronize];
+    self.profileSourceView.string=[self profileSourceForEditor:profile]; self.webProfilePasswordField.stringValue=@""; self.webProfileSyncButton.enabled=YES; self.webProfileLogoutButton.enabled=YES; self.lastAutoAsked=nil; self.lastAsked=nil;
+    self.profileStatusLabel.stringValue=[NSString stringWithFormat:@"Đã đồng bộ hồ sơ của %@. AUTO và SPACE đang dùng dữ liệu này; một bản dự phòng được giữ trên máy.",email.length?email:@"tài khoản web"]; [self setStatus:@"Đã đồng bộ hồ sơ web" color:NSColor.systemGreenColor]; return YES;
+}
+- (void)loginAndSyncWebProfile:(id)sender {
+    if(self.webProfileTask)return; NSString *email=[self.webProfileEmailField.stringValue stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].lowercaseString,*password=self.webProfilePasswordField.stringValue;
+    if(!email.length||!password.length){self.profileStatusLabel.stringValue=@"Hãy nhập email và mật khẩu tài khoản thiladau.com.";return;} self.profileStatusLabel.stringValue=@"Đang đăng nhập và lấy hồ sơ…"; self.webProfileLoginButton.enabled=NO;
+    NSMutableURLRequest *request=[self webProfileRequest:@"/app/login" method:@"POST" token:nil body:@{@"email":email,@"password":password}]; NSWindow *window=self.profileWindow;
+    self.webProfileTask=[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error){NSInteger status=[(NSHTTPURLResponse *)response statusCode];NSDictionary *json=data?[NSJSONSerialization JSONObjectWithData:data options:0 error:nil]:nil;dispatch_async(dispatch_get_main_queue(),^{self.webProfileTask=nil;self.webProfileLoginButton.enabled=YES;if(self.profileWindow!=window||!window.visible)return;if(status<200||status>=300||![json isKindOfClass:NSDictionary.class]){self.profileStatusLabel.stringValue=[self webProfileError:data response:response error:error];return;}NSString *message=nil;if(![self applyWebProfilePayload:json token:json[@"token"] error:&message])self.profileStatusLabel.stringValue=message;});}]; [self.webProfileTask resume];
+}
+- (void)syncWebProfile:(id)sender {
+    if(self.webProfileTask)return; NSString *token=[[NSUserDefaults standardUserDefaults] stringForKey:@"PresenterAI.webProfileToken.v1"];if(token.length!=64){self.profileStatusLabel.stringValue=@"Hãy đăng nhập tài khoản web trước.";return;}self.profileStatusLabel.stringValue=@"Đang lấy thay đổi mới nhất…";self.webProfileSyncButton.enabled=NO;
+    NSMutableURLRequest *request=[self webProfileRequest:@"/app/profile" method:@"GET" token:token body:nil];NSWindow *window=self.profileWindow;
+    self.webProfileTask=[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error){NSInteger status=[(NSHTTPURLResponse *)response statusCode];NSDictionary *json=data?[NSJSONSerialization JSONObjectWithData:data options:0 error:nil]:nil;dispatch_async(dispatch_get_main_queue(),^{self.webProfileTask=nil;self.webProfileSyncButton.enabled=YES;if(self.profileWindow!=window||!window.visible)return;if(status<200||status>=300||![json isKindOfClass:NSDictionary.class]){if(status==401){[[NSUserDefaults standardUserDefaults] removeObjectForKey:@"PresenterAI.webProfileToken.v1"];self.webProfileLogoutButton.enabled=NO;}self.profileStatusLabel.stringValue=[self webProfileError:data response:response error:error];return;}NSString *message=nil;if(![self applyWebProfilePayload:json token:nil error:&message])self.profileStatusLabel.stringValue=message;});}];[self.webProfileTask resume];
+}
+- (void)logoutWebProfile:(id)sender {
+    NSString *token=[[NSUserDefaults standardUserDefaults] stringForKey:@"PresenterAI.webProfileToken.v1"]; [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"PresenterAI.webProfileToken.v1"]; [[NSUserDefaults standardUserDefaults] synchronize]; self.webProfileSyncButton.enabled=NO;self.webProfileLogoutButton.enabled=NO;self.webProfilePasswordField.stringValue=@"";self.profileStatusLabel.stringValue=@"Đã ngắt liên kết. Hồ sơ dự phòng trên máy vẫn được giữ.";
+    if(token.length==64)[[[NSURLSession sharedSession] dataTaskWithRequest:[self webProfileRequest:@"/app/logout" method:@"POST" token:token body:@{}]] resume];
 }
 - (NSDictionary *)profileFieldLimits { return @{@"name":@200,@"restaurant":@300,@"address":@500,@"menu":@10000,@"experience":@5000,@"details":@5000,@"warnings":@2000,@"sourceText":@40000}; }
 - (NSString *)profileSourceForEditor:(NSDictionary *)profile {
@@ -276,7 +321,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     return [parts componentsJoinedByString:@"\n\n"];
 }
 - (void)windowWillClose:(NSNotification *)notification {
-    if(notification.object==self.profileWindow) { [self.profileExtractionTask cancel]; self.profileExtractionTask=nil; }
+    if(notification.object==self.profileWindow) { [self.profileExtractionTask cancel]; self.profileExtractionTask=nil; [self.webProfileTask cancel]; self.webProfileTask=nil; }
 }
 - (void)previewPresenterProfile:(id)sender {
     NSMutableDictionary *profile=[[self presenterProfile] mutableCopy]; [profile removeObjectForKey:@"sourceText"];

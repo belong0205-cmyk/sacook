@@ -1053,16 +1053,32 @@ try {
 setReadingFont(savedFont);
 setBackdrop(savedBackdrop);
 
+function setWebProfileConnection(connected, email = '') {
+  $('webProfileEmail').value=email || $('webProfileEmail').value;$('webProfileEmail').readOnly=connected;
+  $('webProfilePassword').hidden=connected;$('webProfilePassword').value='';$('loginWebProfile').hidden=connected;$('syncWebProfile').hidden=!connected;$('logoutWebProfile').hidden=!connected;
+}
+async function useSyncedProfile(result) {
+  presenterProfile=await window.saCook.setProfile(result.profile);$('profileSource').value=window.SACookProfile.sourceForEditor(presenterProfile);
+  $('profileFacts').textContent=window.SACookProfile.sourceForEditor({...presenterProfile,sourceText:''});$('profilePreview').hidden=false;
+  setWebProfileConnection(true,result.email);$('webProfileStatus').textContent=`Đã đồng bộ hồ sơ của ${result.email}. AUTO và SPACE đang dùng dữ liệu này.`;
+  $('profileStatus').textContent='Bản hồ sơ web đã được lưu dự phòng trên máy để dùng khi mất mạng.';lanes.auto.lastAnswered='';lanes.manual.lastAnswered='';
+}
 $('profileSettings').addEventListener('click', async () => {
   try {
     await profileReady;
     $('profileSource').value = window.SACookProfile.sourceForEditor(presenterProfile);
     $('profileStatus').textContent = '';
+    $('webProfileStatus').textContent='Đang kiểm tra liên kết…';
     $('profilePreview').hidden = true;
     $('moreMenu').open = false;
     $('profileDialog').showModal();
+    const state=await window.saCook.getWebProfileStatus();setWebProfileConnection(state.connected,state.email);
+    $('webProfileStatus').textContent=state.connected?`Đã liên kết ${state.email}. Bấm Đồng bộ lại sau khi sửa hồ sơ trên web.`:'Đăng nhập cùng tài khoản đang dùng trên thiladau.com.';
   } catch (error) { setStatus(error.message, true); }
 });
+$('loginWebProfile').addEventListener('click',async()=>{const button=$('loginWebProfile');button.disabled=true;$('webProfileStatus').textContent='Đang đăng nhập và lấy hồ sơ…';try{await useSyncedProfile(await window.saCook.loginWebProfile($('webProfileEmail').value,$('webProfilePassword').value));}catch(error){$('webProfileStatus').textContent=error.message;}finally{button.disabled=false;}});
+$('syncWebProfile').addEventListener('click',async()=>{const button=$('syncWebProfile');button.disabled=true;$('webProfileStatus').textContent='Đang lấy thay đổi mới nhất…';try{await useSyncedProfile(await window.saCook.syncWebProfile());}catch(error){$('webProfileStatus').textContent=error.message;}finally{button.disabled=false;}});
+$('logoutWebProfile').addEventListener('click',async()=>{const button=$('logoutWebProfile');button.disabled=true;try{await window.saCook.logoutWebProfile();setWebProfileConnection(false,'');$('webProfileEmail').value='';$('webProfileStatus').textContent='Đã ngắt liên kết. Hồ sơ dự phòng trên máy vẫn được giữ.';}catch(error){$('webProfileStatus').textContent=error.message;}finally{button.disabled=false;}});
 $('importProfile').addEventListener('click', async () => {
   try {
     const document = await window.saCook.importProfile();

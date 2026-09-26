@@ -18,8 +18,10 @@ for shared_resource in answer-policy.txt feature-manifest.json ui-tokens.json pr
   cp "$ROOT/../Shared/$shared_resource" "$APP/Contents/Resources/$shared_resource"
 done
 
-if [[ -f "$SOURCE_DATA/questions.json.js" && -f "$SOURCE_DATA/theory.json.js" ]]; then
-  sed -E 's/^(var|const) QUESTIONS_DATA = //; s/;$//' "$SOURCE_DATA/questions.json.js" > "$ROOT/build/questions.json"
+if [[ -f "$SOURCE_DATA/questions.json" && -f "$SOURCE_DATA/theory.json.js" ]]; then
+  # Use the canonical JSON file. The browser bundle may contain executable
+  # compatibility code after the data object and is not a safe JSON source.
+  cp "$SOURCE_DATA/questions.json" "$ROOT/build/questions.json"
   sed -E 's/^(var|const) THEORY_DATA = //; s/;$//' "$SOURCE_DATA/theory.json.js" > "$ROOT/build/theory.json"
   {
     jq -r '.categories[] | "# CHỦ ĐỀ: \(.nameVi // .name // "")", (.questions[] | "CÂU HỎI EN: \(.question // "")\nCÂU HỎI VI: \(.questionVi // "")\nTRẢ LỜI EN: \(.answer // "")\nTRẢ LỜI VI: \(.answerVi // "")\nGIẢI THÍCH: \(.explanation.content // "")\n")' "$ROOT/build/questions.json"

@@ -10,6 +10,8 @@ const { sanitizeProfile } = require('./presenter-profile');
 const { readProfileDocument } = require('./profile-document');
 
 const KEY_FILE = '.openai-key.v2';
+const WEB_SESSION_FILE = '.web-session.v1';
+const WEB_API = 'https://thiladau.com/cook1/api';
 const PORTABLE_DIR_NAME = 'SA Cook Assistant-win32-x64';
 const PORTABLE_EXE_NAME = 'SA Cook Assistant.exe';
 const PORTABLE_MARKER = '.sa-cook-portable-root';
@@ -50,6 +52,28 @@ function isTrustedIpc(event) {
 }
 
 function keyPath() { return path.join(app.getPath('userData'), KEY_FILE); }
+function webSessionPath() { return path.join(app.getPath('userData'), WEB_SESSION_FILE); }
+function readWebSession() {
+  try {
+    const encrypted = fs.readFileSync(webSessionPath());
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows chưa sẵn sàng mã hoá phiên đồng bộ.');
+    const value = JSON.parse(safeStorage.decryptString(encrypted));
+    if (!/^[a-f0-9]{64}$/.test(value.token || '')) throw new Error('Phiên đồng bộ không hợp lệ.');
+    return {token: value.token, email: String(value.email || '').slice(0, 254)};
+  } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+}
+function saveWebSession(token, email) {
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows chưa sẵn sàng mã hoá phiên đồng bộ.');
+  if (!/^[a-f0-9]{64}$/.test(token || '')) throw new Error('Phiên đồng bộ không hợp lệ.');
+  const file = webSessionPath();fs.mkdirSync(path.dirname(file), {recursive: true});
+  fs.writeFileSync(file + '.tmp', safeStorage.encryptString(JSON.stringify({token,email})), {mode: 0o600});fs.renameSync(file + '.tmp', file);
+}
+async function webProfileRequest(route, options = {}) {
+  const response = await fetch(WEB_API + route, {...options,headers:{Origin:'presenter-ai://desktop','Content-Type':'application/json',...(options.headers || {})},signal:AbortSignal.timeout(20000)});
+  const text = await response.text();let value;try { value=JSON.parse(text); } catch (_) { throw new Error(`Máy chủ hồ sơ trả về dữ liệu không hợp lệ (HTTP ${response.status}).`); }
+  if (!response.ok) { const error=new Error(value.error || `Không thể đồng bộ hồ sơ (HTTP ${response.status}).`);error.status=response.status;throw error; }
+  return value;
+}
 
 function readResource(name, fallback = '') {
   try { return fs.readFileSync(path.join(__dirname, 'resources', name), 'utf8'); }
@@ -516,4 +540,26 @@ ipcMain.handle('profile:set', (event, value) => {
   fs.writeFileSync(file + '.tmp', JSON.stringify(profile), { mode: 0o600 });
   fs.renameSync(file + '.tmp', file);
   return profile;
+});
+ipcMain.handle('web-profile:status', event => {
+  if (!isTrustedIpc(event)) throw new Error('Yêu cầu đồng bộ không hợp lệ.');
+  const current=readWebSession();return {connected:Boolean(current),email:current?.email || ''};
+});
+ipcMain.handle('web-profile:login', async (event, email, password) => {
+  if (!isTrustedIpc(event)) throw new Error('Yêu cầu đồng bộ không hợp lệ.');
+  email=String(email || '').trim().toLowerCase();password=String(password || '');
+  if(email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!password||password.length>128)throw new Error('Hãy nhập đúng email và mật khẩu tài khoản web.');
+  const value=await webProfileRequest('/app/login',{method:'POST',body:JSON.stringify({email,password})});
+  saveWebSession(value.token,value.email || email);return {profile:sanitizeProfile(value.profile),updatedAt:value.updatedAt,email:value.email || email};
+});
+ipcMain.handle('web-profile:sync', async event => {
+  if (!isTrustedIpc(event)) throw new Error('Yêu cầu đồng bộ không hợp lệ.');
+  const current=readWebSession();if(!current)throw new Error('Hãy đăng nhập tài khoản web trước.');
+  try{const value=await webProfileRequest('/app/profile',{headers:{Authorization:`Bearer ${current.token}`}});return {profile:sanitizeProfile(value.profile),updatedAt:value.updatedAt,email:value.email || current.email};}
+  catch(error){if(error.status===401)fs.rmSync(webSessionPath(),{force:true});throw error;}
+});
+ipcMain.handle('web-profile:logout', async event => {
+  if (!isTrustedIpc(event)) throw new Error('Yêu cầu đồng bộ không hợp lệ.');
+  const current=readWebSession();if(current)await webProfileRequest('/app/logout',{method:'POST',headers:{Authorization:`Bearer ${current.token}`},body:'{}'}).catch(()=>{});
+  fs.rmSync(webSessionPath(),{force:true});return {ok:true};
 });

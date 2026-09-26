@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "featureVersion": "5.57.0",
+  "featureVersion": "5.58.0",
   "platforms": ["macOS", "Windows"],
   "answerPolicy": {
     "resource": "answer-policy.txt",
@@ -16,6 +16,8 @@
     "conversationContextPerLane": true,
     "copyableConversation": false,
     "perInstallationPresenterProfile": true,
+    "perAccountWebProfileSync": true,
+    "offlineProfileCache": true,
     "profileWordImportAndExtraction": true,
     "linkedAutoTurnGrace": true,
     "compactTwoLaneOverlay": true,
