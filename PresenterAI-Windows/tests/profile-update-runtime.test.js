@@ -26,7 +26,7 @@ function fn(source, name, async = false) {
   const ctx = vm.createContext({profileReady: Promise.resolve(), presenterProfile: {name: 'Cook A', restaurant: 'Restaurant A', menu: 'Lemon tart'},
     window: {SACookProfile: profilePolicy}, rankMatches: () => [{item: {question: 'Q', answer: 'GENERIC'}, score: 1}],
     questionParts: q => [q], questionPartsAreLinked: () => false, needsConversationContext: () => false,
-    requiresBehavioralSynthesis: () => false, buildAnswerVariants: a => a, relevantStudySnippets: () => [],
+    requiresBehavioralSynthesis: () => false, isVietnameseQuestion: () => false, buildAnswerVariants: a => a, relevantStudySnippets: () => [],
     recentConversation: () => '', answerPolicy: 'English B2', api: async (_, body) => {requests.push(body); return 'personal answer';},
     responseText: value => value});
   vm.runInContext(fn(renderer, 'answerQuestion', true), ctx);

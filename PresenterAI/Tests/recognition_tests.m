@@ -271,6 +271,9 @@ int main(int argc, const char *argv[]) {
         NSString *definitionQuestion=@"What is mise en place?";
         NSString *shortDefinition=[app conciseLocalAnswerFromResult:[app bestLocalAnswerForQuestion:definitionQuestion] question:definitionQuestion];
         Check(WordCount(shortDefinition)<=45 && [shortDefinition rangeOfString:@"place" options:NSCaseInsensitiveSearch].location!=NSNotFound,@"A local definition stays focused while retaining useful B2 detail");
+        NSString *vietnameseQuestion=@"Sự khác nhau giữa làm sạch và khử trùng là gì?";
+        NSString *vietnameseAnswer=[app conciseLocalAnswerFromResult:[app bestLocalAnswerForQuestion:vietnameseQuestion] question:vietnameseQuestion];
+        Check([app isVietnameseText:vietnameseQuestion] && [vietnameseAnswer containsString:@"Ngắn:"] && [vietnameseAnswer containsString:@"Đầy đủ:"] && ![vietnameseAnswer containsString:@"No reliable match"],@"Vietnamese AUTO questions resolve locally and keep Vietnamese answer labels");
         NSString *safeProcedure=@"TRẢ LỜI EN: First cool the food from 60°C to 21°C within two hours. Then cool it to 5°C within another four hours. Record the temperature.";
         NSString *safeProcedureDisplay=[app conciseLocalAnswerFromResult:safeProcedure question:@"How do you cool cooked food safely?"];
         Has(safeProcedureDisplay,@"Short:",@"Dual-answer display labels the immediate answer");

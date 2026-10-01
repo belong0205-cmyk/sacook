@@ -461,7 +461,8 @@ ipcMain.handle('resources:get', event => {
       answerPolicy: readResource('answer-policy.txt'),
       knowledge: readResource('sa-cook-knowledge.txt'),
       handbook: readResource('sa-cook-handbook.txt'),
-      profileExtraction: JSON.parse(readResource('profile-extraction.json', '{}'))
+      profileExtraction: JSON.parse(readResource('profile-extraction.json', '{}')),
+      localQAVi: JSON.parse(readResource('sa-cook-qa-vi.json', '[]'))
     };
   } catch (_) { throw new Error('Không đọc được dữ liệu SA Cook.'); }
 });

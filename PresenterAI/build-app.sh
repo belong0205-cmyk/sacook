@@ -13,6 +13,7 @@ cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Scripts/install-update.sh" "$APP/Contents/Resources/install-update.sh"
 cp "$ROOT/Data/internet-qa.json" "$APP/Contents/Resources/internet-qa.json"
 cp "$ROOT/Data/speech-hints.txt" "$APP/Contents/Resources/speech-hints.txt"
+cp "$ROOT/Data/sa-cook-qa-vi.json" "$APP/Contents/Resources/sa-cook-qa-vi.json"
 for shared_resource in answer-policy.txt feature-manifest.json ui-tokens.json profile-extraction.json; do
   test -s "$ROOT/../Shared/$shared_resource"
   cp "$ROOT/../Shared/$shared_resource" "$APP/Contents/Resources/$shared_resource"

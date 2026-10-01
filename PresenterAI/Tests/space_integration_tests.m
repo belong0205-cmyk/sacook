@@ -202,7 +202,7 @@ int main(void) {
         IndependentSpeechTestApp *enhancedFallback=[IndependentSpeechTestApp new];
         NSMutableURLRequest *audioRequest=[enhancedFallback autoTranscriptionRequestForWAV:[@"fake-audio" dataUsingEncoding:NSUTF8StringEncoding]];
         NSString *audioBody=[[NSString alloc] initWithData:audioRequest.HTTPBody encoding:NSUTF8StringEncoding];
-        Check([audioBody containsString:@"name=\"languages[]\"\r\n\r\nen"] && ![audioBody containsString:@"name=\"language\""],@"gpt-transcribe uses plural languages multipart field");
+        Check(![audioBody containsString:@"name=\"languages[]\""] && ![audioBody containsString:@"name=\"language\""],@"AUTO lets gpt-transcribe detect Vietnamese or English");
         enhancedFallback.forceEnhancedAuto=YES;
         enhancedFallback.enhancedAutoTranscriptBuffer=[SCUntimedTranscriptBuffer new];
         Receive(enhancedFallback,natural,2.4,NO);

@@ -30,6 +30,7 @@ cp "$ROOT/presenter-profile.js" "$STAGE/"
 cp "$ROOT/profile-document.js" "$STAGE/"
 node "$ROOT/copy-runtime-deps.js" "$STAGE"
 cp -R "$ROOT/resources" "$STAGE/resources"
+cp "$ROOT/../PresenterAI/Data/sa-cook-qa-vi.json" "$STAGE/resources/sa-cook-qa-vi.json"
 for SHARED_RESOURCE in answer-policy.txt feature-manifest.json ui-tokens.json profile-extraction.json; do
   [[ -f "$ROOT/../Shared/$SHARED_RESOURCE" ]] || { echo "Thieu Shared/$SHARED_RESOURCE" >&2; exit 1; }
   cp "$ROOT/../Shared/$SHARED_RESOURCE" "$STAGE/resources/$SHARED_RESOURCE"

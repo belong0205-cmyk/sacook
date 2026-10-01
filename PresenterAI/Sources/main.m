@@ -551,6 +551,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     NSString *qaPath=[self knowledgeResourcePath:@"sa-cook-qa" extension:@"json"];
     NSData *qaData=qaPath?[NSData dataWithContentsOfFile:qaPath]:nil; if (qaData) self.qaEntries=[NSJSONSerialization JSONObjectWithData:qaData options:0 error:nil];
     NSMutableArray *qa=[self.qaEntries mutableCopy]?:[NSMutableArray array];
+    NSString *viPath=[self knowledgeResourcePath:@"sa-cook-qa-vi" extension:@"json"];NSData *viData=viPath?[NSData dataWithContentsOfFile:viPath]:nil;id viQA=viData?[NSJSONSerialization JSONObjectWithData:viData options:0 error:nil]:nil;if([viQA isKindOfClass:NSArray.class])[qa addObjectsFromArray:viQA];
     NSString *internetPath=[self knowledgeResourcePath:@"internet-qa" extension:@"json"];NSData *internetData=internetPath?[NSData dataWithContentsOfFile:internetPath]:nil;id internetQA=internetData?[NSJSONSerialization JSONObjectWithData:internetData options:0 error:nil]:nil;if([internetQA isKindOfClass:NSArray.class])[qa addObjectsFromArray:internetQA];
     NSString *hintsPath=[self knowledgeResourcePath:@"speech-hints" extension:@"txt"];NSString *hints=hintsPath?[NSString stringWithContentsOfFile:hintsPath encoding:NSUTF8StringEncoding error:nil]:nil;if(hints.length){NSMutableArray *items=[NSMutableArray array];for(NSString *line in [hints componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]){NSString *item=[line stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];if(item.length)[items addObject:item];}self.speechHints=items;self.speechLexicon=nil;}
     [qa addObject:@{@"question":@"List three ways people may define their cultural identity.",@"answer":@"People may define their cultural identity through their ethnicity or nationality, their language and traditions, and their religion or beliefs."}];
@@ -1356,13 +1357,14 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 - (NSString *)autoTranscriptionPrompt {
     NSString *vocabulary=[[self recognitionContextualStrings] componentsJoinedByString:@", "];
     NSString *recent=[self recentAutoQuestionContext];
-    return [NSString stringWithFormat:@"Australian English commercial cookery skills-assessment interview. Preserve the exact question and culinary terminology, including French loanwords. Vocabulary: %@.%@",vocabulary,recent.length?[NSString stringWithFormat:@" Recent conversation: %@",recent]:@""];
+    return [NSString stringWithFormat:@"Bilingual Vietnamese or Australian English commercial cookery skills-assessment interview. Detect the spoken language and transcribe in that same language. Preserve the exact question, numbers, and culinary terminology, including French loanwords. Vocabulary: %@.%@",vocabulary,recent.length?[NSString stringWithFormat:@" Recent conversation: %@",recent]:@""];
 }
 - (NSMutableURLRequest *)autoTranscriptionRequestForWAV:(NSData *)wav {
     NSString *boundary=[@"PresenterAI-" stringByAppendingString:NSUUID.UUID.UUIDString];
     NSMutableData *body=[NSMutableData data];
     [self appendMultipartField:@"model" value:@"gpt-transcribe" boundary:boundary data:body];
-    [self appendMultipartField:@"languages[]" value:@"en" boundary:boundary data:body];
+    // AUTO omits a language hint so gpt-transcribe can detect Vietnamese or
+    // English. The separate SPACE/Apple Speech path stays English (Australia).
     [self appendMultipartField:@"response_format" value:@"json" boundary:boundary data:body];
     [self appendMultipartField:@"prompt" value:[self autoTranscriptionPrompt] boundary:boundary data:body];
     for(NSString *term in [self recognitionContextualStrings])
@@ -1389,7 +1391,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     }
     if(parts.count) return [parts componentsJoinedByString:@"\n"];
     if([self looksLikeQuestion:clean]) return clean;
-    NSString *starter=@"(?i)\\b(?:what|which|why|how|when|where|who|whose|whom|in what ways|can|could|do|does|did|are|is|was|were|would|will|should|may|might|must|have|tell (?:me|us)|(?:walk|talk|take) (?:me|us) through|share|explain|list|name|describe|identify|give|outline|define|compare|discuss|provide|state|mention|show|design|distinguish|demonstrate)\\b";
+    NSString *starter=@"(?i)(?:\\b(?:what|which|why|how|when|where|who|whose|whom|in what ways|can|could|do|does|did|are|is|was|were|would|will|should|may|might|must|have|tell (?:me|us)|(?:walk|talk|take) (?:me|us) through|share|explain|list|name|describe|identify|give|outline|define|compare|discuss|provide|state|mention|show|design|distinguish|demonstrate)\\b|(?:cái gì|điều gì|loại nào|tại sao|vì sao|như thế nào|thế nào|khi nào|ở đâu|bao nhiêu|có thể|bạn có|bạn sẽ|bạn làm|hãy|giải thích|liệt kê|nêu|mô tả|xác định|cho ví dụ|so sánh|phân biệt|trình bày|định nghĩa)(?:\\s|$))";
     NSRange range=[clean rangeOfString:starter options:NSRegularExpressionSearch];
     if(range.location!=NSNotFound) {
       NSString *candidate=[[clean substringFromIndex:range.location] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
@@ -1523,7 +1525,9 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 - (BOOL)looksLikeQuestion:(NSString *)s {
     NSString *text=[s stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     NSString *pattern=@"(?i)^(?:(?:okay|ok|all right|alright|right|well|so|please|and|now|then|next question|let me ask|i(?:'d| would) like to (?:ask|know)|i want to know|i(?:'m| am) curious(?: about)?)[,.: ]+)*(?:what|which|why|how|when|where|who|whose|whom|in what ways|can|could|do|does|did|are|is|was|were|would|will|should|may|might|must|have|tell (?:me|us)|(?:walk|talk|take) (?:me|us) through|share|explain|list|name|describe|identify|give|outline|define|compare|discuss|provide|state|mention|show|design|distinguish|demonstrate)\\b";
+    NSString *vietnamese=@"(?i)^(?:(?:được rồi|rồi|vậy|thế|xin hỏi|cho tôi hỏi|câu tiếp theo|bây giờ|tiếp theo|hãy|vui lòng)[,.: ]+)*(?:cái gì|điều gì|loại nào|tại sao|vì sao|như thế nào|thế nào|khi nào|ở đâu|ai|bao nhiêu|có thể|bạn có|bạn sẽ|bạn làm|hãy|giải thích|liệt kê|nêu|mô tả|xác định|cho ví dụ|so sánh|phân biệt|trình bày|định nghĩa)(?:\\s|$)";
     return [text rangeOfString:pattern options:NSRegularExpressionSearch].location!=NSNotFound ||
+      [text rangeOfString:vietnamese options:NSRegularExpressionSearch].location!=NSNotFound ||
       [text hasSuffix:@"?"];
 }
 - (void)silenceReached:(NSTimer *)t { [self tickAutoRecognition:t]; }
@@ -1558,6 +1562,13 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     NSDictionary *spellings=@{@"organization":@"organisation",@"organizing":@"organising",@"organized":@"organised",@"color":@"colour",@"appetizer":@"appetiser"};
     for(NSString *word in parts) if(word.length) [words addObject:spellings[word] ?: word];
     return [words componentsJoinedByString:@" "];
+}
+- (BOOL)isVietnameseText:(NSString *)text {
+    if(!text.length) return NO;
+    if([text rangeOfString:@"[ăâđêôơưĂÂĐÊÔƠƯàáạảãằắặẳẵầấậẩẫèéẹẻẽềếệểễìíịỉĩòóọỏõồốộổỗờớợởỡùúụủũừứựửữỳýỵỷỹ]" options:NSRegularExpressionSearch].location!=NSNotFound) return YES;
+    NSSet *signals=[NSSet setWithArray:@[@"ban",@"toi",@"chung",@"minh",@"hay",@"vui",@"long",@"giai",@"thich",@"liet",@"ke",@"neu",@"mo",@"ta",@"tai",@"sao",@"mon",@"an",@"nau",@"bep",@"thuc",@"pham"]];
+    NSUInteger count=0;for(NSString *word in [[self normalisedQuestion:text] componentsSeparatedByString:@" "])if([signals containsObject:word])count++;
+    return count>=3;
 }
 - (NSUInteger)editDistance:(NSString *)a other:(NSString *)b {
     NSUInteger n=a.length,m=b.length; NSUInteger *prev=calloc(m+1,sizeof(NSUInteger)),*cur=calloc(m+1,sizeof(NSUInteger));
@@ -1879,8 +1890,9 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     }
 }
 - (NSString *)answerTextFromLocalResult:(NSString *)raw {
-    NSString *prefix=@"TRẢ LỜI EN:";
-    return [raw hasPrefix:prefix]?[[raw substringFromIndex:prefix.length] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]:raw;
+    for(NSString *prefix in @[@"TRẢ LỜI EN:",@"TRẢ LỜI VI:"])
+      if([raw hasPrefix:prefix]) return [[raw substringFromIndex:prefix.length] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    return raw;
 }
 - (NSString *)effectiveAnswerPolicy {
     if(self.answerPolicy.length) return self.answerPolicy;
@@ -2197,7 +2209,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 - (NSDictionary<NSString *,NSString *> *)parseAnswerVariants:(NSString *)text {
     NSString *clean=[text ?: @"" stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     if(!clean.length) return @{};
-    NSRegularExpression *regex=[NSRegularExpression regularExpressionWithPattern:@"(?is)(?:^|\\n)\\s*(?:short(?:\\s+answer)?|short)\\s*:\\s*(.*?)(?:\\n\\s*(?:full(?:\\s+answer)?|full)\\s*:\\s*(.*))$" options:0 error:nil];
+    NSRegularExpression *regex=[NSRegularExpression regularExpressionWithPattern:@"(?is)(?:^|\\n)\\s*(?:short(?:\\s+answer)?|short|ngắn)\\s*:\\s*(.*?)(?:\\n\\s*(?:full(?:\\s+answer)?|full|đầy đủ)\\s*:\\s*(.*))$" options:0 error:nil];
     NSTextCheckingResult *match=[regex firstMatchInString:clean options:0 range:NSMakeRange(0,clean.length)];
     if(match && match.numberOfRanges>=3) {
       NSString *shortText=[[clean substringWithRange:[match rangeAtIndex:1]] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
@@ -2216,9 +2228,11 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     fullAnswer=[self answerByUsingFirstPersonWhenSafe:fullAnswer question:question];
     fullAnswer=[self textByLimitingToWords:fullAnswer count:85];
     if(!shortAnswer.length && !fullAnswer.length) return @"";
+    BOOL vietnamese=[self isVietnameseText:question] || [self isVietnameseText:fullAnswer];
+    NSString *shortLabel=vietnamese?@"Ngắn":@"Short",*fullLabel=vietnamese?@"Đầy đủ":@"Full";
     if(!fullAnswer.length || [[self normalisedQuestion:shortAnswer] isEqualToString:[self normalisedQuestion:fullAnswer]])
-      return [NSString stringWithFormat:@"Short: %@",shortAnswer.length?shortAnswer:fullAnswer];
-    return [NSString stringWithFormat:@"Short: %@\n\nFull: %@",shortAnswer,fullAnswer];
+      return [NSString stringWithFormat:@"%@: %@",shortLabel,shortAnswer.length?shortAnswer:fullAnswer];
+    return [NSString stringWithFormat:@"%@: %@\n\n%@: %@",shortLabel,shortAnswer,fullLabel,fullAnswer];
 }
 - (NSArray<NSString *> *)highlightTermsForQuestion:(NSString *)question answer:(NSString *)answer {
     NSMutableOrderedSet<NSString *> *terms=[NSMutableOrderedSet orderedSetWithArray:@[@"HACCP",@"FIFO",@"mise en place",@"à la carte",@"sous-vide",@"roux",@"béchamel",@"velouté",@"hollandaise",@"béarnaise",@"mirepoix",@"julienne",@"brunoise",@"bain-marie",@"cross-contamination",@"sanitising",@"sanitiser",@"stock",@"temperature",@"danger zone",@"chef's knife",@"grill",@"grilled",@"poultry",@"seafood"]];
@@ -2376,15 +2390,21 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     NSArray<NSString *> *parts=[self questionPartsForSynthesis:heard];
     BOOL multipart=parts.count>1;
     BOOL linkedMultipart=multipart && [self questionPartsAreLinked:parts];
-    NSString *multipartInstructions=linkedMultipart?@"Help with cook interview practice and presentation questions. Answer in English. The HEARD TURN contains linked, repeated, or clarifying question fragments from one speaking turn. Infer the single underlying request from all lines and RECENT CONVERSATION, then give ONE direct answer without numbering. Later fragments may clarify the subject instead of creating a new question.":@"Help with cook interview practice and presentation questions. Answer in English. The HEARD TURN contains multiple independent questions, one per line. Answer EVERY line in the same order, clearly numbered 1 and 2 (and onward). Do not merge, omit, or replace any subject.";
-    NSMutableString *instructions=[NSMutableString stringWithString:multipart?multipartInstructions:@"Help with cook interview practice and presentation questions. Answer in English. The HEARD QUESTION is authoritative; a similar reference question must not replace its subject."];
-    [instructions appendString:@" Return exactly two labelled sections: Short: and Full:. Short must be one direct answer the presenter can say immediately, normally under 28 words. Full must be a fuller answer with the useful details, normally under 85 words. Return only the words the presenter can say aloud after each label. Write actions, experience, choices, and opinions in the presenter's first person using I/my or we/our; state factual definitions directly. Never say 'you can say', 'I suggest', 'the answer is', 'according to the references', or explain how to answer. Use the provided local study references first. If they are insufficient, answer from reliable general culinary and workplace knowledge. Use web search only for a missing, niche, uncertain, or current fact. Never say that the references do not provide information when the question can be answered reliably. Correct or briefly clarify an obvious speech-recognition error when context makes the intended term clear. Do not invent uncertain details. No source labels in the answer text."];
+    BOOL vietnamese=[self isVietnameseText:heard];
+    NSString *multipartInstructions=vietnamese
+      ? (linkedMultipart?@"Bạn hỗ trợ luyện phỏng vấn nghề bếp. Lượt nói gồm các mảnh câu hỏi liên kết, lặp lại hoặc làm rõ. Hãy suy ra một yêu cầu chính từ toàn bộ lượt nói và hội thoại gần đây, rồi trả lời một lần, không đánh số.":@"Bạn hỗ trợ luyện phỏng vấn nghề bếp. Lượt nói gồm nhiều câu hỏi độc lập. Hãy trả lời từng câu theo đúng thứ tự và đánh số rõ ràng.")
+      : (linkedMultipart?@"Help with cook interview practice and presentation questions. Answer in English. The HEARD TURN contains linked, repeated, or clarifying question fragments from one speaking turn. Infer the single underlying request from all lines and RECENT CONVERSATION, then give ONE direct answer without numbering. Later fragments may clarify the subject instead of creating a new question.":@"Help with cook interview practice and presentation questions. Answer in English. The HEARD TURN contains multiple independent questions, one per line. Answer EVERY line in the same order, clearly numbered 1 and 2 (and onward). Do not merge, omit, or replace any subject.");
+    NSMutableString *instructions=[NSMutableString stringWithString:multipart?multipartInstructions:(vietnamese?@"Bạn hỗ trợ luyện phỏng vấn và thuyết trình nghề bếp. Chỉ trả lời bằng tiếng Việt. Câu hỏi vừa nghe là nội dung chính; không được đổi chủ đề theo một câu tham khảo gần giống.":@"Help with cook interview practice and presentation questions. Answer in English. The HEARD QUESTION is authoritative; a similar reference question must not replace its subject.")];
+    [instructions appendString:vietnamese
+      ? @" Chỉ trả lời bằng tiếng Việt và trả về đúng hai phần có nhãn Ngắn: và Đầy đủ:. Ngắn là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ. Đầy đủ chứa các ý hữu ích hơn, thường không quá 85 từ. Chỉ viết lời người thuyết trình có thể nói. Dùng ngôi thứ nhất cho hành động, lựa chọn, kinh nghiệm và quan điểm; nêu định nghĩa trực tiếp. Ưu tiên dữ liệu học cục bộ, sau đó dùng kiến thức nghề bếp và nơi làm việc đáng tin cậy. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh cho phép. Không bịa chi tiết và không nhắc đến nguồn hoặc AI."
+      : @" Return exactly two labelled sections: Short: and Full:. Short must be one direct answer the presenter can say immediately, normally under 28 words. Full must be a fuller answer with the useful details, normally under 85 words. Return only the words the presenter can say aloud after each label. Write actions, experience, choices, and opinions in the presenter's first person using I/my or we/our; state factual definitions directly. Never say 'you can say', 'I suggest', 'the answer is', 'according to the references', or explain how to answer. Use the provided local study references first. If they are insufficient, answer from reliable general culinary and workplace knowledge. Use web search only for a missing, niche, uncertain, or current fact. Never say that the references do not provide information when the question can be answered reliably. Correct or briefly clarify an obvious speech-recognition error when context makes the intended term clear. Do not invent uncertain details. No source labels in the answer text."];
     [instructions replaceOccurrencesOfString:@"Use one short sentence per numbered answer, with no more than 30 words per answer." withString:@"Use up to three concise sentences per numbered answer, with no more than 45 words per answer. Use clear, natural B2 vocabulary and enough relevant detail to make the answer complete." options:0 range:NSMakeRange(0,instructions.length)];
     [instructions replaceOccurrencesOfString:@"Give the direct answer in 1–2 short sentences and no more than 30 words." withString:@"Give the direct answer in two or three concise sentences and no more than 45 words. Use clear, natural B2 vocabulary and enough relevant detail to make the answer complete." options:0 range:NSMakeRange(0,instructions.length)];
     [instructions appendString:@" For a behavioral question, use the strongest concrete example supported by the local references or recent conversation and compress situation, task, action, and result into the same short limit. For a technical or role-specific question, answer the concept directly and mention a tradeoff only when the question asks for one or it is essential. When wording is vague, infer the competency or signal being evaluated and answer it confidently without sounding arrogant or robotic. If a crucial detail is genuinely missing, ask one short clarifying question; otherwise state one reasonable assumption and answer. When explicitly asked to suggest questions for the interviewer, offer two or three concise questions about the role, team, success criteria, product, or company."];
     // Both independent AUTO and SPACE lanes use this same request builder, so
     // the bundled cross-platform policy is mandatory on both AI paths.
-    [instructions appendFormat:@"\n\nSHARED ANSWER POLICY — MANDATORY FOR AUTO AND SPACE:\n%@",[self effectiveAnswerPolicy]];
+    NSString *policy=vietnamese?@"Chỉ trả lời bằng tiếng Việt tự nhiên, rõ ràng và đúng trọng tâm. Giữ đúng thuật ngữ nấu ăn, an toàn thực phẩm và các từ mượn tiếng Pháp. Không bịa kinh nghiệm; nếu hồ sơ không có ví dụ thật, hãy nói điều tôi sẽ làm.":[self effectiveAnswerPolicy];
+    [instructions appendFormat:@"\n\nSHARED ANSWER POLICY — MANDATORY FOR AUTO AND SPACE:\n%@",policy];
     if(recent.length) [instructions appendString:@" RECENT CONVERSATION is context only. Use its questions and answers to resolve words such as it, that, this, they, ingredients, or an omitted dish name. Prefer the most recent explicit subject, but look back through all supplied exchanges if the immediately previous question is also vague. Previous answers may be imperfect: use them only to identify the subject, and use REFERENCE DATA for factual content. Answer only the current HEARD QUESTION; never repeat the earlier questions."];
     NSString *conversation=recent.length?[NSString stringWithFormat:@"\n\nRECENT CONVERSATION — CONTEXT ONLY:\n%@",recent]:@"";
     NSNumber *outputLimit=linkedMultipart?@170:@(150*MAX((NSUInteger)1,parts.count));

@@ -33,6 +33,7 @@ function fixture() {
 let f = fixture();
 assert(f.ctx.isLikelyCompleteQuestion('What is stock?'), 'Three-word culinary questions must be accepted');
 assert(f.ctx.isLikelyCompleteQuestion('How can we use a thermometer?'), 'Embedded we use is not an answer');
+assert(f.ctx.isLikelyCompleteQuestion('Bạn ngăn ngừa nhiễm chéo như thế nào?'), 'Vietnamese AUTO questions must be accepted');
 f.lane.transcribing = true;
 f.ctx.handleAutoPiece('What is the difference between cleaning and sanitising?', 'interval');
 f.advance(1400); // The network is still busy when the endpoint expires.
@@ -91,9 +92,9 @@ console.log('AUTO runtime regression tests passed.');
     }});
   vm.runInContext('async ' + applicationFunction('transcribeBlob'), context);
   assert.strictEqual(await context.transcribeBlob(new Blob(['audio'], {type: 'audio/wav'}), 'auto'), 'What is stock?');
-  assert.deepStrictEqual(requests[0].getAll('languages[]'), ['en']);
-  assert(!requests[0].has('language'), 'Current model must not receive legacy language field');
-  assert.strictEqual(requests[1].get('language'), 'en');
-  assert(!requests[1].has('languages[]'), 'Legacy model must not receive current language field');
+  assert(!requests[0].has('languages[]') && !requests[0].has('language'), 'AUTO lets the transcription model detect Vietnamese or English');
+  assert(!requests[1].has('languages[]') && !requests[1].has('language'), 'AUTO fallback also keeps language auto-detection');
+  assert.strictEqual(await context.transcribeBlob(new Blob(['audio'], {type: 'audio/wav'}), 'manual'), 'What is stock?');
+  assert.deepStrictEqual(requests[2].getAll('languages[]'), ['en'], 'SPACE keeps the existing English language hint');
   console.log('Transcription request and fallback tests passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
