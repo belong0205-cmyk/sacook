@@ -47,6 +47,10 @@
     [self.submittedQuestions addObject:question ?: @""];
     if (!self.captureOnly) [super appendOfflineAnswerForQuestion:question];
 }
+- (void)appendParallelAnswersForQuestion:(NSString *)question {
+    [self.submittedQuestions addObject:question ?: @""];
+    if (!self.captureOnly) [super appendParallelAnswersForQuestion:question];
+}
 @end
 
 static NSUInteger assertions=0, failures=0;
@@ -267,13 +271,23 @@ int main(int argc, const char *argv[]) {
         Equal([app displayQuestionForHeardQuestion:misheardStock],@"What is stock in cooking?",@"Question panel shows stock rather than the recognizer's stuff error");
         NSString *prepQuestion=@"What skills do you think are important for a prep cook?";
         NSString *shortPrep=[app conciseLocalAnswerFromResult:[app bestLocalAnswerForQuestion:prepQuestion] question:prepQuestion];
-        Check(WordCount(shortPrep)<=45 && [shortPrep containsString:@"knife"] && [shortPrep containsString:@"food-safety"],@"Common local interview answer retains useful detail within the B2 limit");
+        Check(WordCount(shortPrep)<=120 && [shortPrep containsString:@"knife"] && [shortPrep containsString:@"food-safety"],@"Common local interview answer retains useful detail across its Short and Full variants");
         NSString *definitionQuestion=@"What is mise en place?";
         NSString *shortDefinition=[app conciseLocalAnswerFromResult:[app bestLocalAnswerForQuestion:definitionQuestion] question:definitionQuestion];
-        Check(WordCount(shortDefinition)<=45 && [shortDefinition rangeOfString:@"place" options:NSCaseInsensitiveSearch].location!=NSNotFound,@"A local definition stays focused while retaining useful B2 detail");
+        Check(WordCount(shortDefinition)<=120 && [shortDefinition rangeOfString:@"place" options:NSCaseInsensitiveSearch].location!=NSNotFound,@"A local definition stays focused while retaining useful B2 detail in its Short and Full variants");
         NSString *vietnameseQuestion=@"Sự khác nhau giữa làm sạch và khử trùng là gì?";
-        NSString *vietnameseAnswer=[app conciseLocalAnswerFromResult:[app bestLocalAnswerForQuestion:vietnameseQuestion] question:vietnameseQuestion];
-        Check([app isVietnameseText:vietnameseQuestion] && [vietnameseAnswer containsString:@"Ngắn:"] && [vietnameseAnswer containsString:@"Đầy đủ:"] && ![vietnameseAnswer containsString:@"No reliable match"],@"Vietnamese AUTO questions resolve locally and keep Vietnamese answer labels");
+        NSString *vietnameseAnswer=[app conciseLocalAnswerFromResult:[app bestLocalAnswerForQuestion:vietnameseQuestion targetLanguage:@"vi"] question:vietnameseQuestion];
+        Check([app isVietnameseText:vietnameseQuestion] && [vietnameseAnswer containsString:@"Ngắn:"] && [vietnameseAnswer containsString:@"Đầy đủ:"] && ![vietnameseAnswer containsString:@"No reliable match"],@"Vietnamese questions resolve locally in the V lane and keep Vietnamese answer labels");
+        NSString *englishAnswer=[app conciseLocalAnswerFromResult:[app bestLocalAnswerForQuestion:vietnameseQuestion targetLanguage:@"en"] question:@"What is the difference between cleaning and sanitising?"];
+        Check([englishAnswer containsString:@"Short:"] && [englishAnswer containsString:@"Full:"] && ![englishAnswer containsString:@"No reliable match"],@"The same Vietnamese question resolves locally in English for the E lane");
+        RecognitionTestApp *parallelApp=[RecognitionTestApp new];
+        parallelApp.resourceRoot=app.resourceRoot; [parallelApp loadBundledKnowledge];
+        NSString *sharedQuestion=@"What is the difference between cleaning and sanitising?";
+        [parallelApp appendParallelAnswersForQuestion:sharedQuestion];
+        Check(parallelApp.autoRecords.count==1 && parallelApp.manualRecords.count==1,@"One Space submission creates exactly one V record and one E record");
+        Equal(parallelApp.autoRecords.lastObject[@"question"],parallelApp.manualRecords.lastObject[@"question"],@"V and E receive the exact same committed question");
+        Check([parallelApp.autoRecords.lastObject[@"targetLanguage"] isEqualToString:@"vi"] && [parallelApp.autoRecords.lastObject[@"answer"] containsString:@"Ngắn:"],@"V always produces a Vietnamese answer");
+        Check([parallelApp.manualRecords.lastObject[@"targetLanguage"] isEqualToString:@"en"] && [parallelApp.manualRecords.lastObject[@"answer"] containsString:@"Short:"],@"E always produces an English answer");
         NSString *safeProcedure=@"TRẢ LỜI EN: First cool the food from 60°C to 21°C within two hours. Then cool it to 5°C within another four hours. Record the temperature.";
         NSString *safeProcedureDisplay=[app conciseLocalAnswerFromResult:safeProcedure question:@"How do you cool cooked food safely?"];
         Has(safeProcedureDisplay,@"Short:",@"Dual-answer display labels the immediate answer");

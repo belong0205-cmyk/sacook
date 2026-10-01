@@ -37,6 +37,7 @@
     return self;
 }
 - (void)appendOfflineAnswerForQuestion:(NSString *)question { [self.committedQuestions addObject:question ?: @""]; }
+- (void)appendParallelAnswersForQuestion:(NSString *)question { [self.committedQuestions addObject:question ?: @""]; }
 - (void)autoRecogniseQuestionText:(NSString *)question fast:(BOOL)fast { [self.autoCandidates addObject:question ?: @""]; }
 - (void)refreshManualAnswerPanel {}
 - (void)refreshAutoAnswerPanel {}

@@ -35,6 +35,15 @@ if [[ -f "$SOURCE_DATA/questions.json" && -f "$SOURCE_DATA/theory.json.js" ]]; t
   fi
   [[ -f "$SOURCE_DATA/export_handbook.txt" ]] && cp "$SOURCE_DATA/export_handbook.txt" "$APP/Contents/Resources/sa-cook-handbook.txt"
 fi
+# The released English corpus is a versioned product resource. Do not let an
+# unrelated edit in the external authoring folder silently change the E lane
+# or SPACE while building a Vietnamese-only enhancement.
+STABLE_ENGLISH="$ROOT/../PresenterAI-Windows/resources"
+for stable_resource in sa-cook-qa.json sa-cook-knowledge.txt sa-cook-handbook.txt; do
+  if [[ -s "$STABLE_ENGLISH/$stable_resource" ]]; then
+    cp "$STABLE_ENGLISH/$stable_resource" "$APP/Contents/Resources/$stable_resource"
+  fi
+done
 test -s "$APP/Contents/Resources/sa-cook-qa.json"
 test -s "$APP/Contents/Resources/sa-cook-knowledge.txt"
 test -s "$APP/Contents/Resources/answer-policy.txt"

@@ -11,19 +11,21 @@
 <body data-backdrop="1">
   <div class="drag-strip" aria-hidden="true"></div>
   <main class="conversation-grid">
-    <section class="lane auto-lane" aria-label="AUTO answers">
+    <section class="lane auto-lane" aria-label="Câu trả lời tiếng Việt">
+      <span class="lane-code" aria-hidden="true">V</span>
       <div id="autoConversation" class="conversation-surface" role="log" aria-live="polite" tabindex="0">
-        <div id="autoQuestion" class="message question" lang="en">Waiting for a question…</div>
-        <div id="autoAnswer" class="message answer" lang="en">The AUTO answer will appear here.</div>
-        <div id="autoLive" class="live-text">Listening for the next question…</div>
-        <div id="autoHistory" class="history" lang="en"></div>
+        <div id="autoQuestion" class="message question">Bấm Space sau khi nghe hết câu hỏi.</div>
+        <div id="autoAnswer" class="message answer" lang="vi">Câu trả lời tiếng Việt sẽ xuất hiện tại đây.</div>
+        <div id="autoLive" class="live-text">V • Bấm Space để chốt câu hỏi.</div>
+        <div id="autoHistory" class="history"></div>
       </div>
     </section>
-    <section class="lane manual-lane" aria-label="SPACE answers">
+    <section class="lane manual-lane" aria-label="English answers">
+      <span class="lane-code" aria-hidden="true">E</span>
       <div id="manualConversation" class="conversation-surface" role="log" aria-live="polite" tabindex="0">
         <div id="manualQuestion" class="message question" lang="en">Listen to the full question, then press Space.</div>
-        <div id="manualAnswer" class="message answer" lang="en">The SPACE answer will appear here.</div>
-        <div id="manualLive" class="live-text">Listening until you press Space…</div>
+        <div id="manualAnswer" class="message answer" lang="en">The English answer will appear here.</div>
+        <div id="manualLive" class="live-text">E • Listening until you press Space…</div>
         <div id="manualHistory" class="history" lang="en"></div>
       </div>
     </section>
@@ -31,15 +33,15 @@
   <footer class="control-dock">
     <button id="start" class="primary" type="button">▶ Bắt đầu nghe</button>
     <label class="source-control" for="source"><span class="sr-only">Nguồn âm thanh</span><select id="source"><option value="system">Âm thanh hệ thống</option><option value="microphone">Micrô</option></select></label>
-    <label class="auto-toggle" title="Automatic question detection"><input id="autoEnabled" type="checkbox" checked><span>AUTO</span></label>
-    <button id="commit" class="commit" type="button" title="Chốt câu hỏi SPACE">Chốt câu</button>
+    <label class="auto-toggle" hidden><input id="autoEnabled" type="checkbox"><span>AUTO</span></label>
+    <button id="commit" class="commit" type="button" title="Chốt một câu hỏi cho cả V và E">Space • V + E</button>
     <div class="listen-state"><span id="status" role="status" aria-live="polite">● Sẵn sàng</span><span id="level" aria-hidden="true">Âm thanh: chưa đo</span></div>
     <button id="update" type="button" title="Kiểm tra và cài bản Windows mới">Update</button>
     <details id="moreMenu" class="more-menu">
       <summary aria-label="More options">•••</summary>
       <div class="menu-popover">
-        <div class="menu-row answer-actions"><span>AUTO</span><button id="retryAuto" type="button">Lại</button><button id="clearAuto" type="button">Xoá</button></div>
-        <div class="menu-row answer-actions"><span>SPACE</span><button id="retryManual" type="button">Lại</button><button id="clearManual" type="button">Xoá</button></div>
+        <div class="menu-row answer-actions"><span>V</span><button id="retryAuto" type="button">Lại</button><button id="clearAuto" type="button">Xoá</button></div>
+        <div class="menu-row answer-actions"><span>E</span><button id="retryManual" type="button">Lại</button><button id="clearManual" type="button">Xoá</button></div>
         <div class="menu-row"><span>Chữ</span><button id="fontDown" type="button" aria-label="Chữ nhỏ hơn">A−</button><output id="fontValue">20</output><button id="fontUp" type="button" aria-label="Chữ lớn hơn">A+</button></div>
         <div class="menu-row backdrop-row"><span>Nền</span><button type="button" data-backdrop-value="0">Nhẹ</button><button type="button" data-backdrop-value="1">Vừa</button><button type="button" data-backdrop-value="2">Đậm</button></div>
         <div class="menu-row menu-wide"><button id="clearAll" type="button">Xoá tất cả</button><button id="settings" type="button">API key…</button></div>

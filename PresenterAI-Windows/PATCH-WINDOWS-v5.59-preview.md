@@ -1,5 +1,6 @@
 # SA Cook Assistant Windows 5.59 preview
 
-- AUTO tự nhận diện tiếng Việt hoặc tiếng Anh và giữ nguyên ngôn ngữ trong câu trả lời.
-- Bổ sung 1.050 câu hỏi–đáp tiếng Việt vào bộ nhớ cục bộ.
-- Không thay đổi hành vi tiếng Anh hiện có; SPACE vẫn dùng tiếng Anh.
+- Bỏ chế độ AUTO. Một lần nhấn Space chốt đúng một câu hỏi cho cả hai khung.
+- Khung V trả lời tiếng Việt và khung E trả lời tiếng Anh, chạy song song với lịch sử độc lập.
+- Hai khung dùng chính xác cùng một bản nhận diện câu hỏi để tránh lệch nội dung.
+- Bộ nhớ cục bộ hỗ trợ câu hỏi tiếng Việt hoặc tiếng Anh cho cả hai ngôn ngữ đầu ra.

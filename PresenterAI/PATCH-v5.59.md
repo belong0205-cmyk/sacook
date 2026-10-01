@@ -1,6 +1,7 @@
-# SA Cook Assistant 5.59 — AUTO song ngữ Việt–Anh
+# SA Cook Assistant 5.59 — hai khung V và E song song
 
-- AUTO tự nhận diện câu hỏi tiếng Việt hoặc tiếng Anh mà không cần đổi chế độ.
-- Câu hỏi tiếng Việt được ghép với 1.050 câu hỏi–đáp tiếng Việt cục bộ và trả lời bằng tiếng Việt.
-- Câu hỏi tiếng Anh tiếp tục dùng nguyên luồng nhận diện, dữ liệu và chính sách trả lời tiếng Anh hiện có.
-- SPACE vẫn giữ chế độ tiếng Anh như phiên bản trước.
+- Bỏ chế độ AUTO. Cả hai khung đều chốt bằng cùng một lần nhấn Space.
+- Khung V luôn trả lời bằng tiếng Việt; khung E luôn trả lời bằng tiếng Anh.
+- Cùng một bản nhận diện câu hỏi được gửi song song vào hai bộ trả lời và hai lịch sử riêng, nên V và E không thể lệch sang hai câu hỏi khác nhau.
+- Bộ nhớ cục bộ hỗ trợ câu hỏi tiếng Việt hoặc tiếng Anh cho cả hai ngôn ngữ đầu ra.
+- Khi cần AI, hai yêu cầu chạy đồng thời và giữ ngữ cảnh riêng cho từng ngôn ngữ.

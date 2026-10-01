@@ -296,7 +296,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     if(!profile){if(message)*message=validationError.localizedDescription;return NO;} NSUserDefaults *defaults=[NSUserDefaults standardUserDefaults]; [defaults setObject:profile forKey:@"PresenterAI.presenterProfile.v1"];
     NSString *email=[payload[@"email"] isKindOfClass:NSString.class]?payload[@"email"]:@""; if(email.length)[defaults setObject:email forKey:@"PresenterAI.webProfileEmail.v1"]; if(token.length)[defaults setObject:token forKey:@"PresenterAI.webProfileToken.v1"]; [defaults synchronize];
     self.profileSourceView.string=[self profileSourceForEditor:profile]; self.webProfilePasswordField.stringValue=@""; self.webProfileSyncButton.enabled=YES; self.webProfileLogoutButton.enabled=YES; self.lastAutoAsked=nil; self.lastAsked=nil;
-    self.profileStatusLabel.stringValue=[NSString stringWithFormat:@"Đã đồng bộ hồ sơ của %@. AUTO và SPACE đang dùng dữ liệu này; một bản dự phòng được giữ trên máy.",email.length?email:@"tài khoản web"]; [self setStatus:@"Đã đồng bộ hồ sơ web" color:NSColor.systemGreenColor]; return YES;
+    self.profileStatusLabel.stringValue=[NSString stringWithFormat:@"Đã đồng bộ hồ sơ của %@. Hai khung V và E đang dùng dữ liệu này; một bản dự phòng được giữ trên máy.",email.length?email:@"tài khoản web"]; [self setStatus:@"Đã đồng bộ hồ sơ web" color:NSColor.systemGreenColor]; return YES;
 }
 - (void)loginAndSyncWebProfile:(id)sender {
     if(self.webProfileTask)return; NSString *email=[self.webProfileEmailField.stringValue stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].lowercaseString,*password=self.webProfilePasswordField.stringValue;
@@ -549,13 +549,14 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     if (!text.length) return;
     self.knowledge = text; self.knowledgeNames = @[@"SA Cook Study"];
     NSString *qaPath=[self knowledgeResourcePath:@"sa-cook-qa" extension:@"json"];
-    NSData *qaData=qaPath?[NSData dataWithContentsOfFile:qaPath]:nil; if (qaData) self.qaEntries=[NSJSONSerialization JSONObjectWithData:qaData options:0 error:nil];
-    NSMutableArray *qa=[self.qaEntries mutableCopy]?:[NSMutableArray array];
+    NSData *qaData=qaPath?[NSData dataWithContentsOfFile:qaPath]:nil;id englishQA=qaData?[NSJSONSerialization JSONObjectWithData:qaData options:0 error:nil]:nil;
+    NSMutableArray *qa=[NSMutableArray array];
+    if([englishQA isKindOfClass:NSArray.class]) for(NSDictionary *entry in englishQA) { NSMutableDictionary *copy=[entry mutableCopy];copy[@"targetLanguage"]=@"en";[qa addObject:copy]; }
     NSString *viPath=[self knowledgeResourcePath:@"sa-cook-qa-vi" extension:@"json"];NSData *viData=viPath?[NSData dataWithContentsOfFile:viPath]:nil;id viQA=viData?[NSJSONSerialization JSONObjectWithData:viData options:0 error:nil]:nil;if([viQA isKindOfClass:NSArray.class])[qa addObjectsFromArray:viQA];
-    NSString *internetPath=[self knowledgeResourcePath:@"internet-qa" extension:@"json"];NSData *internetData=internetPath?[NSData dataWithContentsOfFile:internetPath]:nil;id internetQA=internetData?[NSJSONSerialization JSONObjectWithData:internetData options:0 error:nil]:nil;if([internetQA isKindOfClass:NSArray.class])[qa addObjectsFromArray:internetQA];
+    NSString *internetPath=[self knowledgeResourcePath:@"internet-qa" extension:@"json"];NSData *internetData=internetPath?[NSData dataWithContentsOfFile:internetPath]:nil;id internetQA=internetData?[NSJSONSerialization JSONObjectWithData:internetData options:0 error:nil]:nil;if([internetQA isKindOfClass:NSArray.class])for(NSDictionary *entry in internetQA){NSMutableDictionary *copy=[entry mutableCopy];copy[@"targetLanguage"]=@"en";[qa addObject:copy];}
     NSString *hintsPath=[self knowledgeResourcePath:@"speech-hints" extension:@"txt"];NSString *hints=hintsPath?[NSString stringWithContentsOfFile:hintsPath encoding:NSUTF8StringEncoding error:nil]:nil;if(hints.length){NSMutableArray *items=[NSMutableArray array];for(NSString *line in [hints componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]){NSString *item=[line stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];if(item.length)[items addObject:item];}self.speechHints=items;self.speechLexicon=nil;}
-    [qa addObject:@{@"question":@"List three ways people may define their cultural identity.",@"answer":@"People may define their cultural identity through their ethnicity or nationality, their language and traditions, and their religion or beliefs."}];
-    [qa addObject:@{@"question":@"In what ways can problems or misunderstandings with customers or colleagues from different cultural backgrounds be avoided?",@"answer":@"I avoid misunderstandings by communicating clearly and respectfully, listening actively, asking polite clarifying questions, avoiding assumptions or stereotypes, and showing cultural awareness and empathy."}];
+    [qa addObject:@{@"question":@"List three ways people may define their cultural identity.",@"answer":@"People may define their cultural identity through their ethnicity or nationality, their language and traditions, and their religion or beliefs.",@"targetLanguage":@"en"}];
+    [qa addObject:@{@"question":@"In what ways can problems or misunderstandings with customers or colleagues from different cultural backgrounds be avoided?",@"answer":@"I avoid misunderstandings by communicating clearly and respectfully, listening actively, asking polite clarifying questions, avoiding assumptions or stereotypes, and showing cultural awareness and empathy.",@"targetLanguage":@"en"}];
     [qa addObject:@{@"question":@"What is the difference between cleaning and sanitising?",@"answer":@"Cleaning removes dirt, grease and food residue, while sanitising reduces harmful bacteria to a safe level; I always clean first, then sanitise."}];
     [qa addObject:@{@"question":@"Give one example of preparing Mise en Place for a poultry, seafood or sandwich dish.",@"answer":@"For grilled chicken breast, my mise en place is to trim and portion the chicken, marinate it, blanch the vegetables, prepare the sauce and garnish, and set out the pan, tongs and thermometer before service."}];
     [qa addObject:@{@"question":@"Which knife is the most versatile for slicing, chopping and dicing?",@"answer":@"The chef's knife is the most versatile knife for slicing, chopping and dicing."}];
@@ -666,25 +667,25 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     card.layer.backgroundColor=NSColor.clearColor.CGColor;
     card.layer.cornerRadius=18; card.layer.borderWidth=0;
     card.layer.shadowOpacity=0;
-    card.identifier=automatic?@"autoConversationLane":@"spaceConversationLane";
-    card.accessibilityLabel=automatic?@"AUTO — independent automatic answers":@"SPACE — independent manual answers";
+    card.identifier=automatic?@"vietnameseConversationLane":@"englishConversationLane";
+    card.accessibilityLabel=automatic?@"V — câu trả lời tiếng Việt":@"E — English answers";
     NSTextView *answer=nil,*transcript=nil,*history=nil;
     NSScrollView *answerScroll=[self textBox:&answer editable:NO];
     answer.textContainerInset=NSMakeSize(14,10);
-    answer.accessibilityLabel=automatic?@"AUTO complete conversation":@"SPACE complete conversation";
+    answer.accessibilityLabel=automatic?@"V Vietnamese conversation":@"E English conversation";
     NSScrollView *liveScroll=[self textBox:&transcript editable:NO];
     transcript.font=[NSFont systemFontOfSize:14 weight:NSFontWeightRegular];
     transcript.textColor=[NSColor colorWithWhite:0.82 alpha:1];
     transcript.textContainerInset=NSMakeSize(12,8);
-    transcript.string=automatic?@"Câu AUTO đang nghe sẽ hiện ở đây.":@"Nghe hết câu hỏi, rồi bấm Space.";
-    transcript.accessibilityLabel=automatic?@"AUTO live transcript":@"SPACE live transcript";
-    NSTextField *liveLabel=[self label:automatic?@"Đang nghe tự động":@"Bản chép trực tiếp" size:11 weight:NSFontWeightMedium];
+    transcript.string=automatic?@"Nghe hết câu hỏi rồi bấm Space.":@"Listen to the full question, then press Space.";
+    transcript.accessibilityLabel=automatic?@"V Space transcript":@"E Space transcript";
+    NSTextField *liveLabel=[self label:automatic?@"V • SPACE":@"E • SPACE" size:11 weight:NSFontWeightMedium];
     liveLabel.textColor=accent; liveLabel.lineBreakMode=NSLineBreakByTruncatingTail;
     [liveLabel setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
     NSScrollView *historyScroll=[self textBox:&history editable:NO];
     history.textContainerInset=NSMakeSize(14,12);
-    history.accessibilityLabel=automatic?@"AUTO answer history":@"SPACE answer history";
-    history.string=@"No previous conversation yet.";
+    history.accessibilityLabel=automatic?@"V answer history":@"E answer history";
+    history.string=automatic?@"Chưa có câu trả lời trước.":@"No previous answer yet.";
     historyScroll.hidden=YES; liveScroll.hidden=YES;
     NSLayoutConstraint *historyHeight=[historyScroll.heightAnchor constraintEqualToConstant:0];
     NSButton *historyButton=nil;
@@ -718,8 +719,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     NSScrollView *scroll=automatic?self.autoHistoryScroll:self.manualHistoryScroll;
     NSArray *records=automatic?self.autoRecords:self.manualRecords;
     NSUInteger count=records.count>1?MIN((NSUInteger)50,records.count-1):0;
-    button.title=[NSString stringWithFormat:@"%@  Previous · %lu",scroll.hidden?@"▸":@"▾",(unsigned long)count];
-    button.accessibilityLabel=[NSString stringWithFormat:@"%@ lịch sử %@",scroll.hidden?@"Mở":@"Thu",automatic?@"AUTO":@"SPACE"];
+    button.title=[NSString stringWithFormat:@"%@  History · %lu",scroll.hidden?@"▸":@"▾",(unsigned long)count];
+    button.accessibilityLabel=[NSString stringWithFormat:@"%@ lịch sử %@",scroll.hidden?@"Mở":@"Thu",automatic?@"V":@"E"];
 }
 - (CGFloat)effectiveReadingFontSize {
     return self.readingFontSize>=20?MIN(self.readingFontSize,40):20;
@@ -733,8 +734,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     CGFloat size=[self effectiveReadingFontSize];
     self.readingSizeLabel.stringValue=[NSString stringWithFormat:@"%.0f pt",size];
     self.smallerTextButton.enabled=size>20; self.largerTextButton.enabled=size<40;
-    [self showCurrentQuestion:self.currentQuestion answer:self.currentAnswer.length?self.currentAnswer:@"Press Space after the question.\nYour answer will appear here."];
-    [self showAutoQuestion:self.autoQuestion answer:self.autoAnswer.length?self.autoAnswer:@""];
+    [self showCurrentQuestion:self.currentQuestion answer:self.currentAnswer.length?self.currentAnswer:@"Press Space after the question.\nThe English answer will appear here."];
+    [self showAutoQuestion:self.autoQuestion answer:self.autoAnswer.length?self.autoAnswer:@"Nghe hết câu hỏi rồi bấm Space.\nCâu trả lời tiếng Việt sẽ hiện ở đây."];
     [self renderHistoryRecords:self.manualRecords inView:self.answerView];
     [self renderHistoryRecords:self.autoRecords inView:self.autoHistoryView];
 }
@@ -766,13 +767,13 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     self.deviceButton=[NSPopUpButton new]; self.deviceButton.translatesAutoresizingMaskIntoConstraints=NO; self.deviceButton.font=[NSFont systemFontOfSize:13];
     self.deviceButton.toolTip=@"Chọn nguồn âm thanh — BlackHole để nghe âm thanh máy tính";
     self.deviceButton.accessibilityLabel=@"Nguồn âm thanh";
-    self.commitButton=[self readingButton:@"Chốt câu" action:@selector(commitCurrentQuestionFromSpace)];
+    self.commitButton=[self readingButton:@"Space • V + E" action:@selector(commitCurrentQuestionFromSpace)];
     self.commitButton.font=[NSFont systemFontOfSize:13 weight:NSFontWeightSemibold];
     self.commitButton.layer.backgroundColor=[[self laneAccent:NO] colorWithAlphaComponent:0.16].CGColor;
     self.commitButton.layer.borderColor=[[self laneAccent:NO] colorWithAlphaComponent:0.35].CGColor;
     self.commitButton.toolTip=@"Bấm Space khi người nói kết thúc câu hỏi";
     self.autoButton=[NSButton checkboxWithTitle:@"AUTO" target:self action:@selector(toggleAutoRecognition:)];
-    self.autoButton.translatesAutoresizingMaskIntoConstraints=NO; self.autoButton.state=NSControlStateValueOn; self.autoButton.font=[NSFont systemFontOfSize:13];
+    self.autoButton.translatesAutoresizingMaskIntoConstraints=NO; self.autoButton.state=NSControlStateValueOff; self.autoButton.hidden=YES; self.autoButton.font=[NSFont systemFontOfSize:13];
     self.status=[self label:@"● Sẵn sàng" size:12 weight:NSFontWeightMedium]; self.status.textColor=[NSColor colorWithWhite:0.80 alpha:1];
     self.status.lineBreakMode=NSLineBreakByTruncatingTail; [self.status setContentCompressionResistancePriority:250 forOrientation:NSLayoutConstraintOrientationHorizontal];
     self.levelLabel=[self label:@"Chưa có âm thanh" size:12 weight:NSFontWeightMedium]; self.levelLabel.alignment=NSTextAlignmentRight; self.levelLabel.textColor=[NSColor colorWithWhite:0.76 alpha:1];
@@ -797,11 +798,11 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     backdropRoot.submenu=backdropMenu; self.backdropMenuItems=backdropItems; [secondary addItem:backdropRoot];
     [secondary addItem:[NSMenuItem separatorItem]];
     [secondary addItem:[NSMenuItem separatorItem]];
-    [secondary addItem:[self secondaryMenuItem:@"Trả lời lại AUTO" action:@selector(retryAutoAnswer:) tag:0]];
-    [secondary addItem:[self secondaryMenuItem:@"Trả lời lại SPACE" action:@selector(retryManualAnswer:) tag:0]];
+    [secondary addItem:[self secondaryMenuItem:@"Trả lời lại V" action:@selector(retryAutoAnswer:) tag:0]];
+    [secondary addItem:[self secondaryMenuItem:@"Trả lời lại E" action:@selector(retryManualAnswer:) tag:0]];
     [secondary addItem:[NSMenuItem separatorItem]];
-    [secondary addItem:[self secondaryMenuItem:@"Xoá lịch sử AUTO" action:@selector(clearAutoHistory:) tag:0]];
-    [secondary addItem:[self secondaryMenuItem:@"Xoá lịch sử SPACE" action:@selector(clearManualHistory:) tag:0]];
+    [secondary addItem:[self secondaryMenuItem:@"Xoá lịch sử V" action:@selector(clearAutoHistory:) tag:0]];
+    [secondary addItem:[self secondaryMenuItem:@"Xoá lịch sử E" action:@selector(clearManualHistory:) tag:0]];
     [secondary addItem:[NSMenuItem separatorItem]];
     [secondary addItem:[self secondaryMenuItem:@"Cài đặt OpenAI…" action:@selector(configureAI:) tag:0]];
     [secondary addItem:[self secondaryMenuItem:@"Hồ sơ & menu riêng…" action:@selector(configurePresenterProfile:) tag:0]];
@@ -812,14 +813,13 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     dock.accessibilityLabel=@"Bottom control bar"; dock.layer.cornerRadius=12; dock.layer.borderWidth=0; dock.layer.masksToBounds=YES;
     dock.layer.backgroundColor=[NSColor colorWithWhite:0.025 alpha:[self dockBackdropAlpha]].CGColor;
     self.controlDock=dock;
-    for(NSView *view in @[self.listenButton,self.deviceButton,self.autoButton,self.commitButton,self.status,self.levelLabel,self.moreButton]) [dock addSubview:view];
+    for(NSView *view in @[self.listenButton,self.deviceButton,self.commitButton,self.status,self.levelLabel,self.moreButton]) [dock addSubview:view];
     for(NSView *view in @[automatic,manual,dock]) [root addSubview:view];
     [NSLayoutConstraint activateConstraints:@[
         [dock.leadingAnchor constraintEqualToAnchor:root.leadingAnchor constant:14],[dock.trailingAnchor constraintEqualToAnchor:root.trailingAnchor constant:-14],[dock.bottomAnchor constraintEqualToAnchor:root.bottomAnchor constant:-10],[dock.heightAnchor constraintEqualToConstant:54],
         [self.listenButton.leadingAnchor constraintEqualToAnchor:dock.leadingAnchor constant:12],[self.listenButton.centerYAnchor constraintEqualToAnchor:dock.centerYAnchor],[self.listenButton.widthAnchor constraintEqualToConstant:108],[self.listenButton.heightAnchor constraintEqualToConstant:30],
         [self.deviceButton.leadingAnchor constraintEqualToAnchor:self.listenButton.trailingAnchor constant:6],[self.deviceButton.centerYAnchor constraintEqualToAnchor:self.listenButton.centerYAnchor],[self.deviceButton.widthAnchor constraintEqualToConstant:155],
-        [self.autoButton.leadingAnchor constraintEqualToAnchor:self.deviceButton.trailingAnchor constant:8],[self.autoButton.centerYAnchor constraintEqualToAnchor:self.listenButton.centerYAnchor],[self.autoButton.widthAnchor constraintEqualToConstant:70],
-        [self.commitButton.leadingAnchor constraintEqualToAnchor:self.autoButton.trailingAnchor constant:8],[self.commitButton.centerYAnchor constraintEqualToAnchor:self.listenButton.centerYAnchor],[self.commitButton.widthAnchor constraintEqualToConstant:100],[self.commitButton.heightAnchor constraintEqualToConstant:28],
+        [self.commitButton.leadingAnchor constraintEqualToAnchor:self.deviceButton.trailingAnchor constant:8],[self.commitButton.centerYAnchor constraintEqualToAnchor:self.listenButton.centerYAnchor],[self.commitButton.widthAnchor constraintEqualToConstant:118],[self.commitButton.heightAnchor constraintEqualToConstant:28],
         [self.moreButton.trailingAnchor constraintEqualToAnchor:dock.trailingAnchor constant:-10],[self.moreButton.centerYAnchor constraintEqualToAnchor:dock.centerYAnchor],[self.moreButton.widthAnchor constraintEqualToConstant:44],[self.moreButton.heightAnchor constraintEqualToConstant:30],
         [self.levelLabel.trailingAnchor constraintEqualToAnchor:self.moreButton.leadingAnchor constant:-10],[self.levelLabel.centerYAnchor constraintEqualToAnchor:dock.centerYAnchor],[self.levelLabel.widthAnchor constraintEqualToConstant:116],
         [self.status.leadingAnchor constraintEqualToAnchor:self.commitButton.trailingAnchor constant:14],[self.status.trailingAnchor constraintLessThanOrEqualToAnchor:self.levelLabel.leadingAnchor constant:-8],[self.status.centerYAnchor constraintEqualToAnchor:dock.centerYAnchor],
@@ -939,7 +939,10 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     self.audioTime=0; self.lastVoiceAudioTime=0; self.taskAudioStart=0; self.lastAutoAsked=nil; self.autoCommittedAudioTime=0;
     self.latestTranscript=@""; self.autoTranscript=@""; self.autoPendingSnapshot=@"";
     self.autoPendingChangedAt=NSProcessInfo.processInfo.systemUptime; self.spaceCommitPending=NO;
-    self.transcriptView.string=@"Đang nghe… bấm Space khi đã nghe đủ một câu hỏi.";
+    self.transcriptView.string=@"Listening… press Space after the complete question.";
+    self.autoTranscriptView.string=@"Đang nghe… bấm Space khi đã nghe đủ câu hỏi.";
+    self.manualLiveLabel.stringValue=@"E • Đang nghe cùng câu hỏi";
+    self.autoLiveLabel.stringValue=@"V • Đang nghe cùng câu hỏi";
     self.transcriptView.textColor=[NSColor colorWithWhite:0.82 alpha:1];
     __weak typeof(self) weak = self;
     [input installTapOnBus:0 bufferSize:1024 format:format block:^(AVAudioPCMBuffer *b, AVAudioTime *t) {
@@ -1147,6 +1150,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     self.listenButton.title=@"Bắt đầu nghe";
     self.listenButton.layer.backgroundColor=[NSColor colorWithRed:0.18 green:0.75 blue:0.55 alpha:0.22].CGColor;
     self.listenButton.layer.borderColor=[NSColor colorWithRed:0.30 green:0.92 blue:0.69 alpha:0.40].CGColor;
+    self.manualLiveLabel.stringValue=@"E • Đã dừng";
+    self.autoLiveLabel.stringValue=@"V • Đã dừng";
     [self setStatus:@"● Đã dừng" color:NSColor.secondaryLabelColor];
 }
 - (NSString *)correctCulinaryTerms:(NSString *)text {
@@ -1269,8 +1274,10 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     text=[self correctCulinaryTerms:text];
     if(![text isEqualToString:self.latestTranscript]) self.lastManualSnapshotChange=NSProcessInfo.processInfo.systemUptime;
     self.latestTranscript=text;
-    self.transcriptView.string=text.length?text:@"SPACE: đang nghe câu tiếp theo…";
-    if(self.currentAnswerView) [self showCurrentQuestion:self.currentQuestion answer:self.currentAnswer.length?self.currentAnswer:@"Press Space after the question. Your answer will appear here."];
+    self.transcriptView.string=text.length?text:@"Listening for the next question…";
+    self.autoTranscriptView.string=text.length?text:@"Đang nghe cùng câu hỏi…";
+    if(self.currentAnswerView) [self showCurrentQuestion:self.currentQuestion answer:self.currentAnswer.length?self.currentAnswer:@"Press Space after the question. The English answer will appear here."];
+    if(self.autoAnswerView) [self showAutoQuestion:self.autoQuestion answer:self.autoAnswer.length?self.autoAnswer:@"Nghe hết câu hỏi rồi bấm Space. Câu trả lời tiếng Việt sẽ hiện ở đây."];
     if(self.spaceCommitPending) {
       NSString *bounded=[self correctCulinaryTerms:[self.timeline textFrom:self.pendingSpaceFrom to:self.pendingSpaceTo]];
       // A short revised tail cannot replace the whole visible question.
@@ -1489,14 +1496,14 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     return self.timeline?[self correctCulinaryTerms:[self.timeline textFrom:self.manualCursor to:DBL_MAX]]:(self.latestTranscript ?: @"");
 }
 - (void)commitCurrentQuestionFromSpace {
-    if(!self.listening) { self.manualLiveLabel.stringValue=@"SPACE • Bấm Bắt đầu nghe trước"; return; }
+    if(!self.listening) { self.manualLiveLabel.stringValue=@"E • Start listening first"; self.autoLiveLabel.stringValue=@"V • Hãy bấm Bắt đầu nghe trước"; return; }
     if(self.spaceCommitPending) [self finishSpaceCommit];
     NSString *visible=[self currentBufferedTranscript];
     if(self.manualUsesUntimed) {
       // Without word timing, Space means exactly the words currently shown.
       NSString *question=[self.manualUntimedBuffer consume];
-      if(question.length) [self appendOfflineAnswerForQuestion:question];
-      else self.manualLiveLabel.stringValue=@"SPACE • Chưa có câu hỏi để chốt";
+      if(question.length) [self appendParallelAnswersForQuestion:question];
+      else { self.manualLiveLabel.stringValue=@"E • No question to submit"; self.autoLiveLabel.stringValue=@"V • Chưa có câu hỏi để chốt"; }
       [self refreshManualTranscriptFinal:NO];
       return;
     }
@@ -1510,7 +1517,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     [self.manualUntimedBuffer consume];
     self.spaceDeadlineTimer=[NSTimer scheduledTimerWithTimeInterval:1.20 target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
     if(self.manualSnapshotFinal) self.spaceSettleTimer=[NSTimer scheduledTimerWithTimeInterval:0.12 target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
-    self.manualLiveLabel.stringValue=@"SPACE • Đã chốt • đang nhận nốt chữ cuối…";
+    self.manualLiveLabel.stringValue=@"E • Captured • finishing the last words…";
+    self.autoLiveLabel.stringValue=@"V • Đã chốt • đang nhận nốt chữ cuối…";
     [self refreshManualTranscriptFinal:NO];
 }
 - (void)finishSpaceCommit {
@@ -1518,8 +1526,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     [self.spaceSettleTimer invalidate]; [self.spaceDeadlineTimer invalidate];
     NSString *q=[self correctCulinaryTerms:self.spaceTranscriptSnapshot ?: @""];
     self.spaceCommitPending=NO; self.spaceTranscriptSnapshot=@"";
-    if(q.length) [self appendOfflineAnswerForQuestion:q];
-    else self.manualLiveLabel.stringValue=@"SPACE • Chưa nhận được lời nói trước mốc chốt";
+    if(q.length) [self appendParallelAnswersForQuestion:q];
+    else { self.manualLiveLabel.stringValue=@"E • No speech was captured"; self.autoLiveLabel.stringValue=@"V • Chưa nhận được lời nói"; }
     [self.timeline pruneBefore:self.manualCursor];
 }
 - (BOOL)looksLikeQuestion:(NSString *)s {
@@ -1537,7 +1545,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 }
 - (void)processQuestionText:(NSString *)text {
     NSString *q=[self primaryQuestionFromText:text];
-    if(q.length) [self appendOfflineAnswerForQuestion:q];
+    if(q.length) [self appendParallelAnswersForQuestion:q];
 }
 - (NSSet<NSString *> *)contentTerms:(NSString *)text {
     text=[self correctCulinaryTerms:text ?: @""];
@@ -1582,20 +1590,21 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     return candidates.count?candidates.array:self.qaSearchEntries;
 }
 - (NSArray<NSDictionary *> *)rankedQuestionMatchesForQuestion:(NSString *)question {
+    return [self rankedQuestionMatchesForQuestion:question targetLanguage:@"en"];
+}
+- (NSArray<NSDictionary *> *)rankedQuestionMatchesForQuestion:(NSString *)question targetLanguage:(NSString *)targetLanguage {
     NSString *clean=[self correctCulinaryTerms:question ?: @""];
     NSSet *queryTerms=[self contentTerms:clean]; NSString *normalQuery=[self normalisedQuestion:clean];
     if(!normalQuery.length || !queryTerms.count) return @[];
     NSMutableArray *ranked=[NSMutableArray array];
-    NSDictionary *exact=self.exactQAMemory[normalQuery];
-    if(exact) [ranked addObject:@{@"entry":exact,@"score":@1.0,@"recall":@1.0,@"precision":@1.0,@"edit":@1.0,@"common":@(queryTerms.count),@"exact":@YES}];
     for(NSDictionary *searchEntry in [self candidateSearchEntriesForQuestion:clean]){
-      NSDictionary *entry=searchEntry[@"entry"]; if(exact && [entry[@"question"] isEqualToString:exact[@"question"]]) continue;
+      NSDictionary *entry=searchEntry[@"entry"];NSString *entryLanguage=entry[@"targetLanguage"] ?: @"en";if(targetLanguage.length && ![entryLanguage isEqualToString:targetLanguage]) continue;
       NSSet *candidateTerms=searchEntry[@"qterms"]; NSInteger common=0; for(NSString *term in queryTerms) if([candidateTerms containsObject:term]) common++;
       double recall=queryTerms.count?(double)common/queryTerms.count:0, precision=candidateTerms.count?(double)common/candidateTerms.count:0;
       double f1=(recall+precision)>0?2*recall*precision/(recall+precision):0; NSString *normalCandidate=searchEntry[@"normal"] ?: @"";
       NSUInteger maxLen=MAX(normalQuery.length,normalCandidate.length); double edit=maxLen?1.0-(double)[self editDistance:normalQuery other:normalCandidate]/maxLen:0;
-      double score=(f1*0.58)+(edit*0.42); if([normalCandidate isEqualToString:normalQuery]) score=1;
-      [ranked addObject:@{@"entry":entry,@"score":@(score),@"recall":@(recall),@"precision":@(precision),@"edit":@(edit),@"common":@(common),@"exact":@NO}];
+      BOOL exact=[normalCandidate isEqualToString:normalQuery];double score=exact?1:(f1*0.58)+(edit*0.42);
+      [ranked addObject:@{@"entry":entry,@"score":@(score),@"recall":@(recall),@"precision":@(precision),@"edit":@(edit),@"common":@(common),@"exact":@(exact)}];
     }
     [ranked sortUsingComparator:^NSComparisonResult(NSDictionary *a,NSDictionary *b){return[b[@"score"] compare:a[@"score"]];}];
     return ranked;
@@ -1608,12 +1617,15 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     return confident?top[@"entry"]:nil;
 }
 - (NSString *)bestLocalAnswerForQuestion:(NSString *)question {
+    return [self bestLocalAnswerForQuestion:question targetLanguage:@"en"];
+}
+- (NSString *)bestLocalAnswerForQuestion:(NSString *)question targetLanguage:(NSString *)targetLanguage {
     self.lastMatchedQuestion=nil; self.lastMatchConfidence=0;
     if (!self.qaEntries.count) return @"TRẢ LỜI EN: The structured SA Cook Study question index is unavailable.";
     NSString *normalQuestion=[self normalisedQuestion:question];
-    if ([@[@"what skills do you think are important for a prep cook",@"what skills are important for a prep cook",@"what are the important skills for a prep cook"] containsObject:normalQuestion]) { self.lastMatchedQuestion=@"Synthesis: prep cook skills from SA Cook Study"; self.lastMatchConfidence=1; return @"TRẢ LỜI EN: A prep cook needs strong knife skills, food-safety knowledge, organisation, time management, attention to detail, teamwork, and the ability to follow recipes consistently."; }
-    if ([@[@"how do you ensure food safety in the kitchen",@"how do you maintain food safety in the kitchen"] containsObject:normalQuestion]) { self.lastMatchedQuestion=@"Synthesis: food safety procedures from SA Cook Study"; self.lastMatchConfidence=1; return @"TRẢ LỜI EN: I maintain personal hygiene, control food temperatures, prevent cross-contamination, store and label food correctly, clean and sanitise work areas, follow HACCP, and report hazards immediately."; }
-    NSArray *ranked=[self rankedQuestionMatchesForQuestion:question]; NSDictionary *top=ranked.firstObject; if(!top) return @"TRẢ LỜI EN: No reliable match was found in the SA Cook Study data.";
+    if ([targetLanguage isEqualToString:@"en"] && [@[@"what skills do you think are important for a prep cook",@"what skills are important for a prep cook",@"what are the important skills for a prep cook"] containsObject:normalQuestion]) { self.lastMatchedQuestion=@"Synthesis: prep cook skills from SA Cook Study"; self.lastMatchConfidence=1; return @"TRẢ LỜI EN: A prep cook needs strong knife skills, food-safety knowledge, organisation, time management, attention to detail, teamwork, and the ability to follow recipes consistently."; }
+    if ([targetLanguage isEqualToString:@"en"] && [@[@"how do you ensure food safety in the kitchen",@"how do you maintain food safety in the kitchen"] containsObject:normalQuestion]) { self.lastMatchedQuestion=@"Synthesis: food safety procedures from SA Cook Study"; self.lastMatchConfidence=1; return @"TRẢ LỜI EN: I maintain personal hygiene, control food temperatures, prevent cross-contamination, store and label food correctly, clean and sanitise work areas, follow HACCP, and report hazards immediately."; }
+    NSArray *ranked=[self rankedQuestionMatchesForQuestion:question targetLanguage:targetLanguage]; NSDictionary *top=ranked.firstObject; if(!top) return @"TRẢ LỜI EN: No reliable match was found in the SA Cook Study data.";
     NSDictionary *best=top[@"entry"]; double bestScore=[top[@"score"] doubleValue], bestRecall=[top[@"recall"] doubleValue], bestPrecision=[top[@"precision"] doubleValue], bestEdit=[top[@"edit"] doubleValue]; NSInteger bestCommon=[top[@"common"] integerValue]; BOOL exact=[top[@"exact"] boolValue];
     double second=ranked.count>1?[ranked[1][@"score"] doubleValue]:0; double margin=bestScore-second;
     BOOL clearWinner=exact || margin>=0.03 || bestScore>=0.72 || bestEdit>=0.78;
@@ -1741,7 +1753,11 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     return [[text substringWithRange:NSMakeRange(from,second.location-from)] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
 }
 - (NSString *)heardQuestionFromRequest:(NSString *)request {
-    return [self textBetween:@"<heard_question>" and:@"</heard_question>" inString:request] ?: request;
+    NSString *wrapped=[self textBetween:@"<heard_question>" and:@"</heard_question>" inString:request];
+    if(wrapped.length) return wrapped;
+    NSRange marker=[request rangeOfString:@"<answer_language>"];
+    NSString *plain=marker.location==NSNotFound?request:[request substringToIndex:marker.location];
+    return [plain stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
 }
 - (NSString *)recentQuestionsFromRequest:(NSString *)request {
     return [self textBetween:@"<recent_questions>" and:@"</recent_questions>" inString:request] ?: @"";
@@ -1814,12 +1830,13 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     NSShadow *textShadow=[NSShadow new]; textShadow.shadowColor=[NSColor colorWithWhite:0 alpha:0.96]; textShadow.shadowBlurRadius=3.0; textShadow.shadowOffset=NSZeroSize;
     NSMutableAttributedString *display=[NSMutableAttributedString new];
     NSDictionary *sectionAttributes=@{NSFontAttributeName:[NSFont systemFontOfSize:10 weight:NSFontWeightBold],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.66 alpha:1],NSKernAttributeName:@1.35,NSParagraphStyleAttributeName:sectionStyle,NSShadowAttributeName:textShadow};
+    [display appendAttributedString:[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"%@\n",automatic?@"V":@"E"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:13 weight:NSFontWeightHeavy],NSForegroundColorAttributeName:accent,NSKernAttributeName:@1.4,NSParagraphStyleAttributeName:sectionStyle,NSShadowAttributeName:textShadow}]];
     if(q.length) {
         [display appendAttributedString:[[NSAttributedString alloc] initWithString:[q stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:MAX(18,answerSize*0.76) weight:NSFontWeightSemibold],NSForegroundColorAttributeName:[accent colorWithAlphaComponent:1],NSParagraphStyleAttributeName:questionStyle,NSShadowAttributeName:textShadow}]];
     }
     if(a.length) [display appendAttributedString:[self answerText:a attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:answerSize weight:NSFontWeightMedium],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.97 alpha:1],NSParagraphStyleAttributeName:answerStyle,NSShadowAttributeName:textShadow} question:q]];
     if(display.length) [display appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n" attributes:sectionAttributes]];
-    [display appendAttributedString:[[NSAttributedString alloc] initWithString:@"LISTENING  •  " attributes:sectionAttributes]];
+    [display appendAttributedString:[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"%@ • SPACE  •  ",automatic?@"V":@"E"] attributes:sectionAttributes]];
     [display appendAttributedString:[[NSAttributedString alloc] initWithString:(live.length?live:@"Waiting for the next question…") attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:13 weight:NSFontWeightRegular],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.82 alpha:1],NSParagraphStyleAttributeName:compactStyle,NSShadowAttributeName:textShadow}]];
     if(records.count>1) {
         CGFloat previousSize=MAX(15,answerSize*0.62);
@@ -1839,7 +1856,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
         }
     }
     if([view.textStorage isEqualToAttributedString:display]) return;
-    BOOL sameQuestion=q.length && [view.string hasPrefix:[q stringByAppendingString:@"\n"]];
+    NSString *questionPrefix=[NSString stringWithFormat:@"%@\n%@\n",automatic?@"V":@"E",q];
+    BOOL sameQuestion=q.length && [view.string hasPrefix:questionPrefix];
     NSPoint previous=view.enclosingScrollView.contentView.bounds.origin;
     [view.textStorage setAttributedString:display];
     [view.layoutManager ensureLayoutForTextContainer:view.textContainer];
@@ -2230,9 +2248,9 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     if(!shortAnswer.length && !fullAnswer.length) return @"";
     BOOL vietnamese=[self isVietnameseText:question] || [self isVietnameseText:fullAnswer];
     NSString *shortLabel=vietnamese?@"Ngắn":@"Short",*fullLabel=vietnamese?@"Đầy đủ":@"Full";
-    if(!fullAnswer.length || [[self normalisedQuestion:shortAnswer] isEqualToString:[self normalisedQuestion:fullAnswer]])
-      return [NSString stringWithFormat:@"%@: %@",shortLabel,shortAnswer.length?shortAnswer:fullAnswer];
-    return [NSString stringWithFormat:@"%@: %@\n\n%@: %@",shortLabel,shortAnswer,fullLabel,fullAnswer];
+    NSString *readyShort=shortAnswer.length?shortAnswer:fullAnswer;
+    NSString *readyFull=fullAnswer.length?fullAnswer:readyShort;
+    return [NSString stringWithFormat:@"%@: %@\n\n%@: %@",shortLabel,readyShort,fullLabel,readyFull];
 }
 - (NSArray<NSString *> *)highlightTermsForQuestion:(NSString *)question answer:(NSString *)answer {
     NSMutableOrderedSet<NSString *> *terms=[NSMutableOrderedSet orderedSetWithArray:@[@"HACCP",@"FIFO",@"mise en place",@"à la carte",@"sous-vide",@"roux",@"béchamel",@"velouté",@"hollandaise",@"béarnaise",@"mirepoix",@"julienne",@"brunoise",@"bain-marie",@"cross-contamination",@"sanitising",@"sanitiser",@"stock",@"temperature",@"danger zone",@"chef's knife",@"grill",@"grilled",@"poultry",@"seafood"]];
@@ -2257,7 +2275,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
       NSArray *matches=[regex matchesInString:result.string options:0 range:NSMakeRange(0,result.length)];
       for(NSTextCheckingResult *match in matches) if(match.numberOfRanges>2) [result addAttributes:@{NSFontAttributeName:bold,NSForegroundColorAttributeName:NSColor.whiteColor} range:[match rangeAtIndex:2]];
     }
-    NSRegularExpression *labels=[NSRegularExpression regularExpressionWithPattern:@"(?m)^(Short|Full):" options:0 error:nil];
+    NSRegularExpression *labels=[NSRegularExpression regularExpressionWithPattern:@"(?m)^(Short|Full|Ngắn|Đầy đủ):" options:0 error:nil];
     for(NSTextCheckingResult *match in [labels matchesInString:result.string options:0 range:NSMakeRange(0,result.length)])
       [result addAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:MAX(10,font.pointSize*0.62) weight:NSFontWeightBold],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.72 alpha:1],NSKernAttributeName:@1.0} range:match.range];
     return result;
@@ -2280,7 +2298,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     NSPoint position=nativeView?view.enclosingScrollView.contentView.bounds.origin:NSZeroPoint;
     NSString *oldText=view.string.copy;
     view.string=@"";
-    if(!entries.count) { view.string=@"No previous conversation yet."; return; }
+    if(!entries.count) { view.string=automatic?@"Chưa có câu trả lời trước.":@"No previous answer yet."; return; }
     for(NSDictionary *record in entries) [self appendHistoryQuestion:record[@"question"] answer:record[@"answer"] toTextView:view];
     if(nativeView) {
         [view.layoutManager ensureLayoutForTextContainer:view.textContainer];
@@ -2298,7 +2316,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     NSDictionary *record=self.manualRecords.lastObject;
     if(record) {
       self.currentQuestion=record[@"question"]; self.currentAnswer=record[@"answer"];
-      self.manualLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?@"SPACE • Đã trả lời":[record[@"state"] isEqual:@"failed"]?@"SPACE • Lỗi AI — bấm Thử lại":@"SPACE • AI đang trả lời…";
+      self.manualLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?@"E • Answered":[record[@"state"] isEqual:@"failed"]?@"E • AI error — retry":@"E • Preparing the English answer…";
       [self showCurrentQuestion:self.currentQuestion answer:self.currentAnswer];
     }
     [self renderHistoryRecords:self.manualRecords inView:self.answerView];
@@ -2308,7 +2326,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     if(record) {
       self.autoQuestion=record[@"question"]; self.autoAnswer=record[@"answer"];
       BOOL contextual=[record[@"usedContext"] boolValue];
-      self.autoLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?(contextual?@"AUTO • Đã trả lời theo ngữ cảnh • tiếp tục nghe":@"AUTO • Đã trả lời • tiếp tục nghe"):[record[@"state"] isEqual:@"failed"]?@"AUTO • Lỗi AI — bấm Thử lại":(contextual?@"AUTO • Đang nối với câu trước…":@"AUTO • AI đang trả lời • tiếp tục nghe");
+      self.autoLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?(contextual?@"V • Đã trả lời theo ngữ cảnh":@"V • Đã trả lời"):[record[@"state"] isEqual:@"failed"]?@"V • Lỗi AI — bấm Thử lại":(contextual?@"V • Đang dùng ngữ cảnh câu trước…":@"V • Đang chuẩn bị câu trả lời tiếng Việt…");
       [self showAutoQuestion:self.autoQuestion answer:self.autoAnswer];
     }
     [self renderHistoryRecords:self.autoRecords inView:self.autoHistoryView];
@@ -2332,7 +2350,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
       record[@"requestQuestion"]=[self requestWithPresenterProfile:original];
     NSString *cacheKey=[self answerCacheKeyForRecord:record];
     if(self.keyField.stringValue.length<20 && ![lane.cache[cacheKey] length]) {
-      record[@"answer"]=@"No reliable local answer. Add an active OpenAI API key using “AI key” to answer from your study data.";
+      record[@"answer"]=automatic?@"Không có câu trả lời cục bộ đủ tin cậy. Hãy thêm OpenAI API key đang hoạt động trong phần cài đặt AI.":@"No reliable local answer. Add an active OpenAI API key in AI settings.";
       record[@"state"]=@"failed";
       if(automatic) [self refreshAutoAnswerPanel]; else [self refreshManualAnswerPanel];
       return;
@@ -2390,7 +2408,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     NSArray<NSString *> *parts=[self questionPartsForSynthesis:heard];
     BOOL multipart=parts.count>1;
     BOOL linkedMultipart=multipart && [self questionPartsAreLinked:parts];
-    BOOL vietnamese=[self isVietnameseText:heard];
+    NSString *requestedLanguage=[self textBetween:@"<answer_language>" and:@"</answer_language>" inString:question];
+    BOOL vietnamese=requestedLanguage.length?[requestedLanguage isEqualToString:@"vi"]:[self isVietnameseText:heard];
     NSString *multipartInstructions=vietnamese
       ? (linkedMultipart?@"Bạn hỗ trợ luyện phỏng vấn nghề bếp. Lượt nói gồm các mảnh câu hỏi liên kết, lặp lại hoặc làm rõ. Hãy suy ra một yêu cầu chính từ toàn bộ lượt nói và hội thoại gần đây, rồi trả lời một lần, không đánh số.":@"Bạn hỗ trợ luyện phỏng vấn nghề bếp. Lượt nói gồm nhiều câu hỏi độc lập. Hãy trả lời từng câu theo đúng thứ tự và đánh số rõ ràng.")
       : (linkedMultipart?@"Help with cook interview practice and presentation questions. Answer in English. The HEARD TURN contains linked, repeated, or clarifying question fragments from one speaking turn. Infer the single underlying request from all lines and RECENT CONVERSATION, then give ONE direct answer without numbering. Later fragments may clarify the subject instead of creating a new question.":@"Help with cook interview practice and presentation questions. Answer in English. The HEARD TURN contains multiple independent questions, one per line. Answer EVERY line in the same order, clearly numbered 1 and 2 (and onward). Do not merge, omit, or replace any subject.");
@@ -2436,6 +2455,41 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
       dispatch_async(dispatch_get_main_queue(), ^{ completion(answer,success); });
     }] resume];
 }
+- (void)appendParallelAnswersForQuestion:(NSString *)question {
+    [self ensureAnswerState];
+    NSString *heard=[[self correctCulinaryTerms:question ?: @""] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    NSString *displayQuestion=[self displayQuestionForHeardQuestion:heard];
+    if(!heard.length || !displayQuestion.length) return;
+    self.lastAsked=heard; self.historyCount++;
+    BOOL contextual=[self questionNeedsConversationContext:heard];
+    BOOL synthesis=([self questionNeedsInterviewSynthesis:heard] && self.keyField.stringValue.length>=20) || [self questionNeedsPersonalAnswer:heard];
+    NSArray<NSDictionary *> *lanes=@[
+      @{@"language":@"vi",@"lane":@"auto",@"records":self.autoRecords,@"recent":[self recentAutoQuestionContext] ?: @""},
+      @{@"language":@"en",@"lane":@"manual",@"records":self.manualRecords,@"recent":[self recentManualQuestionContext] ?: @""}
+    ];
+    NSMutableArray<NSMutableDictionary *> *waiting=[NSMutableArray array];
+    for(NSDictionary *spec in lanes) {
+      NSString *language=spec[@"language"],*lane=spec[@"lane"],*recent=spec[@"recent"];
+      NSString *raw=(contextual || synthesis)?@"TRẢ LỜI EN: No reliable match was found in the SA Cook Study data.":[self bestLocalAnswerForQuestion:heard targetLanguage:language];
+      BOOL weak=contextual || synthesis || [raw containsString:@"No reliable match"] || !self.qaEntries.count;
+      NSString *answer=[self conciseLocalAnswerFromResult:raw question:heard];
+      NSString *loading=[language isEqualToString:@"vi"]?@"Đang chuẩn bị câu trả lời…":@"Preparing the answer…";
+      NSMutableDictionary *record=[@{@"question":displayQuestion,@"answer":weak?loading:answer,@"state":weak?@"waiting":@"complete",@"lane":lane,@"targetLanguage":language} mutableCopy];
+      if(weak) {
+        NSString *request=recent.length?[self contextualRequestForQuestion:heard recentQuestions:recent]:heard;
+        record[@"requestQuestion"]=[request stringByAppendingFormat:@"\n<answer_language>%@</answer_language>",language];
+        if(recent.length) record[@"usedContext"]=@YES;
+        [waiting addObject:record];
+      } else if(![displayQuestion isEqualToString:heard]) record[@"requestQuestion"]=heard;
+      [(NSMutableArray *)spec[@"records"] addObject:record];
+    }
+    [self refreshAnswerPanels];
+    for(NSMutableDictionary *record in waiting) [self startAnswerForRecord:record];
+    if(!waiting.count) {
+      self.autoLiveLabel.stringValue=@"V • Đã trả lời • bấm Space cho câu tiếp theo";
+      self.manualLiveLabel.stringValue=@"E • Answered • press Space for the next question";
+    }
+}
 - (void)appendOfflineAnswerForQuestion:(NSString *)question {
     [self ensureAnswerState];
     NSString *heard=[[self correctCulinaryTerms:question ?: @""] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
@@ -2470,8 +2524,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     [pasteboard clearContents]; BOOL copied=[pasteboard setString:text forType:NSPasteboardTypeString];
     [self setStatus:copied?[NSString stringWithFormat:@"✓ Đã sao chép khung %@",name]:@"Không thể ghi vào clipboard" color:copied?NSColor.systemGreenColor:NSColor.systemRedColor];
 }
-- (void)copyAutoConversation:(id)sender { [self copyConversationView:self.autoAnswerView name:@"AUTO"]; }
-- (void)copyManualConversation:(id)sender { [self copyConversationView:self.currentAnswerView name:@"SPACE"]; }
+- (void)copyAutoConversation:(id)sender { [self copyConversationView:self.autoAnswerView name:@"V"]; }
+- (void)copyManualConversation:(id)sender { [self copyConversationView:self.currentAnswerView name:@"E"]; }
 - (void)clearAutoHistory:(id)sender {
     if(self.autoRecords.count>1) [self.autoRecords removeObjectsInRange:NSMakeRange(0,self.autoRecords.count-1)];
     [self refreshAutoAnswerPanel];

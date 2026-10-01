@@ -95,6 +95,6 @@ console.log('AUTO runtime regression tests passed.');
   assert(!requests[0].has('languages[]') && !requests[0].has('language'), 'AUTO lets the transcription model detect Vietnamese or English');
   assert(!requests[1].has('languages[]') && !requests[1].has('language'), 'AUTO fallback also keeps language auto-detection');
   assert.strictEqual(await context.transcribeBlob(new Blob(['audio'], {type: 'audio/wav'}), 'manual'), 'What is stock?');
-  assert.deepStrictEqual(requests[2].getAll('languages[]'), ['en'], 'SPACE keeps the existing English language hint');
+  assert(!requests[2].has('languages[]') && !requests[2].has('language'), 'the shared V/E Space capture detects Vietnamese or English');
   console.log('Transcription request and fallback tests passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

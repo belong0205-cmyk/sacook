@@ -84,7 +84,9 @@ static void CheckText(NSTextView *view, CGFloat fontSize, NSString *question, NS
     NSScrollView *scroll=view.enclosingScrollView;
     Check([view.string containsString:question],@"The full multipart question is displayed");
     Check([view.string containsString:answer],@"The complete long answer is displayed");
-    Check([view.string hasPrefix:[question stringByAppendingString:@"\n"]] && [view.string containsString:@"\nLISTENING  •  "],@"Latest answer and live transcript share one continuous conversation surface without a heading");
+    BOOL hasSpaceStatus=[view.string containsString:@"\nV • SPACE  •  "] || [view.string containsString:@"\nE • SPACE  •  "];
+    BOOL hasLanePrefix=[view.string hasPrefix:[@"V\n" stringByAppendingString:[question stringByAppendingString:@"\n"]]] || [view.string hasPrefix:[@"E\n" stringByAppendingString:[question stringByAppendingString:@"\n"]]];
+    Check(hasLanePrefix && hasSpaceStatus,@"Latest answer and live transcript share one continuous conversation surface with only the compact V/E marker");
     Check([view.string rangeOfString:@"CURRENT\n"].location==NSNotFound && [view.string rangeOfString:@"\nPREVIOUS\n"].location==NSNotFound,@"Conversation omits the CURRENT and PREVIOUS labels");
     Check([view.string rangeOfString:@"\nTHEM\n"].location==NSNotFound && [view.string rangeOfString:@"\nME\n"].location==NSNotFound,@"Question and answer use colour instead of THEM and ME rows");
     Check(!view.editable && !view.selectable,@"Reading content does not enter text selection mode");
@@ -120,13 +122,13 @@ int main(int argc,const char *argv[]) {
         NSView *dock=nil,*autoLane=nil,*spaceLane=nil;
         for(NSView *view in app.window.contentView.subviews) {
             if([view.identifier isEqualToString:@"bottomControlBar"]) dock=view;
-            else if([view.identifier isEqualToString:@"autoConversationLane"]) autoLane=view;
-            else if([view.identifier isEqualToString:@"spaceConversationLane"]) spaceLane=view;
+            else if([view.identifier isEqualToString:@"vietnameseConversationLane"]) autoLane=view;
+            else if([view.identifier isEqualToString:@"englishConversationLane"]) spaceLane=view;
         }
         Check(dock!=nil && autoLane!=nil && spaceLane!=nil,@"Two reading lanes and the bottom control dock are explicit layout regions");
-        Check(app.listenButton.superview==dock && app.deviceButton.superview==dock && app.autoButton.superview==dock && app.commitButton.superview==dock,@"Listening, source, AUTO, and SPACE controls all live in the bottom dock");
+        Check(app.listenButton.superview==dock && app.deviceButton.superview==dock && app.autoButton.superview==nil && app.commitButton.superview==dock,@"Listening, source, and the shared V/E Space control live in the bottom dock without AUTO");
         Check(app.status.superview==dock && app.levelLabel.superview==dock && app.moreButton.superview==dock,@"Status and one compact secondary-actions menu live in the bottom dock");
-        Check(dock.subviews.count==7,@"Bottom dock exposes only four primary controls, two compact states, and one overflow menu");
+        Check(dock.subviews.count==6,@"Bottom dock exposes three primary controls, two compact states, and one overflow menu");
         for(NSString *selectorName in @[@"retryAutoAnswer:",@"retryManualAnswer:",@"clearAutoHistory:",@"clearManualHistory:",@"checkForUpdates:",@"configureAI:",@"changeReadingFont:",@"changeBackdropStrength:"])
             Check(MenuHasAction(app.moreButton.menu,NSSelectorFromString(selectorName)),[NSString stringWithFormat:@"Secondary menu exposes %@",selectorName]);
         Check(app.backdropMenuItems.count==3 && app.backdropStrength==1,@"Background menu offers three levels and starts at the balanced level");
@@ -208,7 +210,7 @@ int main(int argc,const char *argv[]) {
                 Check(NSMinY(dock.frame)<=11.1,@"Control dock remains anchored to the bottom edge");
                 Check(dock.frame.size.height<=54.1,@"Bottom dock remains a compact single row");
                 Check(app.window.contentView.bounds.size.height-NSMaxY(autoLane.frame)<=35.1 && app.window.contentView.bounds.size.height-NSMaxY(spaceLane.frame)<=35.1,@"Both question-and-answer lanes begin near the top edge");
-                NSArray<NSView *> *primary=@[app.listenButton,app.deviceButton,app.autoButton,app.commitButton,app.status,app.levelLabel,app.moreButton];
+                NSArray<NSView *> *primary=@[app.listenButton,app.deviceButton,app.commitButton,app.status,app.levelLabel,app.moreButton];
                 for(NSView *control in primary) Check(NSContainsRect(NSInsetRect(dock.bounds,-1,-1),control.frame),@"Every visible dock control stays inside the compact bar");
                 for(NSUInteger i=0;i<primary.count;i++) for(NSUInteger j=i+1;j<primary.count;j++) {
                     NSRect intersection=NSIntersectionRect(primary[i].frame,primary[j].frame);
@@ -267,9 +269,10 @@ int main(int argc,const char *argv[]) {
             [records addObject:[@{@"question":@"What should I prepare before service?",@"answer":@"I organise my ingredients, equipment and work station before service.",@"state":@"complete",@"lane":automatic?@"auto":@"manual"} mutableCopy]];
             if(automatic) [app refreshAutoAnswerPanel]; else [app refreshManualAnswerPanel];
             Layout(app);
-            Check([conversation.string hasPrefix:@"What should I prepare before service?\n"],@"The latest exchange starts directly at the top");
+            NSString *latestPrefix=[NSString stringWithFormat:@"%@\nWhat should I prepare before service?\n",automatic?@"V":@"E"];
+            Check([conversation.string hasPrefix:latestPrefix],@"The latest exchange starts directly below its compact V/E marker");
             NSRange latestRange=[conversation.string rangeOfString:@"What should I prepare before service?"];
-            NSRange listeningRange=[conversation.string rangeOfString:@"\nLISTENING  •  "];
+            NSRange listeningRange=[conversation.string rangeOfString:automatic?@"\nV • SPACE  •  ":@"\nE • SPACE  •  "];
             NSRange formerRange=[conversation.string rangeOfString:formerQuestion];
             Check(listeningRange.location!=NSNotFound && formerRange.location!=NSNotFound && latestRange.location<listeningRange.location && listeningRange.location<formerRange.location && [conversation.string rangeOfString:@"\nPREVIOUS\n"].location==NSNotFound,@"Earlier exchange remains below a neutral compact separator without a PREVIOUS label");
             Check([otherConversation.string isEqualToString:otherText],@"A new exchange in one lane does not repaint the other conversation");

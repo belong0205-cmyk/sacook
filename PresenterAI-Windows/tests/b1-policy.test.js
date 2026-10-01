@@ -136,7 +136,9 @@ const source = fs.readFileSync(path.resolve(root, 'app.js'), 'utf8');
 assert.match(source, /requiresBehavioralSynthesis\(question\)/, 'local fast path must guard behavioral questions');
 assert.match(source, /!requiresBehavioralSynthesis\(question\)/, 'behavioral questions must bypass memorized exact answers');
 assert.match(source, /A local reference is not proof that the presenter lived that event/);
-assert.match(source, /kind === 'auto' && isVietnameseQuestion\(question\)/, 'only AUTO selects Vietnamese answer generation dynamically');
-assert.match(source, /if \(kind !== 'auto'\).*languages\[\]/, 'SPACE keeps its existing English transcription hint');
+assert.match(source, /const respondInVietnamese = kind === 'auto'/, 'the V lane always selects Vietnamese output');
+assert.match(source, /submitQuestion\('auto', clean\)/, 'one Space transcript must be submitted to V');
+assert.match(source, /submitQuestion\('manual', clean\)/, 'one Space transcript must be submitted to E');
+assert.doesNotMatch(source, /form\.append\('languages\[\]'/, 'Space transcription must allow spoken Vietnamese or English');
 
 console.log('Windows B2 answer policy tests passed.');

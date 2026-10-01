@@ -51,8 +51,8 @@ const profileReady = window.saCook.getProfile().then(value => { presenterProfile
 profileReady.catch(error => setStatus(error.message, true));
 
 const lanes = {
-  auto: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: 'Đang nghe câu hỏi tiếp theo…' },
-  manual: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: 'Đang nghe đến khi bạn bấm Space…' }
+  auto: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: 'V • Bấm Space để chốt câu hỏi.' },
+  manual: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: 'E • Bấm Space để chốt câu hỏi.' }
 };
 
 class ApiError extends Error {
@@ -179,11 +179,11 @@ function editDistance(a, b) {
   return previous[b.length];
 }
 
-function rankMatches(question) {
+function rankMatches(question, targetLanguage = 'en') {
   const queryNormal = normalize(question);
   const query = contentWords(question);
   if (!queryNormal || !query.size) return [];
-  return qa.map(item => {
+  return qa.filter(item => (item.targetLanguage || 'en') === targetLanguage).map(item => {
     const candidateNormal = item._normal || (item._normal = normalize(item.question));
     const candidate = item._words || (item._words = contentWords(item.question));
     let common = 0;
@@ -271,11 +271,12 @@ function formatAnswerVariants(shortAnswer, fullAnswer) {
   const vietnamese = isVietnameseQuestion(`${short}\n${full}`);
   const shortLabel = vietnamese ? 'Ngắn' : 'Short';
   const fullLabel = vietnamese ? 'Đầy đủ' : 'Full';
-  if (!full || normalize(short) === normalize(full)) return `${shortLabel}: ${short || full}`;
-  return `${shortLabel}: ${short}\n\n${fullLabel}: ${full}`;
+  const readyShort = short || full;
+  const readyFull = full || readyShort;
+  return `${shortLabel}: ${readyShort}\n\n${fullLabel}: ${readyFull}`;
 }
 
-function buildAnswerVariants(answer, question = '') {
+function buildAnswerVariants(answer, question = '', targetLanguage = '') {
   const parsed = parseAnswerVariants(answer);
   const fullSource = parsed.full || parsed.short || answer;
   const shortSource = parsed.short || fullSource;
@@ -284,7 +285,7 @@ function buildAnswerVariants(answer, question = '') {
     if (words.length <= limit) return words.join(' ');
     return `${words.slice(0, limit).join(' ').replace(/[,;:]$/, '')}.`;
   };
-  const vietnamese = isVietnameseQuestion(question);
+  const vietnamese = targetLanguage ? targetLanguage === 'vi' : isVietnameseQuestion(question);
   const short = vietnamese ? trimWords(shortSource, 28) : simplifyAnswerOutput(shortSource, question, 28);
   const full = vietnamese ? trimWords(fullSource, 85) : simplifyAnswerOutput(fullSource, question, 85);
   return formatAnswerVariants(short, full);
@@ -339,8 +340,7 @@ function transcriptionPrompt(kind) {
   const priority = ['grill', 'grilled', 'grilling', 'stock', 'mise en place', 'à la carte', 'roux', 'béchamel', 'velouté', 'hollandaise', 'béarnaise', 'mirepoix', 'julienne', 'brunoise', 'sous-vide', 'bain-marie', 'HACCP', 'FIFO', 'sanitising', 'cross-contamination'];
   const vocabulary = [...new Set([...priority, ...speechHints])].slice(0, 90).join(', ');
   const recent = lanes[kind].records.slice(-4).map(record => record.question).join(' | ');
-  if (kind === 'auto') return `Bilingual Vietnamese or Australian English commercial cookery skills-assessment interview. Detect the spoken language and transcribe in that same language. Preserve the exact question, numbers, and culinary terminology, including French loanwords. Vocabulary: ${vocabulary}.${recent ? ` Recent questions: ${recent}.` : ''}`;
-  return `Australian English commercial cookery skills-assessment interview. Preserve the exact question and culinary terminology, including French loanwords. Vocabulary: ${vocabulary}.${recent ? ` Recent questions: ${recent}.` : ''}`;
+  return `Bilingual Vietnamese or Australian English commercial cookery skills-assessment interview. Detect the spoken language and transcribe in that same language. Preserve the exact question, numbers, and culinary terminology, including French loanwords. Vocabulary: ${vocabulary}.${recent ? ` Recent questions: ${recent}.` : ''}`;
 }
 
 async function transcribeBlob(blob, kind, fast = false) {
@@ -353,9 +353,8 @@ async function transcribeBlob(blob, kind, fast = false) {
     const form = new FormData();
     form.append('file', blob, blob.type.includes('wav') ? 'question.wav' : 'question.webm');
     form.append('model', model);
-    // AUTO deliberately omits the language hint so gpt-transcribe detects
-    // Vietnamese or English. SPACE keeps the existing English-only behavior.
-    if (kind !== 'auto') form.append(model === 'gpt-transcribe' ? 'languages[]' : 'language', 'en');
+    // One SPACE capture can contain Vietnamese or English. Omitting a
+    // language hint lets the transcription model detect the spoken language.
     form.append('prompt', transcriptionPrompt(kind));
     if (model === 'gpt-transcribe') {
       const priority = ['grill', 'grilled', 'stock', 'mise en place', 'à la carte', 'roux', 'béchamel', 'velouté', 'hollandaise', 'béarnaise', 'mirepoix', 'julienne', 'brunoise', 'sous-vide', 'bain-marie', 'HACCP', 'FIFO', 'sanitising', 'cross-contamination', "chef's knife"];
@@ -402,12 +401,14 @@ function requiresBehavioralSynthesis(question) {
 async function answerQuestion(question, kind, forceAI = false) {
   await profileReady;
   const profile = window.SACookProfile.answerFacts(presenterProfile); // Exclude the raw document from answers.
-  const matches = rankMatches(question);
+  const respondInVietnamese = kind === 'auto'; // Left V lane; right/manual lane is E.
+  const targetLanguage = respondInVietnamese ? 'vi' : 'en';
+  const matches = rankMatches(question, targetLanguage);
   const best = matches[0];
   const parts = questionParts(question);
   const multipart = parts.length > 1;
   const linkedMultipart = multipart && questionPartsAreLinked(parts);
-  if (!forceAI && !window.SACookProfile.needsPersonalAnswer(question, profile) && !multipart && !needsConversationContext(question) && !requiresBehavioralSynthesis(question) && best && (best.score === 1 || (best.score >= 0.76 && best.common >= 2 && best.recall >= 0.65))) return buildAnswerVariants(best.item.answer, question);
+  if (!forceAI && !window.SACookProfile.needsPersonalAnswer(question, profile) && !multipart && !needsConversationContext(question) && !requiresBehavioralSynthesis(question) && best && (best.score === 1 || (best.score >= 0.76 && best.common >= 2 && best.recall >= 0.65))) return buildAnswerVariants(best.item.answer, question, targetLanguage);
 
   const qaReferences = matches.slice(0, 7).map(match => `Q: ${match.item.question}\nA: ${match.item.answer}`);
   const textReferences = relevantStudySnippets(question).map(chunk => `${chunk.source}:\n${chunk.text}`);
@@ -418,7 +419,6 @@ async function answerQuestion(question, kind, forceAI = false) {
     : multipart
     ? 'The heard turn contains independent questions. Answer every question in the same order with clearly numbered answers.'
     : 'Answer the exact heard question directly in two or three concise sentences.';
-  const respondInVietnamese = kind === 'auto' && isVietnameseQuestion(question);
   const vietnameseInstructions = linkedMultipart
     ? 'Lượt nói gồm các mảnh câu hỏi liên kết, lặp lại hoặc làm rõ. Hãy suy ra một yêu cầu chính từ toàn bộ lượt nói và ngữ cảnh gần đây, rồi trả lời một lần, không đánh số.'
     : multipart
@@ -427,7 +427,7 @@ async function answerQuestion(question, kind, forceAI = false) {
   const body = {
     model: 'gpt-4.1-mini', store: false, max_output_tokens: multipart && !linkedMultipart ? Math.min(300, parts.length * 110) : 130,
     instructions: respondInVietnamese
-      ? `Bạn giúp người thuyết trình trả lời phỏng vấn đánh giá kỹ năng nghề Cook/Chef. Chỉ trả lời bằng tiếng Việt. ${vietnameseInstructions} ${answerPolicy} Trả về đúng hai phần có nhãn: "Ngắn:" là câu trả lời trực tiếp có thể nói ngay; "Đầy đủ:" là câu trả lời đủ ý hơn. Dùng tiếng Việt tự nhiên, dễ nói. Với câu hỏi hành vi, phần Đầy đủ nêu ngắn gọn tình huống, hành động và kết quả. Dữ liệu tham khảo không chứng minh người dùng từng trải qua sự việc; nếu hồ sơ không có ví dụ thật, hãy dùng “tôi sẽ” và không bịa kinh nghiệm. Với câu hỏi kỹ thuật, giải thích trực tiếp và chỉ nêu đánh đổi khi cần. Nếu câu hỏi mơ hồ, suy ra kỹ năng đang được đánh giá và trả lời thẳng. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh nghề bếp cho phép. Ưu tiên dữ liệu cục bộ, sau đó dùng kiến thức nghề bếp đáng tin cậy. Không nhắc đến nguồn, AI hoặc việc thiếu dữ liệu.`
+      ? `Bạn giúp người thuyết trình trả lời phỏng vấn đánh giá kỹ năng nghề Cook/Chef. Chỉ trả lời bằng tiếng Việt. ${vietnameseInstructions} Trả về đúng hai phần có nhãn: "Ngắn:" là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ; "Đầy đủ:" là câu trả lời đủ ý hơn, thường không quá 85 từ. Dùng tiếng Việt tự nhiên, dễ nói. Với câu hỏi hành vi, phần Đầy đủ nêu ngắn gọn tình huống, hành động và kết quả. Dữ liệu tham khảo không chứng minh người dùng từng trải qua sự việc; nếu hồ sơ không có ví dụ thật, hãy dùng “tôi sẽ” và không bịa kinh nghiệm. Với câu hỏi kỹ thuật, giải thích trực tiếp và chỉ nêu đánh đổi khi cần. Nếu câu hỏi mơ hồ, suy ra kỹ năng đang được đánh giá và trả lời thẳng. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh nghề bếp cho phép. Ưu tiên dữ liệu cục bộ, sau đó dùng kiến thức nghề bếp đáng tin cậy. Không nhắc đến nguồn, AI hoặc việc thiếu dữ liệu.`
       : `You help the presenter answer an Australian Cook skills-assessment interview. Answer only in English. ${instructions} ${answerPolicy} Return exactly two labelled sections: "Short:" with one direct answer the presenter can say immediately, and "Full:" with a fuller answer containing the useful details. Use clear, natural CEFR B2 vocabulary. For a behavioral question, give a concrete situation, action and result in the Full answer. A local reference is not proof that the presenter lived that event: without a real user example, answer with “I would” and never claim “I once”, “I handled”, or “I worked”. For a technical question, explain the idea directly and give a tradeoff only when asked or essential. When a question is vague, infer the skill being tested and answer it directly. Be confident, practical and accurate. Correct an obvious transcript error only when culinary context makes it certain. Use the local references first and reliable general culinary knowledge when they are insufficient. Never mention references, AI, or that data is missing.`,
     input: respondInVietnamese
       ? `CÂU HỎI ĐÃ NGHE:\n${question}${recent ? `\n\nHỘI THOẠI GẦN ĐÂY — chỉ dùng làm ngữ cảnh:\n${recent}` : ''}\n\nDỮ LIỆU SA COOK CỤC BỘ:\n${references || 'Không có mục gần giống.'}`
@@ -444,7 +444,7 @@ async function answerQuestion(question, kind, forceAI = false) {
   }
   const answer = responseText(await api('responses', body));
   if (!answer) throw new ApiError('OpenAI không trả về câu trả lời.');
-  return buildAnswerVariants(answer, question);
+  return buildAnswerVariants(answer, question, targetLanguage);
 }
 
 function setLaneLive(kind, text) {
@@ -473,9 +473,9 @@ function renderLane(kind) {
   const lane = lanes[kind];
   const prefix = kind === 'auto' ? 'auto' : 'manual';
   const latest = lane.records[lane.records.length - 1];
-  $(prefix + 'Question').textContent = latest?.question || (kind === 'auto' ? 'Waiting for a question…' : 'Listen to the full question, then press Space.');
+  $(prefix + 'Question').textContent = latest?.question || (kind === 'auto' ? 'Nghe hết câu hỏi rồi bấm Space.' : 'Listen to the full question, then press Space.');
   const answerNode = $(prefix + 'Answer');
-  const answerText = latest?.answer || (kind === 'auto' ? 'The AUTO answer will appear here.' : 'The SPACE answer will appear here.');
+  const answerText = latest?.answer || (kind === 'auto' ? 'Câu trả lời tiếng Việt sẽ xuất hiện tại đây.' : 'The English answer will appear here.');
   answerNode.innerHTML = renderAnswerHtml(answerText, latest?.question || '');
   $(prefix + 'Live').textContent = lane.live;
   const previous = lane.records.slice(0, -1).reverse();
@@ -486,14 +486,14 @@ async function answerRecord(kind, record, forceAI = false) {
   const generation = sessionId;
   const requestId = (record.requestId || 0) + 1;
   record.requestId = requestId;
-  record.answer = 'Đang chuẩn bị câu trả lời…';
-  setLaneLive(kind, kind === 'auto' ? 'AI đang trả lời • vẫn tiếp tục nghe…' : 'AI đang trả lời…');
+  record.answer = kind === 'auto' ? 'Đang chuẩn bị câu trả lời…' : 'Preparing the answer…';
+  setLaneLive(kind, kind === 'auto' ? 'V • Đang trả lời…' : 'E • Preparing the answer…');
   renderLane(kind);
   try {
     const answer = await answerQuestion(record.question, kind, forceAI);
     if (record.requestId !== requestId) return;
     record.answer = answer;
-    setLaneLive(kind, kind === 'auto' ? 'Đang nghe câu hỏi tiếp theo…' : 'Đang nghe đến khi bạn bấm Space…');
+    setLaneLive(kind, kind === 'auto' ? 'V • Bấm Space cho câu tiếp theo.' : 'E • Press Space for the next question.');
     if (generation === sessionId) setStatus(recording ? 'Đang nghe…' : 'Sẵn sàng');
   } catch (error) {
     if (record.requestId !== requestId) return;
@@ -517,6 +517,15 @@ function submitQuestion(kind, question) {
   renderLane(kind);
   $(kind === 'auto' ? 'autoConversation' : 'manualConversation').scrollTop = 0;
   answerRecord(kind, record);
+}
+
+function submitParallelQuestion(question) {
+  const clean = cleanSpeech(question);
+  if (!clean || wordCount(clean) < 3) return;
+  // V and E own independent records, caches and requests, but share the exact
+  // same SPACE transcript so neither side can drift to another question.
+  submitQuestion('auto', clean);
+  submitQuestion('manual', clean);
 }
 
 function handleAutoPiece(piece, reason) {
@@ -630,7 +639,7 @@ async function drainTranscriptionQueue(kind) {
         handleAutoPiece(transcript, job.reason);
         if (job.reason === 'silence') autoTurnEnded = true;
       }
-      else if (transcript) submitQuestion('manual', transcript);
+      else if (transcript) submitParallelQuestion(transcript);
       else if (kind === 'manual') setStatus('SPACE chưa nghe được câu hỏi.', true);
     } catch (error) {
       if (kind === 'auto' && job.reason === 'silence') autoTurnEnded = true;
@@ -653,7 +662,7 @@ function finishSegment(blob, reason, hadSignal, generation) {
     const segment = { id: nextSegmentId++, blob, reason, hadSignal, generation, transcriptPromise: null };
     savedSegments.push(segment);
     lanes.auto.cursor = segment.id + 1;
-    if (hadSignal && $('autoEnabled').checked) enqueueTranscription('auto', [segment], reason, generation);
+    // V and E are both SPACE lanes. Continuous AUTO transcription is disabled.
     pruneSegments();
   }
 }
@@ -907,8 +916,8 @@ async function startListening() {
     beginRecorderSegment();
     $('start').textContent = '■ Dừng nghe';
     $('source').disabled = true;
-    setLaneLive('auto', $('autoEnabled').checked ? 'Đang nghe câu hỏi tiếp theo…' : 'AUTO đang tạm dừng.');
-    setLaneLive('manual', 'Đang nghe đến khi bạn bấm Space…');
+    setLaneLive('auto', 'V • Đang nghe đến khi bạn bấm Space…');
+    setLaneLive('manual', 'E • Đang nghe đến khi bạn bấm Space…');
     setStatus('Đang nghe…');
   } catch (error) {
     if (generation !== sessionId) return;
@@ -947,8 +956,8 @@ function stopListening() {
   $('start').textContent = '▶ Bắt đầu nghe';
   $('source').disabled = false;
   $('level').textContent = 'Âm thanh: đã dừng';
-  setLaneLive('auto', 'Đã dừng nghe.');
-  setLaneLive('manual', 'Đã dừng nghe.');
+  setLaneLive('auto', 'V • Đã dừng nghe.');
+  setLaneLive('manual', 'E • Listening stopped.');
   setStatus('Đã dừng');
 }
 
@@ -956,8 +965,9 @@ function commitManualQuestion() {
   if (!recording) { setStatus('Hãy bấm Bắt đầu nghe trước.', true); return; }
   if (manualCommitPending) return;
   manualCommitPending = true;
-  setStatus('SPACE đã chốt • đang nhận nốt chữ cuối…');
-  setLaneLive('manual', 'Đã chốt • đang nhận nốt chữ cuối…');
+  setStatus('Đã chốt câu hỏi • đang nhận nốt chữ cuối…');
+  setLaneLive('auto', 'V • Đã chốt • đang nhận nốt chữ cuối…');
+  setLaneLive('manual', 'E • Captured • finishing the last words…');
   const generation = sessionId;
   setTimeout(async () => {
     if (!manualCommitPending) return;
@@ -990,16 +1000,16 @@ function clearLane(kind) {
   const lane = lanes[kind];
   lane.records = []; lane.pending = ''; lane.pendingPieces = 0; lane.lastAnswered = '';
   lane.live = recording
-    ? (kind === 'auto' && !$('autoEnabled').checked ? 'AUTO đang tạm dừng.' : kind === 'auto' ? 'Đang nghe câu hỏi tiếp theo…' : 'Đang nghe đến khi bạn bấm Space…')
-    : 'Đã dừng nghe.';
+    ? (kind === 'auto' ? 'V • Đang nghe đến khi bạn bấm Space…' : 'E • Listening until you press Space…')
+    : (kind === 'auto' ? 'V • Đã dừng nghe.' : 'E • Listening stopped.');
   renderLane(kind);
 }
 
 async function copyLane(kind) {
   const lane = lanes[kind];
   const text = lane.records.slice().reverse().map(record => `${record.question}\n${record.answer}`).join('\n\n');
-  if (!text) return setStatus(`Chưa có nội dung ${kind === 'auto' ? 'AUTO' : 'SPACE'} để sao chép.`, true);
-  try { await window.saCook.copyText(text); setStatus(`Đã sao chép ${kind === 'auto' ? 'AUTO' : 'SPACE'}.`); }
+  if (!text) return setStatus(`Chưa có nội dung ${kind === 'auto' ? 'V' : 'E'} để sao chép.`, true);
+  try { await window.saCook.copyText(text); setStatus(`Đã sao chép ${kind === 'auto' ? 'V' : 'E'}.`); }
   catch (_) { setStatus('Windows không cho phép ghi clipboard.', true); }
 }
 
@@ -1011,14 +1021,7 @@ function retryLane(kind) {
 
 $('start').onclick = () => recording ? stopListening() : startListening();
 $('commit').onclick = commitManualQuestion;
-$('autoEnabled').onchange = () => {
-  const enabled = $('autoEnabled').checked;
-  if (autoFlushTimer) { clearTimeout(autoFlushTimer); autoFlushTimer = null; }
-  lanes.auto.pending = '';
-  lanes.auto.pendingPieces = 0;
-  if (!enabled) lanes.auto.queue = [];
-  setLaneLive('auto', enabled ? (recording ? 'Đang nghe câu hỏi tiếp theo…' : 'AUTO sẵn sàng.') : 'AUTO đang tạm dừng.');
-};
+$('autoEnabled').checked = false;
 $('retryAuto').onclick = () => retryLane('auto');
 $('retryManual').onclick = () => retryLane('manual');
 $('clearAuto').onclick = () => clearLane('auto');
@@ -1095,7 +1098,7 @@ function setWebProfileConnection(connected, email = '') {
 async function useSyncedProfile(result) {
   presenterProfile=await window.saCook.setProfile(result.profile);$('profileSource').value=window.SACookProfile.sourceForEditor(presenterProfile);
   $('profileFacts').textContent=window.SACookProfile.sourceForEditor({...presenterProfile,sourceText:''});$('profilePreview').hidden=false;
-  setWebProfileConnection(true,result.email);$('webProfileStatus').textContent=`Đã đồng bộ hồ sơ của ${result.email}. AUTO và SPACE đang dùng dữ liệu này.`;
+  setWebProfileConnection(true,result.email);$('webProfileStatus').textContent=`Đã đồng bộ hồ sơ của ${result.email}. Hai khung V và E đang dùng dữ liệu này.`;
   $('profileStatus').textContent='Bản hồ sơ web đã được lưu dự phòng trên máy để dùng khi mất mạng.';lanes.auto.lastAnswered='';lanes.manual.lastAnswered='';
 }
 $('profileSettings').addEventListener('click', async () => {
@@ -1153,7 +1156,9 @@ $('saveProfile').addEventListener('click', async () => {
 
 window.saCook.loadResources().then(({ localQA, localQAVi, internetQA, hints, answerPolicy: sharedPolicy, knowledge, handbook, profileExtraction }) => {
   profileExtractionTemplate = profileExtraction;
-  qa = [...(Array.isArray(localQA) ? localQA : []), ...(Array.isArray(localQAVi) ? localQAVi : []), ...(Array.isArray(internetQA) ? internetQA : [])];
+  const english = [...(Array.isArray(localQA) ? localQA : []), ...(Array.isArray(internetQA) ? internetQA : [])]
+    .map(item => ({...item, targetLanguage: 'en'}));
+  qa = [...english, ...(Array.isArray(localQAVi) ? localQAVi : [])];
   speechHints = hints.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   if (String(sharedPolicy || '').trim()) answerPolicy = String(sharedPolicy).replace(/\s+/g, ' ').trim();
   buildStudyChunks([['SA Cook Study', knowledge], ['SA Cook Handbook', handbook]]);

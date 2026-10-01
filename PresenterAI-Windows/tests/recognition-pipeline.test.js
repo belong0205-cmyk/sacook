@@ -22,5 +22,8 @@ assert(!source.includes("submitQuestion('auto', part)"), 'AUTO must not spam sep
 assert(source.includes('single underlying request'), 'linked or repeated question fragments must produce one answer');
 assert(source.includes('independent questions'), 'genuinely separate questions can still be handled inside one answer record');
 assert(source.includes('questionPartsAreLinked(parts)'), 'AUTO must classify linked follow-ups before answering');
+assert(source.includes('// V and E are both SPACE lanes. Continuous AUTO transcription is disabled.'), 'continuous AUTO submission must be disabled');
+assert(source.includes("submitQuestion('auto', clean)"), 'the shared Space transcript must create a V record');
+assert(source.includes("submitQuestion('manual', clean)"), 'the shared Space transcript must create an E record');
 
 console.log('Windows recognition pipeline tests passed.');
