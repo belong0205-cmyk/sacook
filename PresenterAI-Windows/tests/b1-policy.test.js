@@ -140,5 +140,6 @@ assert.match(source, /const respondInVietnamese = kind === 'auto'/, 'the V lane 
 assert.match(source, /submitQuestion\('auto', clean\)/, 'one Space transcript must be submitted to V');
 assert.match(source, /submitQuestion\('manual', clean\)/, 'one Space transcript must be submitted to E');
 assert.doesNotMatch(source, /form\.append\('languages\[\]'/, 'Space transcription must allow spoken Vietnamese or English');
+assert.match(source, /respondInVietnamese \? 320 : 240/, 'V and E must have complete-answer token budgets');
 
 console.log('Windows B2 answer policy tests passed.');

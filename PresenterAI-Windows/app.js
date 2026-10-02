@@ -51,8 +51,8 @@ const profileReady = window.saCook.getProfile().then(value => { presenterProfile
 profileReady.catch(error => setStatus(error.message, true));
 
 const lanes = {
-  auto: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: 'V • Bấm Space để chốt câu hỏi.' },
-  manual: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: 'E • Bấm Space để chốt câu hỏi.' }
+  auto: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: '' },
+  manual: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: '' }
 };
 
 class ApiError extends Error {
@@ -425,7 +425,8 @@ async function answerQuestion(question, kind, forceAI = false) {
     ? 'Lượt nói gồm nhiều câu hỏi độc lập. Hãy trả lời từng câu theo đúng thứ tự và đánh số rõ ràng.'
     : 'Trả lời trực tiếp đúng câu hỏi vừa nghe bằng hai hoặc ba câu ngắn gọn.';
   const body = {
-    model: 'gpt-4.1-mini', store: false, max_output_tokens: multipart && !linkedMultipart ? Math.min(300, parts.length * 110) : 130,
+    model: 'gpt-4.1-mini', store: false,
+    max_output_tokens: linkedMultipart ? (respondInVietnamese ? 300 : 220) : Math.min(640, parts.length * (respondInVietnamese ? 320 : 240)),
     instructions: respondInVietnamese
       ? `Bạn giúp người thuyết trình trả lời phỏng vấn đánh giá kỹ năng nghề Cook/Chef. Chỉ trả lời bằng tiếng Việt. ${vietnameseInstructions} Trả về đúng hai phần có nhãn: "Ngắn:" là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ; "Đầy đủ:" là câu trả lời đủ ý hơn, thường không quá 85 từ. Dùng tiếng Việt tự nhiên, dễ nói. Với câu hỏi hành vi, phần Đầy đủ nêu ngắn gọn tình huống, hành động và kết quả. Dữ liệu tham khảo không chứng minh người dùng từng trải qua sự việc; nếu hồ sơ không có ví dụ thật, hãy dùng “tôi sẽ” và không bịa kinh nghiệm. Với câu hỏi kỹ thuật, giải thích trực tiếp và chỉ nêu đánh đổi khi cần. Nếu câu hỏi mơ hồ, suy ra kỹ năng đang được đánh giá và trả lời thẳng. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh nghề bếp cho phép. Ưu tiên dữ liệu cục bộ, sau đó dùng kiến thức nghề bếp đáng tin cậy. Không nhắc đến nguồn, AI hoặc việc thiếu dữ liệu.`
       : `You help the presenter answer an Australian Cook skills-assessment interview. Answer only in English. ${instructions} ${answerPolicy} Return exactly two labelled sections: "Short:" with one direct answer the presenter can say immediately, and "Full:" with a fuller answer containing the useful details. Use clear, natural CEFR B2 vocabulary. For a behavioral question, give a concrete situation, action and result in the Full answer. A local reference is not proof that the presenter lived that event: without a real user example, answer with “I would” and never claim “I once”, “I handled”, or “I worked”. For a technical question, explain the idea directly and give a tradeoff only when asked or essential. When a question is vague, infer the skill being tested and answer it directly. Be confident, practical and accurate. Correct an obvious transcript error only when culinary context makes it certain. Use the local references first and reliable general culinary knowledge when they are insufficient. Never mention references, AI, or that data is missing.`,
@@ -473,9 +474,9 @@ function renderLane(kind) {
   const lane = lanes[kind];
   const prefix = kind === 'auto' ? 'auto' : 'manual';
   const latest = lane.records[lane.records.length - 1];
-  $(prefix + 'Question').textContent = latest?.question || (kind === 'auto' ? 'Nghe hết câu hỏi rồi bấm Space.' : 'Listen to the full question, then press Space.');
+  $(prefix + 'Question').textContent = latest?.question || '';
   const answerNode = $(prefix + 'Answer');
-  const answerText = latest?.answer || (kind === 'auto' ? 'Câu trả lời tiếng Việt sẽ xuất hiện tại đây.' : 'The English answer will appear here.');
+  const answerText = latest?.answer || '';
   answerNode.innerHTML = renderAnswerHtml(answerText, latest?.question || '');
   $(prefix + 'Live').textContent = lane.live;
   const previous = lane.records.slice(0, -1).reverse();

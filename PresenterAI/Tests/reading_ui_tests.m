@@ -84,9 +84,9 @@ static void CheckText(NSTextView *view, CGFloat fontSize, NSString *question, NS
     NSScrollView *scroll=view.enclosingScrollView;
     Check([view.string containsString:question],@"The full multipart question is displayed");
     Check([view.string containsString:answer],@"The complete long answer is displayed");
-    BOOL hasSpaceStatus=[view.string containsString:@"\nV • SPACE  •  "] || [view.string containsString:@"\nE • SPACE  •  "];
     BOOL hasLanePrefix=[view.string hasPrefix:[@"V\n" stringByAppendingString:[question stringByAppendingString:@"\n"]]] || [view.string hasPrefix:[@"E\n" stringByAppendingString:[question stringByAppendingString:@"\n"]]];
-    Check(hasLanePrefix && hasSpaceStatus,@"Latest answer and live transcript share one continuous conversation surface with only the compact V/E marker");
+    BOOL noSpaceGuidance=[view.string rangeOfString:@"• SPACE" options:NSCaseInsensitiveSearch].location==NSNotFound && [view.string rangeOfString:@"press Space" options:NSCaseInsensitiveSearch].location==NSNotFound && [view.string rangeOfString:@"bấm Space" options:NSCaseInsensitiveSearch].location==NSNotFound;
+    Check(hasLanePrefix && noSpaceGuidance,@"Conversation shows the answer below its compact V/E marker without Space guidance");
     Check([view.string rangeOfString:@"CURRENT\n"].location==NSNotFound && [view.string rangeOfString:@"\nPREVIOUS\n"].location==NSNotFound,@"Conversation omits the CURRENT and PREVIOUS labels");
     Check([view.string rangeOfString:@"\nTHEM\n"].location==NSNotFound && [view.string rangeOfString:@"\nME\n"].location==NSNotFound,@"Question and answer use colour instead of THEM and ME rows");
     Check(!view.editable && !view.selectable,@"Reading content does not enter text selection mode");
@@ -272,9 +272,9 @@ int main(int argc,const char *argv[]) {
             NSString *latestPrefix=[NSString stringWithFormat:@"%@\nWhat should I prepare before service?\n",automatic?@"V":@"E"];
             Check([conversation.string hasPrefix:latestPrefix],@"The latest exchange starts directly below its compact V/E marker");
             NSRange latestRange=[conversation.string rangeOfString:@"What should I prepare before service?"];
-            NSRange listeningRange=[conversation.string rangeOfString:automatic?@"\nV • SPACE  •  ":@"\nE • SPACE  •  "];
             NSRange formerRange=[conversation.string rangeOfString:formerQuestion];
-            Check(listeningRange.location!=NSNotFound && formerRange.location!=NSNotFound && latestRange.location<listeningRange.location && listeningRange.location<formerRange.location && [conversation.string rangeOfString:@"\nPREVIOUS\n"].location==NSNotFound,@"Earlier exchange remains below a neutral compact separator without a PREVIOUS label");
+            BOOL noGuidance=[conversation.string rangeOfString:@"• SPACE" options:NSCaseInsensitiveSearch].location==NSNotFound && [conversation.string rangeOfString:@"press Space" options:NSCaseInsensitiveSearch].location==NSNotFound && [conversation.string rangeOfString:@"bấm Space" options:NSCaseInsensitiveSearch].location==NSNotFound;
+            Check(formerRange.location!=NSNotFound && latestRange.location<formerRange.location && [conversation.string rangeOfString:@"\nPREVIOUS\n"].location==NSNotFound && noGuidance,@"Earlier exchange remains below the answer without guidance or a PREVIOUS label");
             Check([otherConversation.string isEqualToString:otherText],@"A new exchange in one lane does not repaint the other conversation");
             [records removeLastObject];
             if(automatic) [app refreshAutoAnswerPanel]; else [app refreshManualAnswerPanel];

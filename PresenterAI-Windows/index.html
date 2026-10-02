@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.openai.com; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self'; img-src 'self' data:; media-src blob:">
-  <title>SA Cook Assistant — Windows Preview 5.59</title>
+  <title>SA Cook Assistant — Windows Preview 5.60</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-backdrop="1">
@@ -14,18 +14,18 @@
     <section class="lane auto-lane" aria-label="Câu trả lời tiếng Việt">
       <span class="lane-code" aria-hidden="true">V</span>
       <div id="autoConversation" class="conversation-surface" role="log" aria-live="polite" tabindex="0">
-        <div id="autoQuestion" class="message question">Bấm Space sau khi nghe hết câu hỏi.</div>
-        <div id="autoAnswer" class="message answer" lang="vi">Câu trả lời tiếng Việt sẽ xuất hiện tại đây.</div>
-        <div id="autoLive" class="live-text">V • Bấm Space để chốt câu hỏi.</div>
+        <div id="autoQuestion" class="message question"></div>
+        <div id="autoAnswer" class="message answer" lang="vi"></div>
+        <div id="autoLive" class="live-text" hidden></div>
         <div id="autoHistory" class="history"></div>
       </div>
     </section>
     <section class="lane manual-lane" aria-label="English answers">
       <span class="lane-code" aria-hidden="true">E</span>
       <div id="manualConversation" class="conversation-surface" role="log" aria-live="polite" tabindex="0">
-        <div id="manualQuestion" class="message question" lang="en">Listen to the full question, then press Space.</div>
-        <div id="manualAnswer" class="message answer" lang="en">The English answer will appear here.</div>
-        <div id="manualLive" class="live-text">E • Listening until you press Space…</div>
+        <div id="manualQuestion" class="message question" lang="en"></div>
+        <div id="manualAnswer" class="message answer" lang="en"></div>
+        <div id="manualLive" class="live-text" hidden></div>
         <div id="manualHistory" class="history" lang="en"></div>
       </div>
     </section>
