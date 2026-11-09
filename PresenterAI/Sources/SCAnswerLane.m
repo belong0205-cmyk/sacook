@@ -96,6 +96,7 @@
     for (NSMutableDictionary *record in job.records) {
         record[@"answer"] = trimmed;
         record[@"state"] = success ? @"complete" : @"failed";
+        [record removeObjectForKey:@"partialReady"];
     }
     [self.jobs removeObjectForKey:job.key];
     self.activeCount--;
@@ -105,6 +106,19 @@
     }
     [self notifyChange];
     [self drain];
+}
+
+- (void)publishProgressForJob:(SCAnswerJob *)job answer:(NSString *)answer {
+    NSAssert(NSThread.isMainThread, @"Publish answer progress on the main thread");
+    if(job.finished) return;
+    NSString *trimmed=[answer isKindOfClass:NSString.class]?[answer stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]:@"";
+    if(!trimmed.length) return;
+    for(NSMutableDictionary *record in job.records) {
+      record[@"answer"]=trimmed;
+      record[@"state"]=@"loading";
+      record[@"partialReady"]=@YES;
+    }
+    [self notifyChange];
 }
 
 - (void)drain {
@@ -118,7 +132,11 @@
         for (NSMutableDictionary *record in job.records) record[@"state"] = @"loading";
         [self notifyChange];
         __weak typeof(self) weakSelf = self;
-        self.requestBlock(job.question, ^(NSString *answer, BOOL success) {
+        self.requestBlock(job.question, ^(NSString *answer) {
+            void (^publish)(void) = ^{ [weakSelf publishProgressForJob:job answer:answer]; };
+            if(NSThread.isMainThread) publish();
+            else dispatch_async(dispatch_get_main_queue(), publish);
+        }, ^(NSString *answer, BOOL success) {
             void (^finish)(void) = ^{ [weakSelf finishJob:job answer:answer success:success]; };
             if (NSThread.isMainThread) finish();
             else dispatch_async(dispatch_get_main_queue(), finish);

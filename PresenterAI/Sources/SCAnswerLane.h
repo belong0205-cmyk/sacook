@@ -3,7 +3,8 @@
 NS_ASSUME_NONNULL_BEGIN
 
 typedef void (^SCAnswerCompletion)(NSString *answer, BOOL success);
-typedef void (^SCAnswerRequest)(NSString *question, SCAnswerCompletion completion);
+typedef void (^SCAnswerProgress)(NSString *answer);
+typedef void (^SCAnswerRequest)(NSString *question, SCAnswerProgress progress, SCAnswerCompletion completion);
 
 /// One panel's answer requests. Create a separate instance for SPACE and AUTO.
 /// Enqueue and configure on the main thread; request completions may arrive on any thread.

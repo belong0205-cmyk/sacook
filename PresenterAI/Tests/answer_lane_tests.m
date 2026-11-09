@@ -16,12 +16,13 @@ static NSMutableDictionary *Record(NSString *question) {
 int main(void) {
     @autoreleasepool {
         NSMutableArray<NSString *> *manualSent = [NSMutableArray array], *autoSent = [NSMutableArray array];
+        NSMutableArray<SCAnswerProgress> *manualProgress = [NSMutableArray array], *autoProgress = [NSMutableArray array];
         NSMutableArray<SCAnswerCompletion> *manualDone = [NSMutableArray array], *autoDone = [NSMutableArray array];
-        SCAnswerLane *manual = [[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question, SCAnswerCompletion completion) {
-            [manualSent addObject:question]; [manualDone addObject:[completion copy]];
+        SCAnswerLane *manual = [[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question,SCAnswerProgress progress,SCAnswerCompletion completion) {
+            [manualSent addObject:question]; [manualProgress addObject:[progress copy]]; [manualDone addObject:[completion copy]];
         }];
-        SCAnswerLane *automatic = [[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question, SCAnswerCompletion completion) {
-            [autoSent addObject:question]; [autoDone addObject:[completion copy]];
+        SCAnswerLane *automatic = [[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question,SCAnswerProgress progress,SCAnswerCompletion completion) {
+            [autoSent addObject:question]; [autoProgress addObject:[progress copy]]; [autoDone addObject:[completion copy]];
         }];
         __block NSUInteger manualChanges = 0, autoChanges = 0, cacheChanges = 0;
         manual.onChange = ^{ manualChanges++; };
@@ -41,10 +42,15 @@ int main(void) {
         Equal(@(automatic.activeCount), @1, @"AUTO accounts for its own active request");
         Equal(@(manualSent.count), @2, @"AUTO does not consume or dispatch SPACE slots");
         Equal(autoSent.firstObject, manualSent.firstObject, @"Identical questions issue independent requests in both lanes");
+        manualProgress[0](@"Short: Everything is prepared first.");
+        Equal(first[@"answer"],@"Short: Everything is prepared first.",@"Short progress appears before the Full answer");
+        Equal(first[@"state"],@"loading",@"Short progress keeps the request active for Full");
+        Equal(@(manual.activeCount),@2,@"Short progress does not release the request slot");
+        Check(manual.cache[@"mise"]==nil,@"Short progress is not cached as a finished answer");
         NSUInteger manualChangesBeforeAuto = manualChanges;
         autoDone[0](@"AUTO answer", YES);
         Equal(autoFirst[@"answer"], @"AUTO answer", @"AUTO receives its own answer");
-        Equal(first[@"answer"], @"Preparing…", @"AUTO answer does not fill SPACE record");
+        Equal(first[@"answer"], @"Short: Everything is prepared first.", @"AUTO answer does not overwrite SPACE Short progress");
         Equal(@(manualChanges), @(manualChangesBeforeAuto), @"AUTO completion does not notify SPACE observers");
         Check(manual.cache[@"mise"] == nil, @"AUTO success does not enter SPACE cache");
 
@@ -53,12 +59,13 @@ int main(void) {
         Equal(@(manualSent.count), @3, @"SPACE starts its retained question after a slot opens");
         Equal(manualSent.lastObject, third[@"question"], @"FIFO preserves the queued question");
         Equal(second[@"answer"], @"Small matchstick cut", @"Out-of-order answer updates only its originating row");
-        Equal(first[@"answer"], @"Preparing…", @"Out-of-order answer leaves first row pending");
+        Equal(first[@"answer"], @"Short: Everything is prepared first.", @"Out-of-order answer leaves the first row's Short progress intact");
         manualDone[1](@"Duplicate result", YES);
         Equal(@(manual.activeCount), @2, @"Duplicate callback cannot release an unrelated slot");
         Equal(second[@"answer"], @"Small matchstick cut", @"Duplicate callback cannot overwrite completed answer");
         manualDone[2](@"Small dice", YES);
         manualDone[0](@"SPACE answer", YES);
+        manualProgress[0](@"Late partial must be ignored");
         Equal(first[@"answer"], @"SPACE answer", @"Late SPACE response retains its own result");
         Equal(third[@"answer"], @"Small dice", @"Late older response cannot overwrite newest row");
         Equal(autoFirst[@"answer"], @"AUTO answer", @"Late SPACE result cannot overwrite AUTO");
@@ -92,6 +99,8 @@ int main(void) {
         [manual enqueueRecord:same2 cacheKey:@"knife"];
         [manual enqueueRecord:same2 cacheKey:@"knife"];
         Equal(@(manualSent.count), @6, @"Only same-lane matching keys may coalesce");
+        manualProgress[5](@"Short: A versatile knife.");
+        Equal(same1[@"answer"],same2[@"answer"],@"Short progress updates every coalesced record");
         manualDone[5](@"A versatile kitchen knife.", YES);
         Equal(same1[@"answer"], same2[@"answer"], @"Same-lane waiters are both resolved");
         Equal(same2[@"question"], @"What is a chef knife", @"Coalescing keeps each original question text");
@@ -105,7 +114,8 @@ int main(void) {
 
         // Synchronous providers must also drain safely without recursive scheduling.
         __block NSUInteger synchronousRequests = 0;
-        SCAnswerLane *synchronous = [[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question, SCAnswerCompletion completion) {
+        SCAnswerLane *synchronous = [[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question,SCAnswerProgress progress,SCAnswerCompletion completion) {
+            (void)progress;
             synchronousRequests++; completion(question, YES);
         }];
         NSMutableDictionary *sync = Record(@"A synchronous answer");
@@ -116,7 +126,8 @@ int main(void) {
         Check(manualChanges > 0 && autoChanges > 0, @"Each lane notifies its own observer");
 
         __block BOOL changesOnMainThread = YES;
-        SCAnswerLane *background = [[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question, SCAnswerCompletion completion) {
+        SCAnswerLane *background = [[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question,SCAnswerProgress progress,SCAnswerCompletion completion) {
+            (void)progress;
             dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{ completion(question, YES); });
         }];
         background.onChange = ^{ changesOnMainThread = changesOnMainThread && NSThread.isMainThread; };

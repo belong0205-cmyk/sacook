@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "featureVersion": "5.65.0",
+  "featureVersion": "5.66.0",
   "platforms": ["macOS", "Windows"],
   "answerPolicy": {
     "resource": "answer-policy.txt",
@@ -31,6 +31,7 @@
     "vietnameseMirrorsEnglishAnswer": true,
     "profilePreservesPairedTranslation": true,
     "lowLatencyPairedTranslation": true,
+    "shortAnswerBeforeFull": true,
     "dualAnswerVariants": true,
     "keywordHighlighting": true
   },

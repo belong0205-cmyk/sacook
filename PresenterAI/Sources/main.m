@@ -24,8 +24,8 @@ static const NSTimeInterval SCAutoTurnSettle = 0.95;
 // acoustic silence is not a reliable endpoint by itself. A detector-approved
 // question may close after remaining unchanged for this bounded interval.
 static const NSTimeInterval SCAutoStableEndpoint = 1.35;
-static NSString * const SCManualAnswerCacheKey = @"PresenterAI.answerCache.manual.v20";
-static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v20";
+static NSString * const SCManualAnswerCacheKey = @"PresenterAI.answerCache.manual.v21";
+static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v21";
 static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1__";
 
 @interface SCArrowTextView : NSTextView
@@ -173,6 +173,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 - (BOOL)questionPartsAreLinked:(NSArray<NSString *> *)parts;
 - (NSString *)pairedBilingualAnswerWithEnglish:(NSString *)english vietnameseQuestion:(NSString *)question vietnameseAnswer:(NSString *)vietnamese;
 - (NSDictionary *)pairedBilingualPayloadFromAnswer:(NSString *)answer;
+- (void)performAnswerRequest:(NSString *)question progress:(SCAnswerProgress)progress completion:(SCAnswerCompletion)completion;
 - (void)sendAnswerBody:(NSDictionary *)body apiKey:(NSString *)apiKey allowModelFallback:(BOOL)allowFallback completion:(void (^)(NSDictionary *parsed))completion;
 @end
 
@@ -1969,15 +1970,15 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       self.answerPreparationQueue=dispatch_queue_create("local.codex.PresenterAI.answer-preparation",DISPATCH_QUEUE_SERIAL);
     __weak typeof(self) weak=self;
     if(!self.manualAnswerLane) {
-      self.manualAnswerLane=[[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question,SCAnswerCompletion completion) {
-        [weak performAnswerRequest:question completion:completion];
+      self.manualAnswerLane=[[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question,SCAnswerProgress progress,SCAnswerCompletion completion) {
+        [weak performAnswerRequest:question progress:progress completion:completion];
       }];
       self.manualAnswerLane.onChange=^{ [weak refreshManualAnswerPanel]; };
       self.manualAnswerLane.onCacheChange=^{ [weak persistAnswerCache]; };
     }
     if(!self.autoAnswerLane) {
-      self.autoAnswerLane=[[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question,SCAnswerCompletion completion) {
-        [weak performAnswerRequest:question completion:completion];
+      self.autoAnswerLane=[[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question,SCAnswerProgress progress,SCAnswerCompletion completion) {
+        [weak performAnswerRequest:question progress:progress completion:completion];
       }];
       self.autoAnswerLane.onChange=^{ [weak refreshAutoAnswerPanel]; };
       self.autoAnswerLane.onCacheChange=^{ [weak persistAnswerCache]; };
@@ -2303,17 +2304,23 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     out=[out stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@",;:"]];
     return [out stringByAppendingString:@"."];
 }
+- (NSString *)textByRemovingLeadingAnswerVariantLabels:(NSString *)text {
+    NSString *clean=[text ?: @"" stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if(!clean.length) return @"";
+    NSRegularExpression *labels=[NSRegularExpression regularExpressionWithPattern:@"(?i)^(?:(?:short(?:\\s+answer)?|full(?:\\s+answer)?|ngắn|đầy\\s+đủ)\\s*:\\s*)+" options:0 error:nil];
+    return [[labels stringByReplacingMatchesInString:clean options:0 range:NSMakeRange(0,clean.length) withTemplate:@""] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+}
 - (NSDictionary<NSString *,NSString *> *)parseAnswerVariants:(NSString *)text {
     NSString *clean=[text ?: @"" stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     if(!clean.length) return @{};
     NSRegularExpression *regex=[NSRegularExpression regularExpressionWithPattern:@"(?is)(?:^|\\n)\\s*(?:short(?:\\s+answer)?|short|ngắn)\\s*:\\s*(.*?)(?:\\n\\s*(?:full(?:\\s+answer)?|full|đầy đủ)\\s*:\\s*(.*))$" options:0 error:nil];
     NSTextCheckingResult *match=[regex firstMatchInString:clean options:0 range:NSMakeRange(0,clean.length)];
     if(match && match.numberOfRanges>=3) {
-      NSString *shortText=[[clean substringWithRange:[match rangeAtIndex:1]] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-      NSString *fullText=[[clean substringWithRange:[match rangeAtIndex:2]] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+      NSString *shortText=[self textByRemovingLeadingAnswerVariantLabels:[clean substringWithRange:[match rangeAtIndex:1]]];
+      NSString *fullText=[self textByRemovingLeadingAnswerVariantLabels:[clean substringWithRange:[match rangeAtIndex:2]]];
       return @{@"short":shortText ?: @"",@"full":fullText ?: @""};
     }
-    return @{@"full":clean};
+    return @{@"full":[self textByRemovingLeadingAnswerVariantLabels:clean]};
 }
 - (NSString *)translatedVietnameseQuestionFromAIText:(NSString *)text {
     NSRegularExpression *regex=[NSRegularExpression regularExpressionWithPattern:@"(?im)^\\s*Câu hỏi\\s*:\\s*([^\\r\\n]+)" options:0 error:nil];
@@ -2417,24 +2424,31 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
         [view scrollPoint:position];
     }
 }
+- (void)applyPairedPayloadToManualRecord:(NSMutableDictionary *)record {
+    if(!record) return;
+    NSDictionary *paired=[self pairedBilingualPayloadFromAnswer:record[@"answer"]];
+    NSMutableDictionary *vietnamese=[record[@"pairedVietnameseRecord"] isKindOfClass:NSMutableDictionary.class]?record[@"pairedVietnameseRecord"]:nil;
+    if(paired) {
+      record[@"answer"]=paired[@"englishAnswer"] ?: @"";
+      if(vietnamese) {
+        vietnamese[@"question"]=paired[@"vietnameseQuestion"] ?: vietnamese[@"question"] ?: @"";
+        vietnamese[@"answer"]=paired[@"vietnameseAnswer"] ?: @"";
+        vietnamese[@"state"]=record[@"state"] ?: @"complete";
+        if([record[@"partialReady"] boolValue]) vietnamese[@"partialReady"]=@YES;
+        else [vietnamese removeObjectForKey:@"partialReady"];
+      }
+    } else if(vietnamese && [record[@"state"] isEqual:@"failed"]) {
+      vietnamese[@"answer"]=@"Không thể dịch câu trả lời. Hãy bấm Thử lại sau khi kiểm tra API key và kết nối mạng.";
+      vietnamese[@"state"]=@"failed";
+    }
+}
 - (void)refreshManualAnswerPanel {
+    for(id value in self.manualRecords) if([value isKindOfClass:NSMutableDictionary.class]) [self applyPairedPayloadToManualRecord:value];
     NSMutableDictionary *record=self.manualRecords.lastObject;
     if(record) {
-      NSDictionary *paired=[self pairedBilingualPayloadFromAnswer:record[@"answer"]];
       NSMutableDictionary *vietnamese=[record[@"pairedVietnameseRecord"] isKindOfClass:NSMutableDictionary.class]?record[@"pairedVietnameseRecord"]:nil;
-      if(paired) {
-        record[@"answer"]=paired[@"englishAnswer"] ?: @"";
-        if(vietnamese) {
-          vietnamese[@"question"]=paired[@"vietnameseQuestion"] ?: vietnamese[@"question"] ?: @"";
-          vietnamese[@"answer"]=paired[@"vietnameseAnswer"] ?: @"";
-          vietnamese[@"state"]=record[@"state"] ?: @"complete";
-        }
-      } else if(vietnamese && [record[@"state"] isEqual:@"failed"]) {
-        vietnamese[@"answer"]=@"Không thể dịch câu trả lời. Hãy bấm Thử lại sau khi kiểm tra API key và kết nối mạng.";
-        vietnamese[@"state"]=@"failed";
-      }
       self.currentQuestion=record[@"question"]; self.currentAnswer=record[@"answer"];
-      self.manualLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?@"E • Answered":[record[@"state"] isEqual:@"failed"]?@"E • AI error — retry":@"E • Preparing the English answer…";
+      self.manualLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?@"E • Answered":[record[@"state"] isEqual:@"failed"]?@"E • AI error — retry":[record[@"partialReady"] boolValue]?@"E • Short ready — preparing Full…":@"E • Preparing the English answer…";
       [self showCurrentQuestion:self.currentQuestion answer:self.currentAnswer];
       if(vietnamese) [self refreshAutoAnswerPanel];
     }
@@ -2462,7 +2476,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       if(![visibleAnswer isEqualToString:record[@"answer"] ?: @""]) record[@"answer"]=visibleAnswer;
       self.autoQuestion=record[@"question"]; self.autoAnswer=record[@"answer"];
       BOOL contextual=[record[@"usedContext"] boolValue];
-      self.autoLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?(contextual?@"V • Đã trả lời theo ngữ cảnh":@"V • Đã trả lời"):[record[@"state"] isEqual:@"failed"]?@"V • Lỗi AI — bấm Thử lại":(contextual?@"V • Đang dùng ngữ cảnh câu trước…":@"V • Đang chuẩn bị câu trả lời tiếng Việt…");
+      self.autoLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?(contextual?@"V • Đã trả lời theo ngữ cảnh":@"V • Đã trả lời"):[record[@"state"] isEqual:@"failed"]?@"V • Lỗi AI — bấm Thử lại":[record[@"partialReady"] boolValue]?@"V • Đã có Ngắn — đang bổ sung Đầy đủ…":(contextual?@"V • Đang dùng ngữ cảnh câu trước…":@"V • Đang chuẩn bị câu trả lời tiếng Việt…");
       [self showAutoQuestion:self.autoQuestion answer:self.autoAnswer];
     }
     if(!self.autoHistoryScroll.hidden) [self renderHistoryRecords:self.autoRecords inView:self.autoHistoryView];
@@ -2580,14 +2594,17 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     if(pairedBilingual) {
       body[@"model"]=@"gpt-5.6-luna";
       body[@"reasoning"]=@{@"effort":@"none"};
-      [instructions appendString:@" Produce the English answer first. Then translate that exact question and answer into natural Vietnamese without adding, removing, or changing any fact. The Vietnamese side must be a translation of the English side, not a separate answer. Keep each short answer under 22 words and each full answer under 55 words so both panels can appear quickly."];
-      body[@"max_output_tokens"]=@640;
+      [instructions appendString:@" Produce the English answer first. Then translate that exact question and answer into natural Vietnamese without adding, removing, or changing any fact. The Vietnamese side must be a translation of the English side, not a separate answer. Keep each short answer under 22 words and each full answer under 55 words so both panels can appear quickly. Every JSON field must contain answer content only: never include Short:, Full:, Ngắn:, or Đầy đủ: inside a field value."];
+      body[@"max_output_tokens"]=@420;
       body[@"text"]=@{@"format":@{
         @"type":@"json_schema",@"name":@"paired_bilingual_answer",@"strict":@YES,
         @"schema":@{@"type":@"object",@"additionalProperties":@NO,
           @"properties":@{
-            @"english_short":@{@"type":@"string"},@"english_full":@{@"type":@"string"},
-            @"vietnamese_question":@{@"type":@"string"},@"vietnamese_short":@{@"type":@"string"},@"vietnamese_full":@{@"type":@"string"}},
+            @"english_short":@{@"type":@"string",@"description":@"English short-answer content only, without a Short label."},
+            @"english_full":@{@"type":@"string",@"description":@"English full-answer content only, without a Full label."},
+            @"vietnamese_question":@{@"type":@"string",@"description":@"Natural Vietnamese translation of the heard question."},
+            @"vietnamese_short":@{@"type":@"string",@"description":@"Vietnamese short-answer content only, without a Ngắn label."},
+            @"vietnamese_full":@{@"type":@"string",@"description":@"Vietnamese full-answer content only, without a Đầy đủ label."}},
           @"required":@[@"english_short",@"english_full",@"vietnamese_question",@"vietnamese_short",@"vietnamese_full"]}}};
     }
     if(includeWebSearch) {
@@ -2596,6 +2613,57 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       body[@"max_tool_calls"]=@1;
     }
     return body;
+}
+- (NSDictionary *)pairedShortAnswerBodyFromBody:(NSDictionary *)base {
+    NSMutableDictionary *body=[base mutableCopy];
+    body[@"model"]=@"gpt-4.1-mini";
+    [body removeObjectForKey:@"reasoning"];
+    body[@"instructions"]=[(body[@"instructions"] ?: @"") stringByAppendingString:@" Return the bilingual Short answer now. Do not generate either Full answer in this response. Field values contain content only and never include visible labels."];
+    body[@"max_output_tokens"]=@220;
+    body[@"text"]=@{@"format":@{
+      @"type":@"json_schema",@"name":@"paired_bilingual_short_answer",@"strict":@YES,
+      @"schema":@{@"type":@"object",@"additionalProperties":@NO,
+        @"properties":@{
+          @"english_short":@{@"type":@"string",@"description":@"Direct English answer content only, under 22 words and without a label."},
+          @"vietnamese_question":@{@"type":@"string",@"description":@"Natural Vietnamese translation of the heard question."},
+          @"vietnamese_short":@{@"type":@"string",@"description":@"Exact natural Vietnamese translation of english_short, without a label."}},
+        @"required":@[@"english_short",@"vietnamese_question",@"vietnamese_short"]}}};
+    return body;
+}
+- (NSDictionary *)pairedFullAnswerBodyFromBody:(NSDictionary *)base englishShort:(NSString *)englishShort vietnameseShort:(NSString *)vietnameseShort {
+    NSMutableDictionary *body=[base mutableCopy];
+    body[@"instructions"]=[(body[@"instructions"] ?: @"") stringByAppendingString:@" Expand the approved Short answer into the Full answer without changing its conclusion or facts. Return only the two Full field values, with no visible labels. The Vietnamese Full answer must translate the English Full answer exactly."];
+    body[@"input"]=[NSString stringWithFormat:@"%@\n\nAPPROVED SHORT ANSWERS — AUTHORITATIVE:\nEnglish: %@\nVietnamese: %@",body[@"input"] ?: @"",englishShort ?: @"",vietnameseShort ?: @""];
+    body[@"max_output_tokens"]=@360;
+    body[@"text"]=@{@"format":@{
+      @"type":@"json_schema",@"name":@"paired_bilingual_full_answer",@"strict":@YES,
+      @"schema":@{@"type":@"object",@"additionalProperties":@NO,
+        @"properties":@{
+          @"english_full":@{@"type":@"string",@"description":@"Full English answer content only, under 55 words and without a label."},
+          @"vietnamese_full":@{@"type":@"string",@"description":@"Exact natural Vietnamese translation of english_full, without a label."}},
+        @"required":@[@"english_full",@"vietnamese_full"]}}};
+    return body;
+}
+- (NSDictionary *)pairedDictionaryFromParsedAnswer:(NSDictionary *)parsed {
+    if(![parsed[@"success"] boolValue]) return nil;
+    NSData *data=[(parsed[@"answer"] ?: @"") dataUsingEncoding:NSUTF8StringEncoding];
+    id value=data?[NSJSONSerialization JSONObjectWithData:data options:0 error:nil]:nil;
+    return [value isKindOfClass:NSDictionary.class]?value:nil;
+}
+- (NSString *)shortAnswerDisplayForValue:(NSString *)value question:(NSString *)question targetLanguage:(NSString *)language {
+    NSString *clean=[self textByRemovingLeadingAnswerVariantLabels:value];
+    NSString *shortLabel=[language isEqualToString:@"vi"]?@"Ngắn":@"Short";
+    NSString *fullLabel=[language isEqualToString:@"vi"]?@"Đầy đủ":@"Full";
+    NSString *variants=[self answerVariantsFromText:[NSString stringWithFormat:@"%@: %@\n\n%@: %@",shortLabel,clean,fullLabel,clean] question:question targetLanguage:language];
+    NSString *ready=[self parseAnswerVariants:variants][@"short"] ?: clean;
+    return [NSString stringWithFormat:@"%@: %@",shortLabel,ready];
+}
+- (NSDictionary *)expandedPairedRetryBodyForBody:(NSDictionary *)body responseJSON:(NSDictionary *)json {
+    if(![json[@"status"] isEqual:@"incomplete"]) return nil;
+    NSString *name=body[@"text"][@"format"][@"name"];
+    NSInteger limit=[name isEqual:@"paired_bilingual_short_answer"]?320:[name isEqual:@"paired_bilingual_full_answer"]?560:[name isEqual:@"paired_bilingual_answer"]?640:0;
+    if(!limit || [body[@"max_output_tokens"] integerValue]>=limit) return nil;
+    NSMutableDictionary *expanded=[body mutableCopy]; expanded[@"max_output_tokens"]=@(limit); return expanded;
 }
 - (void)sendAnswerBody:(NSDictionary *)body apiKey:(NSString *)apiKey allowModelFallback:(BOOL)allowFallback completion:(void (^)(NSDictionary *parsed))completion {
     NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api.openai.com/v1/responses"]];
@@ -2606,16 +2674,22 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     [[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error) {
       NSInteger status=[(NSHTTPURLResponse *)response statusCode];
       BOOL fastModel=[body[@"model"] isEqualToString:@"gpt-5.6-luna"];
+      NSDictionary *json=data?[NSJSONSerialization JSONObjectWithData:data options:0 error:nil]:nil;
+      NSDictionary *expanded=allowFallback && !error && status>=200 && status<300 && [json isKindOfClass:NSDictionary.class]?[self expandedPairedRetryBodyForBody:body responseJSON:json]:nil;
+      if(expanded) {
+        [self sendAnswerBody:expanded apiKey:apiKey allowModelFallback:NO completion:completion];
+        return;
+      }
       if(allowFallback && fastModel && !error && (status==400 || status==403 || status==404)) {
         NSMutableDictionary *fallback=[body mutableCopy];
-        fallback[@"model"]=@"gpt-4.1-mini"; [fallback removeObjectForKey:@"reasoning"];
+        fallback[@"model"]=@"gpt-4.1-mini"; fallback[@"max_output_tokens"]=@640; [fallback removeObjectForKey:@"reasoning"];
         [self sendAnswerBody:fallback apiKey:apiKey allowModelFallback:NO completion:completion];
         return;
       }
       completion([self parsedAnswerData:data status:status error:error]);
     }] resume];
 }
-- (void)performAnswerRequest:(NSString *)question completion:(void (^)(NSString *,BOOL))completion {
+- (void)performAnswerRequest:(NSString *)question progress:(SCAnswerProgress)progress completion:(SCAnswerCompletion)completion {
     // This method is reached only after the instant local retrieval path was
     // unable to produce a reliable answer (or synthesis/context was required).
     // Ranking several thousand local entries and assembling reference context
@@ -2628,26 +2702,48 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSString *requestQuestion=question.copy ?: @"";
     dispatch_async(self.answerPreparationQueue, ^{
       NSDictionary *body=[self answerRequestBodyForQuestion:requestQuestion includeWebSearch:NO];
+      BOOL pairedBilingual=[[self textBetween:@"<paired_vietnamese>" and:@"</paired_vietnamese>" inString:requestQuestion] isEqualToString:@"true"];
+      if(pairedBilingual) {
+        NSDictionary *shortBody=[self pairedShortAnswerBodyFromBody:body];
+        [self sendAnswerBody:shortBody apiKey:apiKey allowModelFallback:YES completion:^(NSDictionary *shortParsed) {
+          NSDictionary *shortPair=[self pairedDictionaryFromParsedAnswer:shortParsed];
+          NSString *englishValue=[self textByRemovingLeadingAnswerVariantLabels:shortPair[@"english_short"]];
+          NSString *vietnameseQuestion=[shortPair[@"vietnamese_question"] isKindOfClass:NSString.class]?[shortPair[@"vietnamese_question"] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]:@"";
+          NSString *vietnameseValue=[self textByRemovingLeadingAnswerVariantLabels:shortPair[@"vietnamese_short"]];
+          if(!englishValue.length || !vietnameseQuestion.length || !vietnameseValue.length) {
+            NSString *error=shortParsed[@"answer"] ?: @"The bilingual Short answer was incomplete. Please retry.";
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(error,NO); }); return;
+          }
+          NSString *heard=[self heardQuestionFromRequest:requestQuestion];
+          NSString *englishShort=[self shortAnswerDisplayForValue:englishValue question:heard targetLanguage:@"en"];
+          NSString *vietnameseShort=[self shortAnswerDisplayForValue:vietnameseValue question:vietnameseQuestion targetLanguage:@"vi"];
+          NSString *partial=[self pairedBilingualAnswerWithEnglish:englishShort vietnameseQuestion:vietnameseQuestion vietnameseAnswer:vietnameseShort];
+          dispatch_async(dispatch_get_main_queue(), ^{ progress(partial); });
+          NSDictionary *fullBody=[self pairedFullAnswerBodyFromBody:body englishShort:englishValue vietnameseShort:vietnameseValue];
+          [self sendAnswerBody:fullBody apiKey:apiKey allowModelFallback:YES completion:^(NSDictionary *fullParsed) {
+            NSDictionary *fullPair=[self pairedDictionaryFromParsedAnswer:fullParsed];
+            NSString *englishFull=[self textByRemovingLeadingAnswerVariantLabels:fullPair[@"english_full"]];
+            NSString *vietnameseFull=[self textByRemovingLeadingAnswerVariantLabels:fullPair[@"vietnamese_full"]];
+            if(!englishFull.length || !vietnameseFull.length) {
+              dispatch_async(dispatch_get_main_queue(), ^{
+                completion(partial,YES);
+                NSString *key=[self answerCacheKeyForRecord:@{@"requestQuestion":requestQuestion}];
+                [self.manualAnswerLane.cache removeObjectForKey:key];
+                [self persistAnswerCache];
+              }); return;
+            }
+            NSString *english=[self answerVariantsFromText:[NSString stringWithFormat:@"Short: %@\n\nFull: %@",englishValue,englishFull] question:heard targetLanguage:@"en"];
+            NSString *vietnamese=[self answerVariantsFromText:[NSString stringWithFormat:@"Ngắn: %@\n\nĐầy đủ: %@",vietnameseValue,vietnameseFull] question:vietnameseQuestion targetLanguage:@"vi"];
+            NSString *final=[self pairedBilingualAnswerWithEnglish:english vietnameseQuestion:vietnameseQuestion vietnameseAnswer:vietnamese];
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(final,YES); });
+          }];
+        }];
+        return;
+      }
       [self sendAnswerBody:body apiKey:apiKey allowModelFallback:YES completion:^(NSDictionary *parsed) {
         BOOL success=[parsed[@"success"] boolValue];
         NSString *language=[self textBetween:@"<answer_language>" and:@"</answer_language>" inString:requestQuestion];
-        BOOL pairedBilingual=[[self textBetween:@"<paired_vietnamese>" and:@"</paired_vietnamese>" inString:requestQuestion] isEqualToString:@"true"];
         NSString *rawAnswer=parsed[@"answer"] ?: @"";
-        if(success && pairedBilingual) {
-          NSData *jsonData=[rawAnswer dataUsingEncoding:NSUTF8StringEncoding];
-          NSDictionary *pair=jsonData?[NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil]:nil;
-          if([pair isKindOfClass:NSDictionary.class] && [pair[@"english_short"] length] && [pair[@"vietnamese_question"] length]) {
-            NSString *englishRaw=[NSString stringWithFormat:@"Short: %@\n\nFull: %@",pair[@"english_short"] ?: @"",pair[@"english_full"] ?: pair[@"english_short"] ?: @""];
-            NSString *vietnameseRaw=[NSString stringWithFormat:@"Ngắn: %@\n\nĐầy đủ: %@",pair[@"vietnamese_short"] ?: @"",pair[@"vietnamese_full"] ?: pair[@"vietnamese_short"] ?: @""];
-            NSString *english=[self answerVariantsFromText:englishRaw question:[self heardQuestionFromRequest:requestQuestion] targetLanguage:@"en"];
-            NSString *vietnamese=[self answerVariantsFromText:vietnameseRaw question:pair[@"vietnamese_question"] targetLanguage:@"vi"];
-            rawAnswer=[self pairedBilingualAnswerWithEnglish:english vietnameseQuestion:pair[@"vietnamese_question"] vietnameseAnswer:vietnamese];
-          } else {
-            success=NO; rawAnswer=@"The bilingual translation was incomplete. Please retry.";
-          }
-          dispatch_async(dispatch_get_main_queue(), ^{ completion(rawAnswer,success); });
-          return;
-        }
         NSString *translated=[language isEqualToString:@"vi"]?[self translatedVietnameseQuestionFromAIText:rawAnswer]:@"";
         if(translated.length) rawAnswer=[self answerTextByRemovingVietnameseQuestionLine:rawAnswer];
         NSString *answer=success?[self answerVariantsFromText:rawAnswer question:[self heardQuestionFromRequest:requestQuestion] targetLanguage:language]:rawAnswer;

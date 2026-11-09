@@ -35,7 +35,8 @@
     }
     return self;
 }
-- (void)performAnswerRequest:(NSString *)question completion:(void (^)(NSString *,BOOL))completion {
+- (void)performAnswerRequest:(NSString *)question progress:(void (^)(NSString *))progress completion:(void (^)(NSString *,BOOL))completion {
+    (void)progress;
     [self.sentQuestions addObject:question];
     if(!self.completions[question]) self.completions[question]=[NSMutableArray array];
     [self.completions[question] addObject:[completion copy]];
@@ -277,16 +278,41 @@ int main(int argc,const char *argv[]) {
         NSDictionary *vietnameseBody=[parser answerRequestBodyForQuestion:@"How do you prevent cross-contamination?\n<answer_language>vi</answer_language>" includeWebSearch:NO];
         Equal(vietnameseBody[@"max_output_tokens"],@320,@"Vietnamese output receives enough tokens to avoid cutting the Full answer mid-sentence");
         NSDictionary *pairedBody=[parser answerRequestBodyForQuestion:@"How do you prevent cross-contamination?\n<answer_language>en</answer_language>\n<paired_vietnamese>true</paired_vietnamese>" includeWebSearch:NO];
-        Equal(pairedBody[@"max_output_tokens"],@640,@"One paired request has enough room to complete both E/V answers");
+        Equal(pairedBody[@"max_output_tokens"],@420,@"The first paired E/V request uses the fast output budget");
         Equal(pairedBody[@"model"],@"gpt-5.6-luna",@"Paired E/V uses the current low-latency model");
         Equal(pairedBody[@"reasoning"][@"effort"],@"none",@"Paired translation avoids hidden reasoning latency");
         Equal(pairedBody[@"text"][@"format"][@"name"],@"paired_bilingual_answer",@"Paired E/V output uses a strict structured schema");
         Check([pairedBody[@"instructions"] containsString:@"translation of the English side, not a separate answer"],@"V is explicitly translated from E instead of being answered independently");
+        Check([pairedBody[@"instructions"] containsString:@"never include Short:"],@"Structured fields are told not to repeat visible answer labels");
+        NSDictionary *shortPaired=[parser pairedShortAnswerBodyFromBody:pairedBody];
+        Equal(shortPaired[@"max_output_tokens"],@220,@"Short E/V is the first low-latency request");
+        Equal(shortPaired[@"model"],@"gpt-4.1-mini",@"Short uses the measured faster low-latency model");
+        Check(shortPaired[@"reasoning"]==nil,@"Short does not spend latency on hidden reasoning");
+        Equal(shortPaired[@"text"][@"format"][@"name"],@"paired_bilingual_short_answer",@"The first request contains only the paired Short schema");
+        Check(shortPaired[@"text"][@"format"][@"schema"][@"properties"][@"english_full"]==nil,@"The Short request does not wait for Full content");
+        NSDictionary *fullPaired=[parser pairedFullAnswerBodyFromBody:pairedBody englishShort:@"Keep food separate." vietnameseShort:@"Giữ riêng thực phẩm."];
+        Equal(fullPaired[@"max_output_tokens"],@360,@"Full is generated later with its own background budget");
+        Equal(fullPaired[@"text"][@"format"][@"name"],@"paired_bilingual_full_answer",@"The second request contains only the paired Full schema");
+        Check([fullPaired[@"input"] containsString:@"APPROVED SHORT ANSWERS"],@"Full must expand the Short answer already shown to the user");
+        NSDictionary *expandedPaired=[parser expandedPairedRetryBodyForBody:pairedBody responseJSON:@{@"status":@"incomplete"}];
+        Equal(expandedPaired[@"max_output_tokens"],@640,@"An incomplete fast response retries once with a safe expanded budget");
+        Check([parser expandedPairedRetryBodyForBody:pairedBody responseJSON:@{@"status":@"completed"}]==nil,@"A completed fast response is never delayed by a retry");
+        Check([parser expandedPairedRetryBodyForBody:expandedPaired responseJSON:@{@"status":@"incomplete"}]==nil,@"The expanded request cannot enter a retry loop");
+        NSString *duplicateEnglish=[parser answerVariantsFromText:@"Short: Short: I keep raw food separate.\n\nFull: Full: I store raw food below ready-to-eat food and use separate equipment." question:@"How do you prevent cross-contamination?" targetLanguage:@"en"];
+        Check([duplicateEnglish rangeOfString:@"Short: Short:" options:NSCaseInsensitiveSearch].location==NSNotFound && [duplicateEnglish rangeOfString:@"Full: Full:" options:NSCaseInsensitiveSearch].location==NSNotFound,@"Repeated English variant labels are removed before display");
+        NSString *duplicateVietnamese=[parser answerVariantsFromText:@"Ngắn: Ngắn: Tôi giữ riêng thực phẩm sống.\n\nĐầy đủ: Đầy đủ: Tôi bảo quản thực phẩm sống bên dưới thực phẩm ăn liền." question:@"Bạn ngăn ngừa nhiễm chéo như thế nào?" targetLanguage:@"vi"];
+        Check([duplicateVietnamese rangeOfString:@"Ngắn: Ngắn:" options:NSCaseInsensitiveSearch].location==NSNotFound && [duplicateVietnamese rangeOfString:@"Đầy đủ: Đầy đủ:" options:NSCaseInsensitiveSearch].location==NSNotFound,@"Repeated Vietnamese variant labels are removed before display");
         NSString *packed=[parser pairedBilingualAnswerWithEnglish:@"Short: Keep food separate." vietnameseQuestion:@"Bạn ngăn ngừa nhiễm chéo như thế nào?" vietnameseAnswer:@"Ngắn: Tôi giữ riêng thực phẩm sống và chín."];
         NSDictionary *unpacked=[parser pairedBilingualPayloadFromAnswer:packed];
         Equal(unpacked[@"englishAnswer"],@"Short: Keep food separate.",@"Paired answer preserves the E content");
         Equal(unpacked[@"vietnameseQuestion"],@"Bạn ngăn ngừa nhiễm chéo như thế nào?",@"Paired answer carries a Vietnamese question");
         Equal(unpacked[@"vietnameseAnswer"],@"Ngắn: Tôi giữ riêng thực phẩm sống và chín.",@"Paired answer carries the direct translation shown in V");
+        NSMutableDictionary *olderVietnamese=[@{@"question":@"Đang dịch…",@"answer":@"Đang chuẩn bị…",@"state":@"loading"} mutableCopy];
+        NSMutableDictionary *olderEnglish=[@{@"answer":packed,@"state":@"loading",@"partialReady":@YES,@"pairedVietnameseRecord":olderVietnamese} mutableCopy];
+        [parser applyPairedPayloadToManualRecord:olderEnglish];
+        Equal(olderEnglish[@"answer"],@"Short: Keep food separate.",@"A coalesced older E row never exposes the packed payload in history");
+        Equal(olderVietnamese[@"answer"],@"Ngắn: Tôi giữ riêng thực phẩm sống và chín.",@"A coalesced older V row receives the same partial or final answer");
+        Check([olderVietnamese[@"partialReady"] boolValue],@"Coalesced V history preserves the Short-ready state while Full is loading");
         NSDictionary *multipartBody=[parser answerRequestBodyForQuestion:@"What is cleaning?\nWhat is sanitising?" includeWebSearch:YES];
         Check([multipartBody[@"instructions"] containsString:@"Short: and Full:"],@"Multipart answers retain both answer variants");
         Equal(multipartBody[@"max_output_tokens"],@480,@"Multipart output retains enough tokens for two complete dual answers");

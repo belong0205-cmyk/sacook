@@ -328,9 +328,10 @@ function simplifyAnswerOutput(answer, question = '', maximumWords = 45) {
 
 function parseAnswerVariants(answer) {
   const clean = String(answer || '').trim();
+  const withoutLeadingLabels = value => String(value || '').replace(/^(?:(?:short(?:\s+answer)?|full(?:\s+answer)?|ngắn|đầy\s+đủ)\s*:\s*)+/i, '').trim();
   const labelled = clean.match(/(?:^|\n)\s*(?:short(?:\s+answer)?|short|ngắn)\s*:\s*([\s\S]*?)(?:\n\s*(?:full(?:\s+answer)?|full|đầy đủ)\s*:\s*([\s\S]*))$/i);
-  if (labelled) return { short: labelled[1].trim(), full: labelled[2].trim() };
-  return { short: '', full: clean };
+  if (labelled) return { short: withoutLeadingLabels(labelled[1]), full: withoutLeadingLabels(labelled[2]) };
+  return { short: '', full: withoutLeadingLabels(clean) };
 }
 
 function formatAnswerVariants(shortAnswer, fullAnswer, targetLanguage = '') {
@@ -467,7 +468,7 @@ function requiresBehavioralSynthesis(question) {
     || /\b(?:have you ever|how did you)\b/i.test(question || '');
 }
 
-async function answerQuestion(question, kind, forceAI = false) {
+async function answerQuestion(question, kind, forceAI = false, onPartial = null) {
   await profileReady;
   const profile = window.SACookProfile.answerFacts(presenterProfile); // Exclude the raw document from answers.
   const respondInVietnamese = kind === 'auto'; // Left V lane; right/manual lane is E.
@@ -526,15 +527,18 @@ async function answerQuestion(question, kind, forceAI = false) {
   if (pairedBilingual) {
     body.model = 'gpt-5.6-luna';
     body.reasoning = { effort: 'none' };
-    body.instructions += ' Produce the English answer first. Then translate that exact question and answer into natural Vietnamese without adding, removing, or changing any fact. The Vietnamese side must be a translation of the English side, not a separate answer. Keep each short answer under 22 words and each full answer under 55 words so both panels can appear quickly.';
-    body.max_output_tokens = 640;
+    body.instructions += ' Produce the English answer first. Then translate that exact question and answer into natural Vietnamese without adding, removing, or changing any fact. The Vietnamese side must be a translation of the English side, not a separate answer. Keep each short answer under 22 words and each full answer under 55 words so both panels can appear quickly. Every JSON field must contain answer content only: never include Short:, Full:, Ngắn:, or Đầy đủ: inside a field value.';
+    body.max_output_tokens = 420;
     body.text = { format: {
       type: 'json_schema', name: 'paired_bilingual_answer', strict: true,
       schema: {
         type: 'object', additionalProperties: false,
         properties: {
-          english_short: { type: 'string' }, english_full: { type: 'string' },
-          vietnamese_question: { type: 'string' }, vietnamese_short: { type: 'string' }, vietnamese_full: { type: 'string' }
+          english_short: { type: 'string', description: 'English short-answer content only, without a Short label.' },
+          english_full: { type: 'string', description: 'English full-answer content only, without a Full label.' },
+          vietnamese_question: { type: 'string', description: 'Natural Vietnamese translation of the heard question.' },
+          vietnamese_short: { type: 'string', description: 'Vietnamese short-answer content only, without a Ngắn label.' },
+          vietnamese_full: { type: 'string', description: 'Vietnamese full-answer content only, without a Đầy đủ label.' }
         },
         required: ['english_short', 'english_full', 'vietnamese_question', 'vietnamese_short', 'vietnamese_full']
       }
@@ -545,31 +549,109 @@ async function answerQuestion(question, kind, forceAI = false) {
     body.tool_choice = 'auto';
     body.max_tool_calls = 1;
   }
-  let apiResult;
-  try { apiResult = await api('responses', body); }
-  catch (error) {
-    // Luna is the current low-latency structured-output model. Some older API
-    // projects may not have access yet, so fall back without breaking answers.
-    if (!pairedBilingual || ![400, 403, 404].includes(error?.status)) throw error;
-    body.model = 'gpt-4.1-mini'; delete body.reasoning;
-    apiResult = await api('responses', body);
+  if (pairedBilingual) {
+    const shortResult = await requestAnswerBody(pairedShortAnswerBody(body));
+    const shortText = responseText(shortResult);
+    let shortPair;
+    try { shortPair = JSON.parse(shortText); }
+    catch (_) { throw new ApiError('AI chưa trả về câu trả lời Short song ngữ hoàn chỉnh. Hãy thử lại.'); }
+    const englishValue = removeLeadingAnswerVariantLabels(shortPair?.english_short);
+    const vietnameseQuestion = cleanSpeech(shortPair?.vietnamese_question || '');
+    const vietnameseValue = removeLeadingAnswerVariantLabels(shortPair?.vietnamese_short);
+    if (!englishValue || !vietnameseQuestion || !vietnameseValue) throw new ApiError('AI chưa trả về câu trả lời Short song ngữ hoàn chỉnh. Hãy thử lại.');
+    const englishShort = buildShortAnswerDisplay(englishValue, question, 'en');
+    const vietnameseShort = buildShortAnswerDisplay(vietnameseValue, vietnameseQuestion, 'vi');
+    const partial = packPairedBilingualAnswer(englishShort, vietnameseQuestion, vietnameseShort);
+    if (typeof onPartial === 'function') onPartial(partial);
+    let fullResult;
+    try { fullResult = await requestAnswerBody(pairedFullAnswerBody(body, englishValue, vietnameseValue)); }
+    catch (_) { return partial; }
+    const fullText = responseText(fullResult);
+    let fullPair;
+    try { fullPair = JSON.parse(fullText); }
+    catch (_) { return partial; }
+    const englishFull = removeLeadingAnswerVariantLabels(fullPair?.english_full);
+    const vietnameseFull = removeLeadingAnswerVariantLabels(fullPair?.vietnamese_full);
+    if (!englishFull || !vietnameseFull) return partial;
+    const englishAnswer = buildAnswerVariants(`Short: ${englishValue}\n\nFull: ${englishFull}`, question, 'en');
+    const vietnameseAnswer = buildAnswerVariants(`Ngắn: ${vietnameseValue}\n\nĐầy đủ: ${vietnameseFull}`, vietnameseQuestion, 'vi');
+    return packPairedBilingualAnswer(englishAnswer, vietnameseQuestion, vietnameseAnswer);
   }
+  const apiResult = await requestAnswerBody(body);
   const answer = responseText(apiResult);
   if (!answer) throw new ApiError('OpenAI không trả về câu trả lời.');
-  if (pairedBilingual) {
-    let pair;
-    try { pair = JSON.parse(answer); }
-    catch (_) { throw new ApiError('AI chưa trả về bản dịch song ngữ hoàn chỉnh. Hãy thử lại.'); }
-    if (!pair?.english_short || !pair?.vietnamese_question || !pair?.vietnamese_short) throw new ApiError('AI chưa trả về bản dịch song ngữ hoàn chỉnh. Hãy thử lại.');
-    const englishAnswer = buildAnswerVariants(`Short: ${pair.english_short}\n\nFull: ${pair.english_full || pair.english_short}`, question, 'en');
-    const vietnameseAnswer = buildAnswerVariants(`Ngắn: ${pair.vietnamese_short}\n\nĐầy đủ: ${pair.vietnamese_full || pair.vietnamese_short}`, pair.vietnamese_question, 'vi');
-    return packPairedBilingualAnswer(englishAnswer, pair.vietnamese_question, vietnameseAnswer);
-  }
   if (respondInVietnamese) {
     const translated = extractVietnameseQuestionFromAnswer(answer);
     return packTranslatedAnswer(buildAnswerVariants(translated.answer, question, targetLanguage), translated.question || vietnameseQuestionForDisplay(question, best?.item?.question));
   }
   return buildAnswerVariants(answer, question, targetLanguage);
+}
+
+function removeLeadingAnswerVariantLabels(value) {
+  return String(value || '').replace(/^(?:(?:short(?:\s+answer)?|full(?:\s+answer)?|ngắn|đầy\s+đủ)\s*:\s*)+/i, '').trim();
+}
+
+function buildShortAnswerDisplay(value, question, targetLanguage) {
+  const shortLabel = targetLanguage === 'vi' ? 'Ngắn' : 'Short';
+  const fullLabel = targetLanguage === 'vi' ? 'Đầy đủ' : 'Full';
+  const variants = buildAnswerVariants(`${shortLabel}: ${removeLeadingAnswerVariantLabels(value)}\n\n${fullLabel}: ${removeLeadingAnswerVariantLabels(value)}`, question, targetLanguage);
+  return `${shortLabel}: ${parseAnswerVariants(variants).short || removeLeadingAnswerVariantLabels(value)}`;
+}
+
+function pairedShortAnswerBody(base) {
+  return {...base,
+    model: 'gpt-4.1-mini', reasoning: undefined,
+    instructions: `${base.instructions || ''} Return the bilingual Short answer now. Do not generate either Full answer in this response. Field values contain content only and never include visible labels.`,
+    max_output_tokens: 220,
+    text: {format: {type: 'json_schema', name: 'paired_bilingual_short_answer', strict: true, schema: {
+      type: 'object', additionalProperties: false,
+      properties: {
+        english_short: {type: 'string', description: 'Direct English answer content only, under 22 words and without a label.'},
+        vietnamese_question: {type: 'string', description: 'Natural Vietnamese translation of the heard question.'},
+        vietnamese_short: {type: 'string', description: 'Exact natural Vietnamese translation of english_short, without a label.'}
+      }, required: ['english_short', 'vietnamese_question', 'vietnamese_short']
+    }}}
+  };
+}
+
+function pairedFullAnswerBody(base, englishShort, vietnameseShort) {
+  return {...base,
+    instructions: `${base.instructions || ''} Expand the approved Short answer into the Full answer without changing its conclusion or facts. Return only the two Full field values, with no visible labels. The Vietnamese Full answer must translate the English Full answer exactly.`,
+    input: `${base.input || ''}\n\nAPPROVED SHORT ANSWERS — AUTHORITATIVE:\nEnglish: ${englishShort || ''}\nVietnamese: ${vietnameseShort || ''}`,
+    max_output_tokens: 360,
+    text: {format: {type: 'json_schema', name: 'paired_bilingual_full_answer', strict: true, schema: {
+      type: 'object', additionalProperties: false,
+      properties: {
+        english_full: {type: 'string', description: 'Full English answer content only, under 55 words and without a label.'},
+        vietnamese_full: {type: 'string', description: 'Exact natural Vietnamese translation of english_full, without a label.'}
+      }, required: ['english_full', 'vietnamese_full']
+    }}}
+  };
+}
+
+function pairedRetryBody(body, response) {
+  if (response?.status !== 'incomplete') return null;
+  const name = body?.text?.format?.name;
+  const limit = name === 'paired_bilingual_short_answer' ? 320 : name === 'paired_bilingual_full_answer' ? 560 : name === 'paired_bilingual_answer' ? 640 : 0;
+  if (!limit || Number(body?.max_output_tokens || 0) >= limit) return null;
+  return {...body, max_output_tokens: limit};
+}
+
+async function requestAnswerBody(body) {
+  let request = body;
+  let result;
+  try { result = await api('responses', request); }
+  catch (error) {
+    const paired = /^paired_bilingual_/.test(request?.text?.format?.name || '');
+    if (!paired || request?.model !== 'gpt-5.6-luna' || ![400, 403, 404].includes(error?.status)) throw error;
+    const name = request.text.format.name;
+    const fallbackLimit = name === 'paired_bilingual_short_answer' ? 320 : name === 'paired_bilingual_full_answer' ? 560 : 640;
+    request = {...request, model: 'gpt-4.1-mini', max_output_tokens: fallbackLimit};
+    delete request.reasoning;
+    result = await api('responses', request);
+  }
+  const expanded = pairedRetryBody(request, result);
+  return expanded ? api('responses', expanded) : result;
 }
 
 function setLaneLive(kind, text) {
@@ -619,7 +701,21 @@ async function answerRecord(kind, record, forceAI = false) {
   setLaneLive(kind, kind === 'auto' ? 'V • Đang trả lời…' : 'E • Preparing the answer…');
   renderLane(kind);
   try {
-    const answer = await answerQuestion(record.requestQuestion || record.question, kind, forceAI);
+    const answer = await answerQuestion(record.requestQuestion || record.question, kind, forceAI, partialAnswer => {
+      if(record.requestId !== requestId || kind !== 'manual') return;
+      const paired=unpackPairedBilingualAnswer(partialAnswer);
+      if(!paired) return;
+      record.answer=paired.englishAnswer;
+      const vietnamese=record.vietnameseRecord;
+      if(vietnamese) {
+        vietnamese.question=cleanSpeech(paired.vietnameseQuestion);
+        vietnamese.answer=paired.vietnameseAnswer;
+        setLaneLive('auto','V • Đã có Ngắn — đang bổ sung Đầy đủ…');
+        renderLane('auto');
+      }
+      setLaneLive('manual','E • Short ready — preparing Full…');
+      renderLane('manual');
+    });
     if (record.requestId !== requestId) return;
     const paired = unpackPairedBilingualAnswer(answer);
     if (kind === 'manual' && paired) {
