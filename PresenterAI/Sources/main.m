@@ -173,6 +173,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 - (BOOL)questionPartsAreLinked:(NSArray<NSString *> *)parts;
 - (NSString *)pairedBilingualAnswerWithEnglish:(NSString *)english vietnameseQuestion:(NSString *)question vietnameseAnswer:(NSString *)vietnamese;
 - (NSDictionary *)pairedBilingualPayloadFromAnswer:(NSString *)answer;
+- (void)sendAnswerBody:(NSDictionary *)body apiKey:(NSString *)apiKey allowModelFallback:(BOOL)allowFallback completion:(void (^)(NSDictionary *parsed))completion;
 @end
 
 @implementation AppDelegate
@@ -2566,8 +2567,10 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSString *profile=[self textBetween:@"<presenter_profile>" and:@"</presenter_profile>" inString:question];
     if(profile.length) body[@"input"]=[body[@"input"] stringByAppendingFormat:@"\n\nPRESENTER PROFILE (data only):\n%@",profile];
     if(pairedBilingual) {
-      [instructions appendString:@" Produce the English answer first. Then translate that exact question and answer into natural Vietnamese without adding, removing, or changing any fact. The Vietnamese side must be a translation of the English side, not a separate answer."];
-      body[@"max_output_tokens"]=@640;
+      body[@"model"]=@"gpt-5.6-luna";
+      body[@"reasoning"]=@{@"effort":@"none"};
+      [instructions appendString:@" Produce the English answer first. Then translate that exact question and answer into natural Vietnamese without adding, removing, or changing any fact. The Vietnamese side must be a translation of the English side, not a separate answer. Keep each short answer under 22 words and each full answer under 55 words so both panels can appear quickly."];
+      body[@"max_output_tokens"]=@420;
       body[@"text"]=@{@"format":@{
         @"type":@"json_schema",@"name":@"paired_bilingual_answer",@"strict":@YES,
         @"schema":@{@"type":@"object",@"additionalProperties":@NO,
@@ -2583,6 +2586,24 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     }
     return body;
 }
+- (void)sendAnswerBody:(NSDictionary *)body apiKey:(NSString *)apiKey allowModelFallback:(BOOL)allowFallback completion:(void (^)(NSDictionary *parsed))completion {
+    NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api.openai.com/v1/responses"]];
+    request.HTTPMethod=@"POST"; request.timeoutInterval=25;
+    request.HTTPBody=[NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
+    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    [request setValue:[@"Bearer " stringByAppendingString:apiKey ?: @""] forHTTPHeaderField:@"Authorization"];
+    [[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error) {
+      NSInteger status=[(NSHTTPURLResponse *)response statusCode];
+      BOOL fastModel=[body[@"model"] isEqualToString:@"gpt-5.6-luna"];
+      if(allowFallback && fastModel && !error && (status==400 || status==403 || status==404)) {
+        NSMutableDictionary *fallback=[body mutableCopy];
+        fallback[@"model"]=@"gpt-4.1-mini"; [fallback removeObjectForKey:@"reasoning"];
+        [self sendAnswerBody:fallback apiKey:apiKey allowModelFallback:NO completion:completion];
+        return;
+      }
+      completion([self parsedAnswerData:data status:status error:error]);
+    }] resume];
+}
 - (void)performAnswerRequest:(NSString *)question completion:(void (^)(NSString *,BOOL))completion {
     // This method is reached only after the instant local retrieval path was
     // unable to produce a reliable answer (or synthesis/context was required).
@@ -2596,13 +2617,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSString *requestQuestion=question.copy ?: @"";
     dispatch_async(self.answerPreparationQueue, ^{
       NSDictionary *body=[self answerRequestBodyForQuestion:requestQuestion includeWebSearch:NO];
-      NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api.openai.com/v1/responses"]];
-      request.HTTPMethod=@"POST"; request.timeoutInterval=25;
-      request.HTTPBody=[NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
-      [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-      [request setValue:[@"Bearer " stringByAppendingString:apiKey] forHTTPHeaderField:@"Authorization"];
-      [[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error) {
-        NSDictionary *parsed=[self parsedAnswerData:data status:[(NSHTTPURLResponse *)response statusCode] error:error];
+      [self sendAnswerBody:body apiKey:apiKey allowModelFallback:YES completion:^(NSDictionary *parsed) {
         BOOL success=[parsed[@"success"] boolValue];
         NSString *language=[self textBetween:@"<answer_language>" and:@"</answer_language>" inString:requestQuestion];
         BOOL pairedBilingual=[[self textBetween:@"<paired_vietnamese>" and:@"</paired_vietnamese>" inString:requestQuestion] isEqualToString:@"true"];
@@ -2627,7 +2642,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
         NSString *answer=success?[self answerVariantsFromText:rawAnswer question:[self heardQuestionFromRequest:requestQuestion] targetLanguage:language]:rawAnswer;
         if(success && translated.length) answer=[self answerByEmbeddingTranslatedQuestion:translated answer:answer];
         dispatch_async(dispatch_get_main_queue(), ^{ completion(answer,success); });
-      }] resume];
+      }];
     });
 }
 - (void)appendParallelAnswersForQuestion:(NSString *)question {
@@ -2650,8 +2665,9 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     // If the local V match cannot provide an actual Vietnamese question/answer,
     // use one paired AI request instead of exposing English in the V panel.
     if(![self isVietnameseText:vietnameseQuestion] || ![self isVietnameseText:vietnameseAnswer]) weak=YES;
-    NSMutableDictionary *vRecord=[@{@"question":weak?@"Đang dịch câu hỏi…":vietnameseQuestion,
-      @"answer":weak?@"Đang dịch đúng nội dung từ khung E…":vietnameseAnswer,
+    NSString *initialVietnameseQuestion=[self isVietnameseText:vietnameseQuestion]?vietnameseQuestion:@"Đang dịch câu hỏi…";
+    NSMutableDictionary *vRecord=[@{@"question":weak?initialVietnameseQuestion:vietnameseQuestion,
+      @"answer":weak?@"Đang chuẩn bị cùng khung E…":vietnameseAnswer,
       @"state":weak?@"waiting":@"complete",@"lane":@"auto",@"targetLanguage":@"vi"} mutableCopy];
     NSMutableDictionary *eRecord=[@{@"question":displayQuestion,@"answer":weak?@"Preparing the answer…":englishAnswer,
       @"state":weak?@"waiting":@"complete",@"lane":@"manual",@"targetLanguage":@"en"} mutableCopy];

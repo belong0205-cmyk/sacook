@@ -277,7 +277,9 @@ int main(int argc,const char *argv[]) {
         NSDictionary *vietnameseBody=[parser answerRequestBodyForQuestion:@"How do you prevent cross-contamination?\n<answer_language>vi</answer_language>" includeWebSearch:NO];
         Equal(vietnameseBody[@"max_output_tokens"],@320,@"Vietnamese output receives enough tokens to avoid cutting the Full answer mid-sentence");
         NSDictionary *pairedBody=[parser answerRequestBodyForQuestion:@"How do you prevent cross-contamination?\n<answer_language>en</answer_language>\n<paired_vietnamese>true</paired_vietnamese>" includeWebSearch:NO];
-        Equal(pairedBody[@"max_output_tokens"],@640,@"One paired request has room for E plus its Vietnamese translation");
+        Equal(pairedBody[@"max_output_tokens"],@420,@"One paired request is capped for a fast E/V response");
+        Equal(pairedBody[@"model"],@"gpt-5.6-luna",@"Paired E/V uses the current low-latency model");
+        Equal(pairedBody[@"reasoning"][@"effort"],@"none",@"Paired translation avoids hidden reasoning latency");
         Equal(pairedBody[@"text"][@"format"][@"name"],@"paired_bilingual_answer",@"Paired E/V output uses a strict structured schema");
         Check([pairedBody[@"instructions"] containsString:@"translation of the English side, not a separate answer"],@"V is explicitly translated from E instead of being answered independently");
         NSString *packed=[parser pairedBilingualAnswerWithEnglish:@"Short: Keep food separate." vietnameseQuestion:@"Bạn ngăn ngừa nhiễm chéo như thế nào?" vietnameseAnswer:@"Ngắn: Tôi giữ riêng thực phẩm sống và chín."];

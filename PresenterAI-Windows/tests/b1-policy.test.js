@@ -141,6 +141,8 @@ assert.match(source, /vietnameseRecord: vietnamese/, 'one Space turn must pair V
 assert.match(source, /answerRecord\('manual', english\)/, 'one Space turn must create the answer once through E');
 assert.match(source, /packPairedBilingualAnswer/, 'V must be the Vietnamese translation bundled with the E answer');
 assert.match(source, /The Vietnamese side must be a translation of the English side, not a separate answer/, 'the paired request must forbid an independent V answer');
+assert.match(source, /body\.model = 'gpt-5\.6-luna'/, 'paired E/V must use the current low-latency model');
+assert.match(source, /body\.reasoning = \{ effort: 'none' \}/, 'paired E/V must disable reasoning latency');
 assert.doesNotMatch(source, /form\.append\('languages\[\]'/, 'Space transcription must allow spoken Vietnamese or English');
 assert.match(source, /respondInVietnamese \? 320 : 240/, 'V and E must have complete-answer token budgets');
 assert.match(source, /targetLanguage \? targetLanguage === 'vi'/, 'V formatting must not depend on guessing the language of an English question');
