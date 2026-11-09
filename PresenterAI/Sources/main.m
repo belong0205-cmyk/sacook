@@ -24,8 +24,8 @@ static const NSTimeInterval SCAutoTurnSettle = 0.95;
 // acoustic silence is not a reliable endpoint by itself. A detector-approved
 // question may close after remaining unchanged for this bounded interval.
 static const NSTimeInterval SCAutoStableEndpoint = 1.35;
-static NSString * const SCManualAnswerCacheKey = @"PresenterAI.answerCache.manual.v19";
-static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v19";
+static NSString * const SCManualAnswerCacheKey = @"PresenterAI.answerCache.manual.v20";
+static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v20";
 static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1__";
 
 @interface SCArrowTextView : NSTextView
@@ -400,13 +400,24 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 - (NSString *)requestWithPresenterProfile:(NSString *)request {
     // Snapshot into the queued request; changing a profile cannot change a
     // pending answer or accidentally reuse an answer from another profile.
+    // The language-control tags belong to the queued request, not to the
+    // question text. Rebuilding the contextual request used to drop them when
+    // a personal profile was present, so E completed while V waited forever.
+    NSString *language=[self textBetween:@"<answer_language>" and:@"</answer_language>" inString:request];
+    NSString *paired=[self textBetween:@"<paired_vietnamese>" and:@"</paired_vietnamese>" inString:request];
     NSMutableDictionary *profile=[[self presenterProfile] mutableCopy]; [profile removeObjectForKey:@"sourceText"];
     NSString *base=[self contextualRequestForQuestion:[self heardQuestionFromRequest:request] recentQuestions:[self recentQuestionsFromRequest:request]];
     NSData *json=[NSJSONSerialization dataWithJSONObject:profile options:NSJSONWritingSortedKeys error:nil];
     NSString *text=[[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding];
     text=[text stringByReplacingOccurrencesOfString:@"<" withString:@"\\u003c"];
-    if(![[profile.allValues componentsJoinedByString:@""] length]) return base;
-    return [base stringByAppendingFormat:@"\n<presenter_profile>%@</presenter_profile>",text];
+    NSMutableString *result=[base mutableCopy];
+    if([[profile.allValues componentsJoinedByString:@""] length])
+      [result appendFormat:@"\n<presenter_profile>%@</presenter_profile>",text];
+    if([@[@"en",@"vi"] containsObject:language])
+      [result appendFormat:@"\n<answer_language>%@</answer_language>",language];
+    if([paired isEqualToString:@"true"])
+      [result appendString:@"\n<paired_vietnamese>true</paired_vietnamese>"];
+    return result;
 }
 
 - (void)validateAndSaveOpenAIKey:(NSString *)key {
@@ -2570,7 +2581,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       body[@"model"]=@"gpt-5.6-luna";
       body[@"reasoning"]=@{@"effort":@"none"};
       [instructions appendString:@" Produce the English answer first. Then translate that exact question and answer into natural Vietnamese without adding, removing, or changing any fact. The Vietnamese side must be a translation of the English side, not a separate answer. Keep each short answer under 22 words and each full answer under 55 words so both panels can appear quickly."];
-      body[@"max_output_tokens"]=@420;
+      body[@"max_output_tokens"]=@640;
       body[@"text"]=@{@"format":@{
         @"type":@"json_schema",@"name":@"paired_bilingual_answer",@"strict":@YES,
         @"schema":@{@"type":@"object",@"additionalProperties":@NO,

@@ -527,7 +527,7 @@ async function answerQuestion(question, kind, forceAI = false) {
     body.model = 'gpt-5.6-luna';
     body.reasoning = { effort: 'none' };
     body.instructions += ' Produce the English answer first. Then translate that exact question and answer into natural Vietnamese without adding, removing, or changing any fact. The Vietnamese side must be a translation of the English side, not a separate answer. Keep each short answer under 22 words and each full answer under 55 words so both panels can appear quickly.';
-    body.max_output_tokens = 420;
+    body.max_output_tokens = 640;
     body.text = { format: {
       type: 'json_schema', name: 'paired_bilingual_answer', strict: true,
       schema: {

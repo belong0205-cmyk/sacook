@@ -39,6 +39,14 @@ int main(void) { @autoreleasepool {
   Check([[app profileSourceForEditor:saved] isEqual:@"Original source"],@"Editor shows the original document");
   Check([[app profileSourceForEditor:facts] containsString:@"Test Bistro"],@"Old structured profiles migrate into the one-box editor");
   Check(![[app requestWithPresenterProfile:@"What is your menu?"] containsString:@"Original source"],@"Answer requests exclude the raw document");
-  fprintf(stdout,"Profile snapshot and answer isolation: 15 checks, %d failures\n",failures);
+  app.testProfile=@{@"name":@"Cook V",@"menu":@"Caesar salad"};
+  NSString *paired=[app requestWithPresenterProfile:@"What are the ingredients?\n<answer_language>en</answer_language>\n<paired_vietnamese>true</paired_vietnamese>"];
+  Check([[app heardQuestionFromRequest:paired] isEqual:@"What are the ingredients?"],@"Paired profile request keeps the heard question exact");
+  Check([[app textBetween:@"<answer_language>" and:@"</answer_language>" inString:paired] isEqual:@"en"],@"Profile enrichment preserves the E language control");
+  Check([[app textBetween:@"<paired_vietnamese>" and:@"</paired_vietnamese>" inString:paired] isEqual:@"true"],@"Profile enrichment preserves the paired V control");
+  app.testProfile=@{};
+  NSString *withoutProfile=[app requestWithPresenterProfile:paired];
+  Check([[app textBetween:@"<paired_vietnamese>" and:@"</paired_vietnamese>" inString:withoutProfile] isEqual:@"true"],@"Clearing a profile cannot disable the queued V translation");
+  fprintf(stdout,"Profile snapshot and answer isolation: 19 checks, %d failures\n",failures);
   return failures?1:0;
 } }
