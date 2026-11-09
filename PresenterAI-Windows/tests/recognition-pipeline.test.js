@@ -1,6 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 
@@ -26,5 +27,14 @@ assert(source.includes('// V and E are both SPACE lanes. Continuous AUTO transcr
 assert(source.includes("lanes.auto.records.push(vietnamese)"), 'the shared Space transcript must create a V record');
 assert(source.includes("lanes.manual.records.push(english)"), 'the shared Space transcript must create an E record');
 assert(source.includes("answerRecord('manual', english)"), 'E must be answered once and translated into V');
+assert(!source.includes('const SPACE_TAIL_MS = 80'), 'Space must not cut the loopback stream after the old fixed 80 ms delay');
+const tailStart = source.indexOf('function shouldFinishSpaceTail(');
+const tailFunction = source.slice(tailStart, source.indexOf('\n}', tailStart) + 2);
+const tail = vm.createContext({});
+vm.runInContext(`const SPACE_TAIL_MIN_MS=180, SPACE_TAIL_QUIET_MS=360, SPACE_TAIL_MAX_MS=850; ${tailFunction}`, tail);
+assert.strictEqual(tail.shouldFinishSpaceTail(80, 80), false, 'Space must retain audio beyond 80 ms');
+assert.strictEqual(tail.shouldFinishSpaceTail(250, 200), false, 'Space waits while final voice frames are still arriving');
+assert.strictEqual(tail.shouldFinishSpaceTail(360, 360), true, 'Space cuts promptly after a stable quiet tail');
+assert.strictEqual(tail.shouldFinishSpaceTail(850, 0), true, 'Background noise cannot keep a Space capture open forever');
 
 console.log('Windows recognition pipeline tests passed.');

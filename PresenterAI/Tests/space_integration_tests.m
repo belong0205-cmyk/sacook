@@ -108,6 +108,26 @@ int main(void) {
         Check(finalSame.spaceSettleTimer!=nil && finalSame.spaceSettleTimer.isValid,@"Identical final text schedules manual settle");
         [finalSame finishSpaceCommit]; Equal(finalSame.committedQuestions.firstObject,first,@"Unchanged final retains visible question"); CleanUp(finalSame);
 
+        IndependentSpeechTestApp *lateTail=[IndependentSpeechTestApp new];
+        NSArray *tailPartial=@[Word(@"What",.1,.3),Word(@"is",.4,.6),Word(@"the",.7,.8),Word(@"difference",.9,1.3),Word(@"between",1.4,1.7),Word(@"cleaning",1.8,2.1)];
+        NSArray *tailComplete=[tailPartial arrayByAddingObjectsFromArray:@[Word(@"and",2.25,2.35),Word(@"sanitising?",2.36,2.52)]];
+        Receive(lateTail,tailPartial,2.2,NO); lateTail.lastVoiceAudioTime=2.18; [lateTail commitCurrentQuestionFromSpace];
+        Check(lateTail.pendingSpaceTo>2.5 && lateTail.manualCursor==lateTail.pendingSpaceTo,@"Immediate Space reserves a bounded acoustic tail for delayed final frames");
+        Receive(lateTail,tailComplete,2.6,YES);
+        Equal(lateTail.spaceTranscriptSnapshot,Joined(tailComplete),@"Words delivered just after Space remain inside the captured question");
+        [lateTail finishSpaceCommit]; Equal(lateTail.committedQuestions.firstObject,Joined(tailComplete),@"Immediate Space includes the complete final phrase"); CleanUp(lateTail);
+
+        IndependentSpeechTestApp *lateUntimedTail=[IndependentSpeechTestApp new];
+        NSArray *zeroTailComplete=@[Word(@"What",0,0),Word(@"is",0,0),Word(@"the",0,0),Word(@"difference",0,0),Word(@"between",0,0),Word(@"cleaning",0,0),Word(@"and",0,0),Word(@"sanitising?",0,0)];
+        Receive(lateUntimedTail,tailPartial,2.2,NO); lateUntimedTail.lastVoiceAudioTime=2.18; [lateUntimedTail commitCurrentQuestionFromSpace];
+        Receive(lateUntimedTail,zeroTailComplete,2.6,YES);
+        [lateUntimedTail finishSpaceCommit]; Equal(lateUntimedTail.committedQuestions.firstObject,Joined(zeroTailComplete),@"A final untimed revision after a timed Space keeps the original words and appends its tail"); CleanUp(lateUntimedTail);
+
+        IndependentSpeechTestApp *alreadyQuiet=[IndependentSpeechTestApp new];
+        Receive(alreadyQuiet,complete,3.0,NO); alreadyQuiet.lastVoiceAudioTime=2.0; [alreadyQuiet commitCurrentQuestionFromSpace];
+        Check(fabs(alreadyQuiet.pendingSpaceTo-3.0)<0.001,@"Space adds no acoustic delay after the source has already been quiet");
+        [alreadyQuiet finishSpaceCommit]; CleanUp(alreadyQuiet);
+
         IndependentSpeechTestApp *autoFirst=[IndependentSpeechTestApp new];
         Receive(autoFirst,complete,2.2,YES); [autoFirst commitCurrentQuestionFromSpace];
         NSTimeInterval pendingFrom=autoFirst.pendingSpaceFrom, pendingTo=autoFirst.pendingSpaceTo;
@@ -158,13 +178,14 @@ int main(void) {
         Receive(untimed,zeroFirst,3,NO); Check(untimed.manualUsesUntimed,@"Zero timestamps select text fallback");
         Equal(untimed.latestTranscript,@"What is mise en place?",@"Missing timing cannot blank visible question");
         NSTimer *untimedTimer=untimed.autoTimer; [untimed commitCurrentQuestionFromSpace];
-        Check(!untimed.spaceCommitPending,@"Untimed Space immediately snapshots visible text");
+        Check(untimed.spaceCommitPending,@"Untimed Space keeps a bounded revision window for late words");
+        [untimed finishSpaceCommit];
         Equal(untimed.committedQuestions.firstObject,@"What is mise en place?",@"Untimed Space keeps exact visible question");
         Check(untimed.autoTimer==untimedTimer && untimed.autoTimer.isValid,@"Untimed Space leaves AUTO running");
         Receive(untimed,[zeroFirst arrayByAddingObjectsFromArray:zeroNext],5,NO);
         Equal(untimed.latestTranscript,@"What is FIFO?",@"Zero-timestamp next question remains available");
         DrainAuto(untimed); Check(untimed.autoCandidates.count==1 && [untimed.autoCandidates.firstObject containsString:@"What is mise en place?"] && [untimed.autoCandidates.firstObject containsString:@"What is FIFO?"],@"AUTO keeps all-zero questions in one readable answer record");
-        [untimed commitCurrentQuestionFromSpace]; Equal(untimed.committedQuestions.lastObject,@"What is FIFO?",@"Second untimed Space does not repeat first");
+        [untimed commitCurrentQuestionFromSpace]; [untimed finishSpaceCommit]; Equal(untimed.committedQuestions.lastObject,@"What is FIFO?",@"Second untimed Space does not repeat first");
         Receive(untimed,[zeroFirst arrayByAddingObjectsFromArray:zeroNext],5.2,YES); DrainAuto(untimed);
         Check(untimed.autoCandidates.count==1 && untimed.committedQuestions.count==2,@"Untimed identical final duplicates neither lane"); CleanUp(untimed);
 
@@ -173,8 +194,15 @@ int main(void) {
         NSArray *mixedZero=@[Word(@"What",0,0),Word(@"is",0,0),Word(@"FIFO?",0,0),Word(@"What",0,0),Word(@"is",0,0),Word(@"HACCP?",0,0)];
         Receive(mixed,mixedZero,2,NO); Equal(mixed.latestTranscript,@"What is HACCP?",@"Metadata loss cannot replay timed consumed words");
         [mixed commitCurrentQuestionFromSpace]; Receive(mixed,[fifo arrayByAddingObjectsFromArray:haccp],2.2,YES);
-        Equal(mixed.latestTranscript,@"",@"Timed final cannot restore fallback-consumed words");
+        Equal(mixed.latestTranscript,@"What is HACCP?",@"A late untimed revision remains available until the pending Space commit finishes");
+        [mixed finishSpaceCommit]; Equal(mixed.latestTranscript,@"",@"Finishing the untimed commit consumes the captured words exactly once");
         Check(mixed.committedQuestions.count==2,@"Metadata changes preserve two manual questions once"); CleanUp(mixed);
+
+        IndependentSpeechTestApp *untimedTail=[IndependentSpeechTestApp new];
+        NSArray *zeroPartial=@[Word(@"What",0,0),Word(@"is",0,0),Word(@"mise",0,0),Word(@"en",0,0)];
+        Receive(untimedTail,zeroPartial,3,NO); [untimedTail commitCurrentQuestionFromSpace];
+        Receive(untimedTail,zeroFirst,3.3,YES);
+        [untimedTail finishSpaceCommit]; Equal(untimedTail.committedQuestions.firstObject,@"What is mise en place?",@"Untimed Space includes a final word revision arriving after the keypress"); CleanUp(untimedTail);
 
         IndependentSpeechTestApp *rollover=[IndependentSpeechTestApp new];
         Receive(rollover,zeroFirst,3,NO); [rollover restartSpeechTaskOnly];
@@ -182,7 +210,7 @@ int main(void) {
         Receive(rollover,zeroNext,5,NO);
         Equal(rollover.latestTranscript,@"What is mise en place? What is FIFO?",@"Rollover carries SPACE's unconsumed question into next task");
         DrainAuto(rollover); Check(rollover.autoCandidates.count==1 && [rollover.autoCandidates.firstObject containsString:@"What is mise en place?"] && [rollover.autoCandidates.firstObject containsString:@"What is FIFO?"],@"AUTO rollover keeps unconsumed questions in one readable answer record");
-        [rollover commitCurrentQuestionFromSpace];
+        [rollover commitCurrentQuestionFromSpace]; [rollover finishSpaceCommit];
         Equal(rollover.committedQuestions.firstObject,@"What is mise en place? What is FIFO?",@"Space after rollover preserves all words since last press");
         Check(rollover.autoCandidates.count==1,@"Space after rollover does not duplicate AUTO results"); CleanUp(rollover);
 

@@ -20,6 +20,12 @@
 static const NSTimeInterval SCAutoUtteranceSilence = 0.72;
 static const NSTimeInterval SCAutoTurnSilence = 1.05;
 static const NSTimeInterval SCAutoTurnSettle = 0.95;
+// Space is a user-intent boundary, but Core Audio and Speech can deliver the
+// final frames after the key event. Capture only enough extra audio to reach a
+// short quiet tail instead of asking the presenter to wait a full second.
+static const NSTimeInterval SCSpaceQuietTail = 0.45;
+static const NSTimeInterval SCSpaceUntimedSettle = 0.55;
+static const NSTimeInterval SCSpaceCommitDeadline = 1.45;
 // BlackHole often carries room tone, music, or the beginning of an answer, so
 // acoustic silence is not a reliable endpoint by itself. A detector-approved
 // question may close after remaining unchanged for this bounded interval.
@@ -78,6 +84,8 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 @property BOOL autoRequestInFlight;
 @property BOOL spaceCommitPending;
 @property NSString *spaceTranscriptSnapshot;
+@property NSString *spaceTranscriptBaseSnapshot;
+@property BOOL pendingSpaceUsesUntimed;
 @property NSString *knowledge;
 @property NSString *answerPolicy;
 @property NSArray<NSString *> *knowledgeNames;
@@ -1304,7 +1312,6 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     else if(heard.length && !self.manualUsesUntimed) {
       // A partial transcript may have no usable word timestamps. Never turn
       // zero metadata into an audio boundary and silently discard future words.
-      if(self.spaceCommitPending) [self finishSpaceCommit];
       self.manualUsesUntimed=YES;
     }
     [self refreshManualTranscriptFinal:final];
@@ -1328,15 +1335,29 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     if(self.currentAnswerView) [self showCurrentQuestion:self.currentQuestion answer:self.currentAnswer.length?self.currentAnswer:@""];
     if(self.autoAnswerView) [self showAutoQuestion:self.autoQuestion answer:self.autoAnswer.length?self.autoAnswer:@""];
     if(self.spaceCommitPending) {
-      NSString *bounded=[self correctCulinaryTerms:[self.timeline textFrom:self.pendingSpaceFrom to:self.pendingSpaceTo]];
-      // A short revised tail cannot replace the whole visible question.
-      NSUInteger oldWords=[self.spaceTranscriptSnapshot componentsSeparatedByString:@" "].count;
-      NSUInteger newWords=[bounded componentsSeparatedByString:@" "].count;
-      if(bounded.length && (final || newWords+1>=oldWords)) self.spaceTranscriptSnapshot=bounded;
-      BOOL crossed=[self.timeline endTimeFrom:self.pendingSpaceTo to:DBL_MAX]>self.pendingSpaceTo;
-      if(final || crossed) {
-        [self.spaceSettleTimer invalidate];
-        self.spaceSettleTimer=[NSTimer scheduledTimerWithTimeInterval:0.15 target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
+      if(self.manualUsesUntimed) {
+        NSString *pending=[self correctCulinaryTerms:self.manualUntimedBuffer.pendingText];
+        NSString *base=self.spaceTranscriptBaseSnapshot ?: @"";
+        NSString *revised=self.pendingSpaceUsesUntimed?pending:(pending.length?[NSString stringWithFormat:@"%@%@%@",base,base.length?@" ":@"",pending]:base);
+        NSUInteger oldWords=[self.spaceTranscriptSnapshot componentsSeparatedByString:@" "].count;
+        NSUInteger newWords=[revised componentsSeparatedByString:@" "].count;
+        if(revised.length && (final || newWords+1>=oldWords)) self.spaceTranscriptSnapshot=revised;
+        if(final) {
+          [self.spaceSettleTimer invalidate];
+          self.spaceSettleTimer=[NSTimer scheduledTimerWithTimeInterval:0.15 target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
+        }
+      } else {
+        NSString *bounded=[self correctCulinaryTerms:[self.timeline textFrom:self.pendingSpaceFrom to:self.pendingSpaceTo]];
+        // A short revised tail cannot replace the whole visible question.
+        NSUInteger oldWords=[self.spaceTranscriptSnapshot componentsSeparatedByString:@" "].count;
+        NSUInteger newWords=[bounded componentsSeparatedByString:@" "].count;
+        if(bounded.length && (final || newWords+1>=oldWords)) self.spaceTranscriptSnapshot=bounded;
+        BOOL tailCaptured=self.audioTime+0.02>=self.pendingSpaceTo;
+        BOOL crossed=[self.timeline endTimeFrom:self.pendingSpaceTo to:DBL_MAX]>self.pendingSpaceTo;
+        if(tailCaptured && (final || crossed)) {
+          [self.spaceSettleTimer invalidate];
+          self.spaceSettleTimer=[NSTimer scheduledTimerWithTimeInterval:0.15 target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
+        }
       }
     }
 }
@@ -1549,23 +1570,40 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     if(self.spaceCommitPending) [self finishSpaceCommit];
     NSString *visible=[self currentBufferedTranscript];
     if(self.manualUsesUntimed) {
-      // Without word timing, Space means exactly the words currently shown.
-      NSString *question=[self.manualUntimedBuffer consume];
-      if(question.length) [self appendParallelAnswersForQuestion:question];
-      else { self.manualLiveLabel.stringValue=@"E • No question to submit"; self.autoLiveLabel.stringValue=@"V • Chưa có câu hỏi để chốt"; }
-      [self refreshManualTranscriptFinal:NO];
+      if(!visible.length) { self.manualLiveLabel.stringValue=@"E • No question to submit"; self.autoLiveLabel.stringValue=@"V • Chưa có câu hỏi để chốt"; return; }
+      // Untimed hypotheses can still revise after Space. Keep a short bounded
+      // window so the last words are included, then consume the text once.
+      self.spaceTranscriptSnapshot=visible;
+      self.spaceTranscriptBaseSnapshot=visible;
+      self.pendingSpaceUsesUntimed=YES;
+      self.spaceCommitPending=YES;
+      [self.spaceDeadlineTimer invalidate];
+      self.spaceDeadlineTimer=[NSTimer scheduledTimerWithTimeInterval:SCSpaceCommitDeadline target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
+      [self.spaceSettleTimer invalidate];
+      self.spaceSettleTimer=[NSTimer scheduledTimerWithTimeInterval:(self.manualSnapshotFinal?0.15:SCSpaceUntimedSettle) target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
+      self.manualLiveLabel.stringValue=@"E • Captured • finishing the last words…";
+      self.autoLiveLabel.stringValue=@"V • Đã chốt • đang nhận nốt chữ cuối…";
       return;
     }
     NSTimeInterval cutoff;
     @synchronized(self) { cutoff=self.audioTime; }
     if(cutoff<=self.manualCursor) return;
-    self.pendingSpaceFrom=self.manualCursor; self.pendingSpaceTo=cutoff;
+    NSTimeInterval quietFor=MAX(0,cutoff-self.lastVoiceAudioTime);
+    NSTimeInterval captureTail=MAX(0,SCSpaceQuietTail-quietFor);
+    NSTimeInterval boundary=cutoff+captureTail;
+    self.pendingSpaceFrom=self.manualCursor; self.pendingSpaceTo=boundary;
     self.spaceTranscriptSnapshot=visible;
-    self.manualCursor=cutoff;
+    self.spaceTranscriptBaseSnapshot=visible;
+    self.pendingSpaceUsesUntimed=NO;
+    self.manualCursor=boundary;
     self.spaceCommitPending=YES;
     [self.manualUntimedBuffer consume];
-    self.spaceDeadlineTimer=[NSTimer scheduledTimerWithTimeInterval:1.20 target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
-    if(self.manualSnapshotFinal) self.spaceSettleTimer=[NSTimer scheduledTimerWithTimeInterval:0.12 target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
+    [self.spaceDeadlineTimer invalidate];
+    self.spaceDeadlineTimer=[NSTimer scheduledTimerWithTimeInterval:SCSpaceCommitDeadline target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
+    if(self.manualSnapshotFinal) {
+      [self.spaceSettleTimer invalidate];
+      self.spaceSettleTimer=[NSTimer scheduledTimerWithTimeInterval:MAX(0.15,captureTail+0.08) target:self selector:@selector(finishSpaceCommit) userInfo:nil repeats:NO];
+    }
     self.manualLiveLabel.stringValue=@"E • Captured • finishing the last words…";
     self.autoLiveLabel.stringValue=@"V • Đã chốt • đang nhận nốt chữ cuối…";
     [self refreshManualTranscriptFinal:NO];
@@ -1573,11 +1611,21 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 - (void)finishSpaceCommit {
     if(!self.spaceCommitPending) return;
     [self.spaceSettleTimer invalidate]; [self.spaceDeadlineTimer invalidate];
-    NSString *q=[self correctCulinaryTerms:self.spaceTranscriptSnapshot ?: @""];
-    self.spaceCommitPending=NO; self.spaceTranscriptSnapshot=@"";
+    NSString *q=self.spaceTranscriptSnapshot ?: @"";
+    if(self.manualUsesUntimed) {
+      NSString *pending=[self.manualUntimedBuffer consume];
+      NSString *base=self.spaceTranscriptBaseSnapshot ?: @"";
+      NSString *revised=self.pendingSpaceUsesUntimed?pending:(pending.length?[NSString stringWithFormat:@"%@%@%@",base,base.length?@" ":@"",pending]:base);
+      NSUInteger oldWords=[q componentsSeparatedByString:@" "].count;
+      NSUInteger newWords=[revised componentsSeparatedByString:@" "].count;
+      if(revised.length && newWords+1>=oldWords) q=revised;
+    }
+    q=[self correctCulinaryTerms:q];
+    self.spaceCommitPending=NO; self.spaceTranscriptSnapshot=@""; self.spaceTranscriptBaseSnapshot=@"";
     if(q.length) [self appendParallelAnswersForQuestion:q];
     else { self.manualLiveLabel.stringValue=@"E • No speech was captured"; self.autoLiveLabel.stringValue=@"V • Chưa nhận được lời nói"; }
     [self.timeline pruneBefore:self.manualCursor];
+    if(self.manualUsesUntimed) [self refreshManualTranscriptFinal:NO];
 }
 - (BOOL)looksLikeQuestion:(NSString *)s {
     NSString *text=[s stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];

@@ -1,7 +1,10 @@
 const $ = id => document.getElementById(id);
 
 const AUTO_SEGMENT_MS = 2500;
-const SPACE_TAIL_MS = 80;
+const SPACE_TAIL_MIN_MS = 180;
+const SPACE_TAIL_QUIET_MS = 360;
+const SPACE_TAIL_MAX_MS = 850;
+const SPACE_TAIL_POLL_MS = 40;
 const SILENCE_MS = 900;
 const AUTO_TURN_GRACE_MS = 950;
 const AUTO_INTERVAL_GRACE_MS = 1350;
@@ -28,6 +31,7 @@ let segmentPeak = 0;
 let nextSegmentId = 0;
 let savedSegments = [];
 let manualCommitPending = false;
+let spaceTailTimer = null;
 let manualRecorder = null;
 let manualPeak = 0;
 let audioContext = null;
@@ -1023,6 +1027,24 @@ function requestSpaceCut(generation) {
   });
 }
 
+function shouldFinishSpaceTail(elapsed, quietFor) {
+  return (elapsed >= SPACE_TAIL_MIN_MS && quietFor >= SPACE_TAIL_QUIET_MS) || elapsed >= SPACE_TAIL_MAX_MS;
+}
+
+function waitForSpaceTail(generation, completion) {
+  const startedAt = performance.now();
+  const poll = () => {
+    spaceTailTimer = null;
+    if (!manualCommitPending || generation !== sessionId) return;
+    const now = performance.now();
+    const elapsed = now - startedAt;
+    const quietFor = Math.max(0, now - lastVoiceAt);
+    if (shouldFinishSpaceTail(elapsed, quietFor)) return completion();
+    spaceTailTimer = setTimeout(poll, Math.min(SPACE_TAIL_POLL_MS, Math.max(1, SPACE_TAIL_MAX_MS - elapsed)));
+  };
+  spaceTailTimer = setTimeout(poll, SPACE_TAIL_MIN_MS);
+}
+
 function trimAndDownsample(samples, inputRate, outputRate = 16000) {
   const threshold = 0.0018;
   let first = 0;
@@ -1192,6 +1214,7 @@ function stopListening() {
   if (autoFlushTimer) { clearTimeout(autoFlushTimer); autoFlushTimer = null; }
   starting = false;
   manualCommitPending = false;
+  if (spaceTailTimer) { clearTimeout(spaceTailTimer); spaceTailTimer = null; }
   recording = false;
   clearTimeout(segmentTimer);
   if (meterFrame) cancelAnimationFrame(meterFrame);
@@ -1227,7 +1250,7 @@ function commitManualQuestion() {
   setLaneLive('auto', 'V • Đã chốt • đang nhận nốt chữ cuối…');
   setLaneLive('manual', 'E • Captured • finishing the last words…');
   const generation = sessionId;
-  setTimeout(async () => {
+  waitForSpaceTail(generation, async () => {
     if (!manualCommitPending) return;
     if (spaceCaptureMode === 'pcm') {
       try {
@@ -1251,7 +1274,7 @@ function commitManualQuestion() {
       manualCommitPending = false;
       setStatus('SPACE recorder chưa sẵn sàng. Hãy thử lại.', true);
     }
-  }, SPACE_TAIL_MS);
+  });
 }
 
 function clearLane(kind) {
