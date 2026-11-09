@@ -24,7 +24,7 @@ function fn(source, name, async = false) {
   assert(!profilePolicy.needsPersonalAnswer('What is mise en place?', clean));
   const requests = [];
   const ctx = vm.createContext({profileReady: Promise.resolve(), presenterProfile: {name: 'Cook A', restaurant: 'Restaurant A', menu: 'Lemon tart'},
-    window: {SACookProfile: profilePolicy}, rankMatches: () => [{item: {question: 'Q', answer: 'GENERIC'}, score: 1}],
+    window: {SACookProfile: profilePolicy}, answerEvidence: () => ({matches: [{item: {question: 'Q', answer: 'GENERIC'}, score: 1}], snippets: []}),
     questionParts: q => [q], questionPartsAreLinked: () => false, needsConversationContext: () => false,
     requiresBehavioralSynthesis: () => false, isVietnameseQuestion: () => false, buildAnswerVariants: a => a, relevantStudySnippets: () => [],
     recentConversation: () => '', answerPolicy: 'English B2', api: async (_, body) => {requests.push(body); return 'personal answer';},

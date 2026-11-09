@@ -51,9 +51,10 @@ const profileReady = window.saCook.getProfile().then(value => { presenterProfile
 profileReady.catch(error => setStatus(error.message, true));
 
 const lanes = {
-  auto: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: '' },
-  manual: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: '' }
+  auto: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: '', renderedHistoryKey: null },
+  manual: { cursor: 0, queue: [], transcribing: false, pending: '', pendingPieces: 0, lastAnswered: '', records: [], live: '', renderedHistoryKey: null }
 };
+const answerEvidenceCache = new Map();
 
 class ApiError extends Error {
   constructor(message, status = 0, code = '') { super(message); this.status = status; this.code = code; }
@@ -249,6 +250,18 @@ function relevantStudySnippets(question, limit = 3) {
   }).filter(item => item.common >= Math.min(2, query.size)).sort((a, b) => b.score - a.score || b.common - a.common).slice(0, limit).map(item => item.chunk);
 }
 
+function answerEvidence(question, targetLanguage) {
+  const identity = normalize(question);
+  let cached = answerEvidenceCache.get(identity);
+  if (!cached) {
+    cached = { createdAt: Date.now(), matches: {}, snippets: relevantStudySnippets(question) };
+    answerEvidenceCache.set(identity, cached);
+    while (answerEvidenceCache.size > 20) answerEvidenceCache.delete(answerEvidenceCache.keys().next().value);
+  }
+  if (!cached.matches[targetLanguage]) cached.matches[targetLanguage] = rankMatches(question, targetLanguage);
+  return { matches: cached.matches[targetLanguage], snippets: cached.snippets };
+}
+
 function firstSpeakableSentences(answer, question = '', maximumWords = 45) {
   return window.SACookB1.simplifyAnswer(answer, question, maximumWords);
 }
@@ -264,11 +277,11 @@ function parseAnswerVariants(answer) {
   return { short: '', full: clean };
 }
 
-function formatAnswerVariants(shortAnswer, fullAnswer) {
+function formatAnswerVariants(shortAnswer, fullAnswer, targetLanguage = '') {
   const short = String(shortAnswer || '').trim();
   const full = String(fullAnswer || '').trim();
   if (!short && !full) return '';
-  const vietnamese = isVietnameseQuestion(`${short}\n${full}`);
+  const vietnamese = targetLanguage ? targetLanguage === 'vi' : isVietnameseQuestion(`${short}\n${full}`);
   const shortLabel = vietnamese ? 'Ngắn' : 'Short';
   const fullLabel = vietnamese ? 'Đầy đủ' : 'Full';
   const readyShort = short || full;
@@ -288,7 +301,7 @@ function buildAnswerVariants(answer, question = '', targetLanguage = '') {
   const vietnamese = targetLanguage ? targetLanguage === 'vi' : isVietnameseQuestion(question);
   const short = vietnamese ? trimWords(shortSource, 28) : simplifyAnswerOutput(shortSource, question, 28);
   const full = vietnamese ? trimWords(fullSource, 85) : simplifyAnswerOutput(fullSource, question, 85);
-  return formatAnswerVariants(short, full);
+  return formatAnswerVariants(short, full, targetLanguage);
 }
 
 function escapeHtml(value) {
@@ -403,7 +416,11 @@ async function answerQuestion(question, kind, forceAI = false) {
   const profile = window.SACookProfile.answerFacts(presenterProfile); // Exclude the raw document from answers.
   const respondInVietnamese = kind === 'auto'; // Left V lane; right/manual lane is E.
   const targetLanguage = respondInVietnamese ? 'vi' : 'en';
-  const matches = rankMatches(question, targetLanguage);
+  // V and E share the expensive document lookup for the same Space turn.
+  // Language-specific QA matches stay isolated, while handbook snippets are
+  // built once instead of blocking Electron's renderer twice.
+  const evidence = answerEvidence(question, targetLanguage);
+  const matches = evidence.matches;
   const best = matches[0];
   const parts = questionParts(question);
   const multipart = parts.length > 1;
@@ -411,7 +428,7 @@ async function answerQuestion(question, kind, forceAI = false) {
   if (!forceAI && !window.SACookProfile.needsPersonalAnswer(question, profile) && !multipart && !needsConversationContext(question) && !requiresBehavioralSynthesis(question) && best && (best.score === 1 || (best.score >= 0.76 && best.common >= 2 && best.recall >= 0.65))) return buildAnswerVariants(best.item.answer, question, targetLanguage);
 
   const qaReferences = matches.slice(0, 7).map(match => `Q: ${match.item.question}\nA: ${match.item.answer}`);
-  const textReferences = relevantStudySnippets(question).map(chunk => `${chunk.source}:\n${chunk.text}`);
+  const textReferences = evidence.snippets.map(chunk => `${chunk.source}:\n${chunk.text}`);
   const references = [...qaReferences, ...textReferences].join('\n---\n');
   const recent = recentConversation(kind);
   const instructions = linkedMultipart
@@ -480,7 +497,11 @@ function renderLane(kind) {
   answerNode.innerHTML = renderAnswerHtml(answerText, latest?.question || '');
   $(prefix + 'Live').textContent = lane.live;
   const previous = lane.records.slice(0, -1).reverse();
-  renderHistory($(prefix + 'History'), previous);
+  const historyKey = previous.map(record => `${record.question}\u0000${record.answer || ''}`).join('\u0001');
+  if (historyKey !== lane.renderedHistoryKey) {
+    renderHistory($(prefix + 'History'), previous);
+    lane.renderedHistoryKey = historyKey;
+  }
 }
 
 async function answerRecord(kind, record, forceAI = false) {
@@ -999,7 +1020,7 @@ function commitManualQuestion() {
 
 function clearLane(kind) {
   const lane = lanes[kind];
-  lane.records = []; lane.pending = ''; lane.pendingPieces = 0; lane.lastAnswered = '';
+  lane.records = []; lane.pending = ''; lane.pendingPieces = 0; lane.lastAnswered = ''; lane.renderedHistoryKey = null;
   lane.live = recording
     ? (kind === 'auto' ? 'V • Đang nghe đến khi bạn bấm Space…' : 'E • Listening until you press Space…')
     : (kind === 'auto' ? 'V • Đã dừng nghe.' : 'E • Listening stopped.');
@@ -1163,6 +1184,7 @@ window.saCook.loadResources().then(({ localQA, localQAVi, internetQA, hints, ans
   speechHints = hints.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   if (String(sharedPolicy || '').trim()) answerPolicy = String(sharedPolicy).replace(/\s+/g, ' ').trim();
   buildStudyChunks([['SA Cook Study', knowledge], ['SA Cook Handbook', handbook]]);
+  answerEvidenceCache.clear();
   setStatus(`Sẵn sàng • ${qa.length} câu hỏi • ${speechHints.length} thuật ngữ`);
 }).catch(error => setStatus(error.message || 'Không đọc được dữ liệu SA Cook.', true));
 

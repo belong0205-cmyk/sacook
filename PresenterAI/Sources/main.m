@@ -24,6 +24,8 @@ static const NSTimeInterval SCAutoTurnSettle = 0.95;
 // acoustic silence is not a reliable endpoint by itself. A detector-approved
 // question may close after remaining unchanged for this bounded interval.
 static const NSTimeInterval SCAutoStableEndpoint = 1.35;
+static NSString * const SCManualAnswerCacheKey = @"PresenterAI.answerCache.manual.v17";
+static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v17";
 
 @interface SCArrowTextView : NSTextView
 @end
@@ -103,6 +105,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 @property BOOL manualUsesUntimed;
 @property SCAnswerLane *manualAnswerLane;
 @property SCAnswerLane *autoAnswerLane;
+@property (strong) dispatch_queue_t answerPreparationQueue;
 @property NSTextView *autoTranscriptView;
 @property NSTextField *manualLiveLabel;
 @property NSTextField *autoLiveLabel;
@@ -135,6 +138,10 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 @property NSButton *autoHistoryButton;
 @property NSDictionary *manualHistoryRenderState;
 @property NSDictionary *autoHistoryRenderState;
+@property NSDictionary *manualConversationHistoryState;
+@property NSDictionary *autoConversationHistoryState;
+@property NSAttributedString *manualConversationHistory;
+@property NSAttributedString *autoConversationHistory;
 @property NSInteger backdropStrength;
 @property NSView *controlDock;
 @property NSArray<NSMenuItem *> *backdropMenuItems;
@@ -569,9 +576,10 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     }
     self.qaSearchEntries=search;self.exactQAMemory=exact;self.qaTermIndex=termIndex;
     [self ensureAnswerState];
-    // v15 drops shorter B1-era answers so both lanes use the richer B2 policy.
-    NSDictionary *savedManual=[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"PresenterAI.answerCache.manual.v16"];
-    NSDictionary *savedAuto=[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"PresenterAI.answerCache.auto.v16"];
+    // v17 keeps V and E cache entries isolated by their explicit target
+    // language and fixes the old read-v16/write-v15 mismatch.
+    NSDictionary *savedManual=[[NSUserDefaults standardUserDefaults] dictionaryForKey:SCManualAnswerCacheKey];
+    NSDictionary *savedAuto=[[NSUserDefaults standardUserDefaults] dictionaryForKey:SCAutoAnswerCacheKey];
     self.manualAnswerLane.cache=[savedManual mutableCopy] ?: [NSMutableDictionary dictionary];
     self.autoAnswerLane.cache=[savedAuto mutableCopy] ?: [NSMutableDictionary dictionary];
     // No unused embedding model is loaded on startup.
@@ -736,8 +744,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     self.smallerTextButton.enabled=size>20; self.largerTextButton.enabled=size<40;
     [self showCurrentQuestion:self.currentQuestion answer:self.currentAnswer.length?self.currentAnswer:@""];
     [self showAutoQuestion:self.autoQuestion answer:self.autoAnswer.length?self.autoAnswer:@""];
-    [self renderHistoryRecords:self.manualRecords inView:self.answerView];
-    [self renderHistoryRecords:self.autoRecords inView:self.autoHistoryView];
+    if(!self.manualHistoryScroll.hidden) [self renderHistoryRecords:self.manualRecords inView:self.answerView];
+    if(!self.autoHistoryScroll.hidden) [self renderHistoryRecords:self.autoRecords inView:self.autoHistoryView];
 }
 - (void)buildUI {
     self.readingFontSize=[[NSUserDefaults standardUserDefaults] doubleForKey:@"PresenterAI.readingFontSize.v2"];
@@ -1837,19 +1845,32 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     if(records.count>1) {
         CGFloat previousSize=MAX(15,answerSize*0.62);
         NSInteger first=MAX(0,(NSInteger)records.count-51);
-        BOOL appendedHistory=NO;
+        NSMutableArray *entries=[NSMutableArray array];
         for(NSInteger i=(NSInteger)records.count-2;i>=first;i--) {
             NSDictionary *record=records[(NSUInteger)i];
-            NSString *previousQuestion=[record[@"question"] isKindOfClass:NSString.class]?record[@"question"]:@"";
-            NSString *previousAnswer=[record[@"answer"] isKindOfClass:NSString.class]?record[@"answer"]:@"";
-            if(!previousQuestion.length || !previousAnswer.length) continue;
-            if(!appendedHistory) {
-                [display appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n\n" attributes:sectionAttributes]];
-                appendedHistory=YES;
-            }
-            [display appendAttributedString:[[NSAttributedString alloc] initWithString:[previousQuestion stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightSemibold],NSForegroundColorAttributeName:[accent colorWithAlphaComponent:0.92],NSParagraphStyleAttributeName:compactStyle,NSShadowAttributeName:textShadow}]];
-            [display appendAttributedString:[self answerText:[previousAnswer stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightRegular],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.94 alpha:1],NSParagraphStyleAttributeName:compactStyle,NSShadowAttributeName:textShadow} question:previousQuestion]];
+            [entries addObject:@{ @"question":[record[@"question"] copy] ?: @"", @"answer":[record[@"answer"] copy] ?: @"" }];
         }
+        NSDictionary *historyState=@{ @"entries":entries.copy, @"size":@(previousSize) };
+        NSDictionary *cachedState=automatic?self.autoConversationHistoryState:self.manualConversationHistoryState;
+        NSAttributedString *history=automatic?self.autoConversationHistory:self.manualConversationHistory;
+        if(!history || ![historyState isEqual:cachedState]) {
+            NSMutableAttributedString *fresh=[NSMutableAttributedString new];
+            BOOL appendedHistory=NO;
+            for(NSDictionary *entry in entries) {
+                NSString *previousQuestion=entry[@"question"],*previousAnswer=entry[@"answer"];
+                if(!previousQuestion.length || !previousAnswer.length) continue;
+                if(!appendedHistory) {
+                    [fresh appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n\n" attributes:sectionAttributes]];
+                    appendedHistory=YES;
+                }
+                [fresh appendAttributedString:[[NSAttributedString alloc] initWithString:[previousQuestion stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightSemibold],NSForegroundColorAttributeName:[accent colorWithAlphaComponent:0.92],NSParagraphStyleAttributeName:compactStyle,NSShadowAttributeName:textShadow}]];
+                [fresh appendAttributedString:[self answerText:[previousAnswer stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightRegular],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.94 alpha:1],NSParagraphStyleAttributeName:compactStyle,NSShadowAttributeName:textShadow} question:previousQuestion]];
+            }
+            history=fresh.copy;
+            if(automatic) { self.autoConversationHistoryState=historyState; self.autoConversationHistory=history; }
+            else { self.manualConversationHistoryState=historyState; self.manualConversationHistory=history; }
+        }
+        if(history.length) [display appendAttributedString:history];
     }
     if([view.textStorage isEqualToAttributedString:display]) return;
     NSString *questionPrefix=[NSString stringWithFormat:@"%@\n%@\n",automatic?@"V":@"E",q];
@@ -1887,6 +1908,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 - (void)ensureAnswerState {
     if(!self.manualRecords) self.manualRecords=[NSMutableArray array];
     if(!self.autoRecords) self.autoRecords=[NSMutableArray array];
+    if(!self.answerPreparationQueue)
+      self.answerPreparationQueue=dispatch_queue_create("local.codex.PresenterAI.answer-preparation",DISPATCH_QUEUE_SERIAL);
     __weak typeof(self) weak=self;
     if(!self.manualAnswerLane) {
       self.manualAnswerLane=[[SCAnswerLane alloc] initWithRequestBlock:^(NSString *question,SCAnswerCompletion completion) {
@@ -2204,8 +2227,11 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     return [self presenterReadyB1Answer:answer];
 }
 - (NSString *)conciseLocalAnswerFromResult:(NSString *)raw question:(NSString *)question {
+    return [self conciseLocalAnswerFromResult:raw question:question targetLanguage:nil];
+}
+- (NSString *)conciseLocalAnswerFromResult:(NSString *)raw question:(NSString *)question targetLanguage:(NSString *)targetLanguage {
     NSString *answer=[self answerTextFromLocalResult:raw] ?: @"";
-    return [self answerVariantsFromText:answer question:question];
+    return [self answerVariantsFromText:answer question:question targetLanguage:targetLanguage];
 }
 - (NSString *)textByLimitingToWords:(NSString *)text count:(NSUInteger)limit {
     NSString *clean=[[text ?: @"" stringByReplacingOccurrencesOfString:@"\\s+" withString:@" " options:NSRegularExpressionSearch range:NSMakeRange(0,(text ?: @"").length)] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
@@ -2233,6 +2259,9 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     return @{@"full":clean};
 }
 - (NSString *)answerVariantsFromText:(NSString *)text question:(NSString *)question {
+    return [self answerVariantsFromText:text question:question targetLanguage:nil];
+}
+- (NSString *)answerVariantsFromText:(NSString *)text question:(NSString *)question targetLanguage:(NSString *)targetLanguage {
     NSDictionary *parsed=[self parseAnswerVariants:text];
     NSString *fullSource=([parsed[@"full"] length]?parsed[@"full"]:([parsed[@"short"] length]?parsed[@"short"]:(text ?: @"")));
     NSString *shortSource=([parsed[@"short"] length]?parsed[@"short"]:fullSource);
@@ -2242,7 +2271,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     fullAnswer=[self answerByUsingFirstPersonWhenSafe:fullAnswer question:question];
     fullAnswer=[self textByLimitingToWords:fullAnswer count:85];
     if(!shortAnswer.length && !fullAnswer.length) return @"";
-    BOOL vietnamese=[self isVietnameseText:question] || [self isVietnameseText:fullAnswer];
+    BOOL vietnamese=targetLanguage.length?[targetLanguage isEqualToString:@"vi"]:([self isVietnameseText:question] || [self isVietnameseText:fullAnswer]);
     NSString *shortLabel=vietnamese?@"Ngắn":@"Short",*fullLabel=vietnamese?@"Đầy đủ":@"Full";
     NSString *readyShort=shortAnswer.length?shortAnswer:fullAnswer;
     NSString *readyFull=fullAnswer.length?fullAnswer:readyShort;
@@ -2315,7 +2344,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
       self.manualLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?@"E • Answered":[record[@"state"] isEqual:@"failed"]?@"E • AI error — retry":@"E • Preparing the English answer…";
       [self showCurrentQuestion:self.currentQuestion answer:self.currentAnswer];
     }
-    [self renderHistoryRecords:self.manualRecords inView:self.answerView];
+    if(!self.manualHistoryScroll.hidden) [self renderHistoryRecords:self.manualRecords inView:self.answerView];
 }
 - (void)refreshAutoAnswerPanel {
     NSDictionary *record=self.autoRecords.lastObject;
@@ -2325,7 +2354,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
       self.autoLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?(contextual?@"V • Đã trả lời theo ngữ cảnh":@"V • Đã trả lời"):[record[@"state"] isEqual:@"failed"]?@"V • Lỗi AI — bấm Thử lại":(contextual?@"V • Đang dùng ngữ cảnh câu trước…":@"V • Đang chuẩn bị câu trả lời tiếng Việt…");
       [self showAutoQuestion:self.autoQuestion answer:self.autoAnswer];
     }
-    [self renderHistoryRecords:self.autoRecords inView:self.autoHistoryView];
+    if(!self.autoHistoryScroll.hidden) [self renderHistoryRecords:self.autoRecords inView:self.autoHistoryView];
 }
 - (void)refreshAnswerPanels {
     [self refreshManualAnswerPanel]; [self refreshAutoAnswerPanel];
@@ -2359,8 +2388,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
     return profile.length?[[self normalisedQuestion:request ?: @""] stringByAppendingFormat:@"|profile:%@",profile]:[self normalisedQuestion:request ?: @""];
 }
 - (void)persistAnswerCache {
-    [[NSUserDefaults standardUserDefaults] setObject:self.manualAnswerLane.cache forKey:@"PresenterAI.answerCache.manual.v15"];
-    [[NSUserDefaults standardUserDefaults] setObject:self.autoAnswerLane.cache forKey:@"PresenterAI.answerCache.auto.v15"];
+    [[NSUserDefaults standardUserDefaults] setObject:self.manualAnswerLane.cache forKey:SCManualAnswerCacheKey];
+    [[NSUserDefaults standardUserDefaults] setObject:self.autoAnswerLane.cache forKey:SCAutoAnswerCacheKey];
 }
 - (void)retryManualAnswer:(id)sender {
     NSMutableDictionary *record=self.manualRecords.lastObject;
@@ -2439,18 +2468,29 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 - (void)performAnswerRequest:(NSString *)question completion:(void (^)(NSString *,BOOL))completion {
     // This method is reached only after the instant local retrieval path was
     // unable to produce a reliable answer (or synthesis/context was required).
-    NSDictionary *body=[self answerRequestBodyForQuestion:question includeWebSearch:NO];
-    NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api.openai.com/v1/responses"]];
-    request.HTTPMethod=@"POST"; request.timeoutInterval=25;
-    request.HTTPBody=[NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
-    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    [request setValue:[@"Bearer " stringByAppendingString:self.keyField.stringValue] forHTTPHeaderField:@"Authorization"];
-    [[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error) {
-      NSDictionary *parsed=[self parsedAnswerData:data status:[(NSHTTPURLResponse *)response statusCode] error:error];
-      BOOL success=[parsed[@"success"] boolValue];
-      NSString *answer=success?[self answerVariantsFromText:parsed[@"answer"] question:[self heardQuestionFromRequest:question]]:parsed[@"answer"];
-      dispatch_async(dispatch_get_main_queue(), ^{ completion(answer,success); });
-    }] resume];
+    // Ranking several thousand local entries and assembling reference context
+    // twice (V + E) used to run on AppKit's main thread and could show the
+    // spinning wait cursor after Space. Keep the UI thread free; the serial
+    // preparation queue also prevents both language lanes mutating lazy search
+    // state at the same time.
+    [self ensureAnswerState];
+    NSString *apiKey=self.keyField.stringValue.copy ?: @"";
+    NSString *requestQuestion=question.copy ?: @"";
+    dispatch_async(self.answerPreparationQueue, ^{
+      NSDictionary *body=[self answerRequestBodyForQuestion:requestQuestion includeWebSearch:NO];
+      NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://api.openai.com/v1/responses"]];
+      request.HTTPMethod=@"POST"; request.timeoutInterval=25;
+      request.HTTPBody=[NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
+      [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+      [request setValue:[@"Bearer " stringByAppendingString:apiKey] forHTTPHeaderField:@"Authorization"];
+      [[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error) {
+        NSDictionary *parsed=[self parsedAnswerData:data status:[(NSHTTPURLResponse *)response statusCode] error:error];
+        BOOL success=[parsed[@"success"] boolValue];
+        NSString *language=[self textBetween:@"<answer_language>" and:@"</answer_language>" inString:requestQuestion];
+        NSString *answer=success?[self answerVariantsFromText:parsed[@"answer"] question:[self heardQuestionFromRequest:requestQuestion] targetLanguage:language]:parsed[@"answer"];
+        dispatch_async(dispatch_get_main_queue(), ^{ completion(answer,success); });
+      }] resume];
+    });
 }
 - (void)appendParallelAnswersForQuestion:(NSString *)question {
     [self ensureAnswerState];
@@ -2469,7 +2509,7 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
       NSString *language=spec[@"language"],*lane=spec[@"lane"],*recent=spec[@"recent"];
       NSString *raw=(contextual || synthesis)?@"TRẢ LỜI EN: No reliable match was found in the SA Cook Study data.":[self bestLocalAnswerForQuestion:heard targetLanguage:language];
       BOOL weak=contextual || synthesis || [raw containsString:@"No reliable match"] || !self.qaEntries.count;
-      NSString *answer=[self conciseLocalAnswerFromResult:raw question:heard];
+      NSString *answer=[self conciseLocalAnswerFromResult:raw question:heard targetLanguage:language];
       NSString *loading=[language isEqualToString:@"vi"]?@"Đang chuẩn bị câu trả lời…":@"Preparing the answer…";
       NSMutableDictionary *record=[@{@"question":displayQuestion,@"answer":weak?loading:answer,@"state":weak?@"waiting":@"complete",@"lane":lane,@"targetLanguage":language} mutableCopy];
       if(weak) {

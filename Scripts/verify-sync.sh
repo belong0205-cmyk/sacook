@@ -40,7 +40,7 @@ if [[ "$MODE" == "--built" ]]; then
   cmp "$ROOT/Shared/answer-policy.txt" "$MAC_RESOURCES/answer-policy.txt"
   cmp "$ROOT/Shared/feature-manifest.json" "$MAC_RESOURCES/feature-manifest.json"
   cmp "$ROOT/Shared/ui-tokens.json" "$MAC_RESOURCES/ui-tokens.json"
-  for name in sa-cook-qa.json internet-qa.json speech-hints.txt sa-cook-knowledge.txt sa-cook-handbook.txt; do
+  for name in sa-cook-qa.json sa-cook-qa-vi.json internet-qa.json speech-hints.txt sa-cook-knowledge.txt sa-cook-handbook.txt; do
     test -f "$MAC_RESOURCES/$name"
     test -f "$WIN_RESOURCES/$name"
     cmp "$MAC_RESOURCES/$name" "$WIN_RESOURCES/$name"

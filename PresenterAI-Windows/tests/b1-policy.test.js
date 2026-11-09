@@ -141,5 +141,8 @@ assert.match(source, /submitQuestion\('auto', clean\)/, 'one Space transcript mu
 assert.match(source, /submitQuestion\('manual', clean\)/, 'one Space transcript must be submitted to E');
 assert.doesNotMatch(source, /form\.append\('languages\[\]'/, 'Space transcription must allow spoken Vietnamese or English');
 assert.match(source, /respondInVietnamese \? 320 : 240/, 'V and E must have complete-answer token budgets');
+assert.match(source, /targetLanguage \? targetLanguage === 'vi'/, 'V formatting must not depend on guessing the language of an English question');
+assert.match(source, /answerEvidenceCache/, 'V and E must share expensive reference retrieval for one Space turn');
+assert.match(source, /renderedHistoryKey/, 'answer state changes must not rebuild the complete history and freeze the renderer');
 
 console.log('Windows B2 answer policy tests passed.');
