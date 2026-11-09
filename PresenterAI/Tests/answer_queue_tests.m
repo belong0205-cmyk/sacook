@@ -286,12 +286,15 @@ int main(int argc,const char *argv[]) {
         Check([pairedBody[@"instructions"] containsString:@"never include Short:"],@"Structured fields are told not to repeat visible answer labels");
         NSDictionary *shortPaired=[parser pairedShortAnswerBodyFromBody:pairedBody];
         Equal(shortPaired[@"max_output_tokens"],@220,@"Short E/V is the first low-latency request");
-        Equal(shortPaired[@"model"],@"gpt-4.1-mini",@"Short uses the measured faster low-latency model");
-        Check(shortPaired[@"reasoning"]==nil,@"Short does not spend latency on hidden reasoning");
+        Equal(shortPaired[@"model"],@"gpt-6-luna",@"Short uses the measured fastest low-latency model");
+        Equal(shortPaired[@"reasoning"][@"effort"],@"none",@"Short does not spend latency on hidden reasoning");
+        Equal(shortPaired[@"service_tier"],@"fast",@"Short requests the OpenAI Fast service tier");
         Equal(shortPaired[@"text"][@"format"][@"name"],@"paired_bilingual_short_answer",@"The first request contains only the paired Short schema");
         Check(shortPaired[@"text"][@"format"][@"schema"][@"properties"][@"english_full"]==nil,@"The Short request does not wait for Full content");
         NSDictionary *fullPaired=[parser pairedFullAnswerBodyFromBody:pairedBody englishShort:@"Keep food separate." vietnameseShort:@"Giữ riêng thực phẩm."];
         Equal(fullPaired[@"max_output_tokens"],@360,@"Full is generated later with its own background budget");
+        Equal(fullPaired[@"model"],@"gpt-5.6-luna",@"Full keeps the quality-focused background model");
+        Check(fullPaired[@"service_tier"]==nil,@"Only the urgent Short answer pays for Fast mode");
         Equal(fullPaired[@"text"][@"format"][@"name"],@"paired_bilingual_full_answer",@"The second request contains only the paired Full schema");
         Check([fullPaired[@"input"] containsString:@"APPROVED SHORT ANSWERS"],@"Full must expand the Short answer already shown to the user");
         NSDictionary *expandedPaired=[parser expandedPairedRetryBodyForBody:pairedBody responseJSON:@{@"status":@"incomplete"}];

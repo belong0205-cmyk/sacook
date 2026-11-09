@@ -62,10 +62,13 @@ function fn(source, name, async = false) {
   assert.strictEqual(partials.length, 1, 'The bilingual Short answer is published before Full');
   assert.strictEqual(requests[1].text.format.name, 'paired_bilingual_short_answer');
   assert.strictEqual(requests[1].max_output_tokens, 220);
-  assert.strictEqual(requests[1].model, 'gpt-4.1-mini');
-  assert.strictEqual(requests[1].reasoning, undefined);
+  assert.strictEqual(requests[1].model, 'gpt-6-luna');
+  assert.strictEqual(requests[1].reasoning.effort, 'none');
+  assert.strictEqual(requests[1].service_tier, 'fast');
   assert.strictEqual(requests[2].text.format.name, 'paired_bilingual_full_answer');
   assert.strictEqual(requests[2].max_output_tokens, 360);
+  assert.strictEqual(requests[2].model, 'gpt-5.6-luna');
+  assert.strictEqual(requests[2].service_tier, undefined);
   assert(requests[2].input.includes('APPROVED SHORT ANSWERS'));
   assert(finalPaired.includes('Full EN'), 'The terminal result adds Full after Short');
   let failureCall=0;

@@ -600,7 +600,7 @@ function buildShortAnswerDisplay(value, question, targetLanguage) {
 
 function pairedShortAnswerBody(base) {
   return {...base,
-    model: 'gpt-4.1-mini', reasoning: undefined,
+    model: 'gpt-6-luna', reasoning: {effort: 'none'}, service_tier: 'fast',
     instructions: `${base.instructions || ''} Return the bilingual Short answer now. Do not generate either Full answer in this response. Field values contain content only and never include visible labels.`,
     max_output_tokens: 220,
     text: {format: {type: 'json_schema', name: 'paired_bilingual_short_answer', strict: true, schema: {
@@ -643,11 +643,12 @@ async function requestAnswerBody(body) {
   try { result = await api('responses', request); }
   catch (error) {
     const paired = /^paired_bilingual_/.test(request?.text?.format?.name || '');
-    if (!paired || request?.model !== 'gpt-5.6-luna' || ![400, 403, 404].includes(error?.status)) throw error;
+    if (!paired || !['gpt-5.6-luna', 'gpt-6-luna'].includes(request?.model) || ![400, 403, 404].includes(error?.status)) throw error;
     const name = request.text.format.name;
     const fallbackLimit = name === 'paired_bilingual_short_answer' ? 320 : name === 'paired_bilingual_full_answer' ? 560 : 640;
     request = {...request, model: 'gpt-4.1-mini', max_output_tokens: fallbackLimit};
     delete request.reasoning;
+    delete request.service_tier;
     result = await api('responses', request);
   }
   const expanded = pairedRetryBody(request, result);

@@ -2616,8 +2616,9 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 }
 - (NSDictionary *)pairedShortAnswerBodyFromBody:(NSDictionary *)base {
     NSMutableDictionary *body=[base mutableCopy];
-    body[@"model"]=@"gpt-4.1-mini";
-    [body removeObjectForKey:@"reasoning"];
+    body[@"model"]=@"gpt-6-luna";
+    body[@"reasoning"]=@{@"effort":@"none"};
+    body[@"service_tier"]=@"fast";
     body[@"instructions"]=[(body[@"instructions"] ?: @"") stringByAppendingString:@" Return the bilingual Short answer now. Do not generate either Full answer in this response. Field values contain content only and never include visible labels."];
     body[@"max_output_tokens"]=@220;
     body[@"text"]=@{@"format":@{
@@ -2673,7 +2674,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     [request setValue:[@"Bearer " stringByAppendingString:apiKey ?: @""] forHTTPHeaderField:@"Authorization"];
     [[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error) {
       NSInteger status=[(NSHTTPURLResponse *)response statusCode];
-      BOOL fastModel=[body[@"model"] isEqualToString:@"gpt-5.6-luna"];
+      BOOL fastModel=[body[@"model"] isEqualToString:@"gpt-5.6-luna"] || [body[@"model"] isEqualToString:@"gpt-6-luna"];
       NSDictionary *json=data?[NSJSONSerialization JSONObjectWithData:data options:0 error:nil]:nil;
       NSDictionary *expanded=allowFallback && !error && status>=200 && status<300 && [json isKindOfClass:NSDictionary.class]?[self expandedPairedRetryBodyForBody:body responseJSON:json]:nil;
       if(expanded) {
@@ -2682,7 +2683,9 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       }
       if(allowFallback && fastModel && !error && (status==400 || status==403 || status==404)) {
         NSMutableDictionary *fallback=[body mutableCopy];
-        fallback[@"model"]=@"gpt-4.1-mini"; fallback[@"max_output_tokens"]=@640; [fallback removeObjectForKey:@"reasoning"];
+        fallback[@"model"]=@"gpt-4.1-mini"; fallback[@"max_output_tokens"]=@640;
+        [fallback removeObjectForKey:@"reasoning"];
+        [fallback removeObjectForKey:@"service_tier"];
         [self sendAnswerBody:fallback apiKey:apiKey allowModelFallback:NO completion:completion];
         return;
       }

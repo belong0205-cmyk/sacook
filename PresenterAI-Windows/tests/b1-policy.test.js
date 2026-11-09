@@ -143,6 +143,7 @@ assert.match(source, /packPairedBilingualAnswer/, 'V must be the Vietnamese tran
 assert.match(source, /The Vietnamese side must be a translation of the English side, not a separate answer/, 'the paired request must forbid an independent V answer');
 assert.match(source, /body\.model = 'gpt-5\.6-luna'/, 'paired E/V must use the current low-latency model');
 assert.match(source, /body\.reasoning = \{ effort: 'none' \}/, 'paired E/V must disable reasoning latency');
+assert.match(source, /model: 'gpt-6-luna', reasoning: \{effort: 'none'\}, service_tier: 'fast'/, 'Short must use GPT-6 Luna Fast without hidden reasoning');
 assert.match(source, /paired_bilingual_short_answer/, 'paired E/V must publish Short through its own low-latency request');
 assert.match(source, /Short ready — preparing Full/, 'the interface must show that Short is usable while Full continues');
 assert.match(source, /record\.requestId !== requestId/, 'a late Short or Full result cannot overwrite a retried record');
