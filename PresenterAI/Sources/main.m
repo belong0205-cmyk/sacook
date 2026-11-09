@@ -24,8 +24,8 @@ static const NSTimeInterval SCAutoTurnSettle = 0.95;
 // acoustic silence is not a reliable endpoint by itself. A detector-approved
 // question may close after remaining unchanged for this bounded interval.
 static const NSTimeInterval SCAutoStableEndpoint = 1.35;
-static NSString * const SCManualAnswerCacheKey = @"PresenterAI.answerCache.manual.v17";
-static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v17";
+static NSString * const SCManualAnswerCacheKey = @"PresenterAI.answerCache.manual.v18";
+static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v18";
 
 @interface SCArrowTextView : NSTextView
 @end
@@ -94,6 +94,7 @@ static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v1
 @property NSArray<NSDictionary *> *qaSearchEntries;
 @property NSDictionary<NSString *,NSDictionary *> *exactQAMemory;
 @property NSDictionary<NSString *,NSArray<NSDictionary *> *> *qaTermIndex;
+@property NSDictionary<NSString *,NSString *> *vietnameseQuestionTranslations;
 @property NSArray<NSString *> *speechHints;
 @property NSSet<NSString *> *speechLexicon;
 @property NSMutableDictionary<NSString *,NSString *> *answerCache;
@@ -559,7 +560,31 @@ static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v1
     NSData *qaData=qaPath?[NSData dataWithContentsOfFile:qaPath]:nil;id englishQA=qaData?[NSJSONSerialization JSONObjectWithData:qaData options:0 error:nil]:nil;
     NSMutableArray *qa=[NSMutableArray array];
     if([englishQA isKindOfClass:NSArray.class]) for(NSDictionary *entry in englishQA) { NSMutableDictionary *copy=[entry mutableCopy];copy[@"targetLanguage"]=@"en";[qa addObject:copy]; }
-    NSString *viPath=[self knowledgeResourcePath:@"sa-cook-qa-vi" extension:@"json"];NSData *viData=viPath?[NSData dataWithContentsOfFile:viPath]:nil;id viQA=viData?[NSJSONSerialization JSONObjectWithData:viData options:0 error:nil]:nil;if([viQA isKindOfClass:NSArray.class])[qa addObjectsFromArray:viQA];
+    NSString *viPath=[self knowledgeResourcePath:@"sa-cook-qa-vi" extension:@"json"];
+    NSData *viData=viPath?[NSData dataWithContentsOfFile:viPath]:nil;
+    id viJSON=viData?[NSJSONSerialization JSONObjectWithData:viData options:0 error:nil]:nil;
+    NSArray<NSDictionary *> *viQA=[viJSON isKindOfClass:NSArray.class]?viJSON:@[];
+    [qa addObjectsFromArray:viQA];
+    // The sidecar stores an English question/Vietnamese answer row beside its
+    // Vietnamese-question twin. Build a direct display translation index so V
+    // can translate the question instantly without another API request.
+    NSMutableSet<NSString *> *knownVietnameseQuestions=[NSMutableSet set];
+    for(NSDictionary *entry in viQA) if([entry[@"targetLanguage"] isEqualToString:@"en"] && [entry[@"question"] length])
+      [knownVietnameseQuestions addObject:[self normalisedQuestion:entry[@"question"]]];
+    NSMutableDictionary<NSString *,NSString *> *viQuestionByAnswer=[NSMutableDictionary dictionary];
+    for(NSDictionary *entry in viQA) {
+      NSString *question=entry[@"question"],*answer=entry[@"answer"],*language=entry[@"targetLanguage"];
+      if([language isEqualToString:@"vi"] && question.length && answer.length && [knownVietnameseQuestions containsObject:[self normalisedQuestion:question]] && !viQuestionByAnswer[answer])
+        viQuestionByAnswer[answer]=question;
+    }
+    NSMutableDictionary<NSString *,NSString *> *translations=[NSMutableDictionary dictionary];
+    for(NSDictionary *entry in viQA) {
+      NSString *question=entry[@"question"],*answer=entry[@"answer"],*language=entry[@"targetLanguage"];
+      NSString *translated=viQuestionByAnswer[answer];
+      if([language isEqualToString:@"vi"] && question.length && translated.length && ![knownVietnameseQuestions containsObject:[self normalisedQuestion:question]])
+        translations[[self normalisedQuestion:question]]=translated;
+    }
+    self.vietnameseQuestionTranslations=translations.copy;
     NSString *internetPath=[self knowledgeResourcePath:@"internet-qa" extension:@"json"];NSData *internetData=internetPath?[NSData dataWithContentsOfFile:internetPath]:nil;id internetQA=internetData?[NSJSONSerialization JSONObjectWithData:internetData options:0 error:nil]:nil;if([internetQA isKindOfClass:NSArray.class])for(NSDictionary *entry in internetQA){NSMutableDictionary *copy=[entry mutableCopy];copy[@"targetLanguage"]=@"en";[qa addObject:copy];}
     NSString *hintsPath=[self knowledgeResourcePath:@"speech-hints" extension:@"txt"];NSString *hints=hintsPath?[NSString stringWithContentsOfFile:hintsPath encoding:NSUTF8StringEncoding error:nil]:nil;if(hints.length){NSMutableArray *items=[NSMutableArray array];for(NSString *line in [hints componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]){NSString *item=[line stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];if(item.length)[items addObject:item];}self.speechHints=items;self.speechLexicon=nil;}
     [qa addObject:@{@"question":@"List three ways people may define their cultural identity.",@"answer":@"People may define their cultural identity through their ethnicity or nationality, their language and traditions, and their religion or beliefs.",@"targetLanguage":@"en"}];
@@ -576,8 +601,8 @@ static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v1
     }
     self.qaSearchEntries=search;self.exactQAMemory=exact;self.qaTermIndex=termIndex;
     [self ensureAnswerState];
-    // v17 keeps V and E cache entries isolated by their explicit target
-    // language and fixes the old read-v16/write-v15 mismatch.
+    // v18 stores V answers together with their translated display question;
+    // it also keeps V/E isolated and preserves the fixed read/write key.
     NSDictionary *savedManual=[[NSUserDefaults standardUserDefaults] dictionaryForKey:SCManualAnswerCacheKey];
     NSDictionary *savedAuto=[[NSUserDefaults standardUserDefaults] dictionaryForKey:SCAutoAnswerCacheKey];
     self.manualAnswerLane.cache=[savedManual mutableCopy] ?: [NSMutableDictionary dictionary];
@@ -1684,6 +1709,19 @@ static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v1
     }
     return [lines componentsJoinedByString:@"\n"];
 }
+- (NSString *)vietnameseQuestionForHeardQuestion:(NSString *)heard matchedQuestion:(NSString *)matched fallback:(NSString *)fallback {
+    NSString *display=fallback.length?fallback:[self displayQuestionForHeardQuestion:heard];
+    NSMutableArray<NSString *> *translatedLines=[NSMutableArray array];
+    for(NSString *line in [display componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
+      NSString *translated=self.vietnameseQuestionTranslations[[self normalisedQuestion:line]];
+      if(!translated.length) { [translatedLines removeAllObjects]; break; }
+      [translatedLines addObject:translated];
+    }
+    if(translatedLines.count) return [translatedLines componentsJoinedByString:@"\n"];
+    if([self isVietnameseText:display]) return display;
+    NSString *matchedTranslation=self.vietnameseQuestionTranslations[[self normalisedQuestion:matched ?: @""]];
+    return matchedTranslation.length?matchedTranslation:display;
+}
 - (NSString *)primaryQuestionFromText:(NSString *)text {
     return [[self correctCulinaryTerms:text ?: @""] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
 }
@@ -2258,6 +2296,29 @@ static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v1
     }
     return @{@"full":clean};
 }
+- (NSString *)translatedVietnameseQuestionFromAIText:(NSString *)text {
+    NSRegularExpression *regex=[NSRegularExpression regularExpressionWithPattern:@"(?im)^\\s*Câu hỏi\\s*:\\s*([^\\r\\n]+)" options:0 error:nil];
+    NSTextCheckingResult *match=[regex firstMatchInString:text ?: @"" options:0 range:NSMakeRange(0,(text ?: @"").length)];
+    if(!match || match.numberOfRanges<2) return @"";
+    return [[text substringWithRange:[match rangeAtIndex:1]] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+}
+- (NSString *)answerTextByRemovingVietnameseQuestionLine:(NSString *)text {
+    NSString *source=text ?: @"";
+    NSRegularExpression *regex=[NSRegularExpression regularExpressionWithPattern:@"(?im)^\\s*Câu hỏi\\s*:[^\\r\\n]*(?:\\r?\\n)*" options:0 error:nil];
+    return [[regex stringByReplacingMatchesInString:source options:0 range:NSMakeRange(0,source.length) withTemplate:@""] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+}
+- (NSString *)answerByEmbeddingTranslatedQuestion:(NSString *)question answer:(NSString *)answer {
+    if(!question.length) return answer ?: @"";
+    return [NSString stringWithFormat:@"<translated_question>%@</translated_question>\n%@",question,answer ?: @""];
+}
+- (NSString *)visibleAnswerFromEmbeddedTranslation:(NSString *)answer translatedQuestion:(NSString **)translatedQuestion {
+    NSString *source=answer ?: @"";
+    NSString *translated=[self textBetween:@"<translated_question>" and:@"</translated_question>" inString:source] ?: @"";
+    if(translatedQuestion) *translatedQuestion=translated;
+    NSRange end=[source rangeOfString:@"</translated_question>"];
+    if(end.location==NSNotFound) return source;
+    return [[source substringFromIndex:NSMaxRange(end)] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+}
 - (NSString *)answerVariantsFromText:(NSString *)text question:(NSString *)question {
     return [self answerVariantsFromText:text question:question targetLanguage:nil];
 }
@@ -2347,8 +2408,12 @@ static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v1
     if(!self.manualHistoryScroll.hidden) [self renderHistoryRecords:self.manualRecords inView:self.answerView];
 }
 - (void)refreshAutoAnswerPanel {
-    NSDictionary *record=self.autoRecords.lastObject;
+    NSMutableDictionary *record=self.autoRecords.lastObject;
     if(record) {
+      NSString *translatedQuestion=@"";
+      NSString *visibleAnswer=[self visibleAnswerFromEmbeddedTranslation:record[@"answer"] translatedQuestion:&translatedQuestion];
+      if(translatedQuestion.length) record[@"question"]=[self displayQuestionForHeardQuestion:translatedQuestion];
+      if(![visibleAnswer isEqualToString:record[@"answer"] ?: @""]) record[@"answer"]=visibleAnswer;
       self.autoQuestion=record[@"question"]; self.autoAnswer=record[@"answer"];
       BOOL contextual=[record[@"usedContext"] boolValue];
       self.autoLiveLabel.stringValue=[record[@"state"] isEqual:@"complete"]?(contextual?@"V • Đã trả lời theo ngữ cảnh":@"V • Đã trả lời"):[record[@"state"] isEqual:@"failed"]?@"V • Lỗi AI — bấm Thử lại":(contextual?@"V • Đang dùng ngữ cảnh câu trước…":@"V • Đang chuẩn bị câu trả lời tiếng Việt…");
@@ -2440,7 +2505,7 @@ static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v1
       : (linkedMultipart?@"Help with cook interview practice and presentation questions. Answer in English. The HEARD TURN contains linked, repeated, or clarifying question fragments from one speaking turn. Infer the single underlying request from all lines and RECENT CONVERSATION, then give ONE direct answer without numbering. Later fragments may clarify the subject instead of creating a new question.":@"Help with cook interview practice and presentation questions. Answer in English. The HEARD TURN contains multiple independent questions, one per line. Answer EVERY line in the same order, clearly numbered 1 and 2 (and onward). Do not merge, omit, or replace any subject.");
     NSMutableString *instructions=[NSMutableString stringWithString:multipart?multipartInstructions:(vietnamese?@"Bạn hỗ trợ luyện phỏng vấn và thuyết trình nghề bếp. Chỉ trả lời bằng tiếng Việt. Câu hỏi vừa nghe là nội dung chính; không được đổi chủ đề theo một câu tham khảo gần giống.":@"Help with cook interview practice and presentation questions. Answer in English. The HEARD QUESTION is authoritative; a similar reference question must not replace its subject.")];
     [instructions appendString:vietnamese
-      ? @" Chỉ trả lời bằng tiếng Việt và trả về đúng hai phần có nhãn Ngắn: và Đầy đủ:. Ngắn là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ. Đầy đủ chứa các ý hữu ích hơn, thường không quá 85 từ. Chỉ viết lời người thuyết trình có thể nói. Dùng ngôi thứ nhất cho hành động, lựa chọn, kinh nghiệm và quan điểm; nêu định nghĩa trực tiếp. Ưu tiên dữ liệu học cục bộ, sau đó dùng kiến thức nghề bếp và nơi làm việc đáng tin cậy. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh cho phép. Không bịa chi tiết và không nhắc đến nguồn hoặc AI."
+      ? @" Chỉ trả lời bằng tiếng Việt. Dòng đầu tiên phải có dạng Câu hỏi: theo sau là bản dịch tiếng Việt ngắn gọn, chính xác của câu hỏi đã nghe. Sau đó trả về đúng hai phần có nhãn Ngắn: và Đầy đủ:. Ngắn là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ. Đầy đủ chứa các ý hữu ích hơn, thường không quá 85 từ. Chỉ viết lời người thuyết trình có thể nói. Dùng ngôi thứ nhất cho hành động, lựa chọn, kinh nghiệm và quan điểm; nêu định nghĩa trực tiếp. Ưu tiên dữ liệu học cục bộ, sau đó dùng kiến thức nghề bếp và nơi làm việc đáng tin cậy. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh cho phép. Không bịa chi tiết và không nhắc đến nguồn hoặc AI."
       : @" Return exactly two labelled sections: Short: and Full:. Short must be one direct answer the presenter can say immediately, normally under 28 words. Full must be a fuller answer with the useful details, normally under 85 words. Return only the words the presenter can say aloud after each label. Write actions, experience, choices, and opinions in the presenter's first person using I/my or we/our; state factual definitions directly. Never say 'you can say', 'I suggest', 'the answer is', 'according to the references', or explain how to answer. Use the provided local study references first. If they are insufficient, answer from reliable general culinary and workplace knowledge. Use web search only for a missing, niche, uncertain, or current fact. Never say that the references do not provide information when the question can be answered reliably. Correct or briefly clarify an obvious speech-recognition error when context makes the intended term clear. Do not invent uncertain details. No source labels in the answer text."];
     [instructions replaceOccurrencesOfString:@"Use one short sentence per numbered answer, with no more than 30 words per answer." withString:@"Use up to three concise sentences per numbered answer, with no more than 45 words per answer. Use clear, natural B2 vocabulary and enough relevant detail to make the answer complete." options:0 range:NSMakeRange(0,instructions.length)];
     [instructions replaceOccurrencesOfString:@"Give the direct answer in 1–2 short sentences and no more than 30 words." withString:@"Give the direct answer in two or three concise sentences and no more than 45 words. Use clear, natural B2 vocabulary and enough relevant detail to make the answer complete." options:0 range:NSMakeRange(0,instructions.length)];
@@ -2487,7 +2552,11 @@ static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v1
         NSDictionary *parsed=[self parsedAnswerData:data status:[(NSHTTPURLResponse *)response statusCode] error:error];
         BOOL success=[parsed[@"success"] boolValue];
         NSString *language=[self textBetween:@"<answer_language>" and:@"</answer_language>" inString:requestQuestion];
-        NSString *answer=success?[self answerVariantsFromText:parsed[@"answer"] question:[self heardQuestionFromRequest:requestQuestion] targetLanguage:language]:parsed[@"answer"];
+        NSString *rawAnswer=parsed[@"answer"] ?: @"";
+        NSString *translated=[language isEqualToString:@"vi"]?[self translatedVietnameseQuestionFromAIText:rawAnswer]:@"";
+        if(translated.length) rawAnswer=[self answerTextByRemovingVietnameseQuestionLine:rawAnswer];
+        NSString *answer=success?[self answerVariantsFromText:rawAnswer question:[self heardQuestionFromRequest:requestQuestion] targetLanguage:language]:rawAnswer;
+        if(success && translated.length) answer=[self answerByEmbeddingTranslatedQuestion:translated answer:answer];
         dispatch_async(dispatch_get_main_queue(), ^{ completion(answer,success); });
       }] resume];
     });
@@ -2507,17 +2576,22 @@ static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v1
     NSMutableArray<NSMutableDictionary *> *waiting=[NSMutableArray array];
     for(NSDictionary *spec in lanes) {
       NSString *language=spec[@"language"],*lane=spec[@"lane"],*recent=spec[@"recent"];
-      NSString *raw=(contextual || synthesis)?@"TRẢ LỜI EN: No reliable match was found in the SA Cook Study data.":[self bestLocalAnswerForQuestion:heard targetLanguage:language];
+      NSString *raw=nil,*matched=nil;
+      if(contextual || synthesis) raw=@"TRẢ LỜI EN: No reliable match was found in the SA Cook Study data.";
+      else { raw=[self bestLocalAnswerForQuestion:heard targetLanguage:language]; matched=self.lastMatchedQuestion.copy; }
       BOOL weak=contextual || synthesis || [raw containsString:@"No reliable match"] || !self.qaEntries.count;
       NSString *answer=[self conciseLocalAnswerFromResult:raw question:heard targetLanguage:language];
       NSString *loading=[language isEqualToString:@"vi"]?@"Đang chuẩn bị câu trả lời…":@"Preparing the answer…";
-      NSMutableDictionary *record=[@{@"question":displayQuestion,@"answer":weak?loading:answer,@"state":weak?@"waiting":@"complete",@"lane":lane,@"targetLanguage":language} mutableCopy];
+      NSString *laneQuestion=[language isEqualToString:@"vi"]?[self vietnameseQuestionForHeardQuestion:heard matchedQuestion:matched fallback:displayQuestion]:displayQuestion;
+      NSMutableDictionary *record=[@{@"question":laneQuestion,@"answer":weak?loading:answer,@"state":weak?@"waiting":@"complete",@"lane":lane,@"targetLanguage":language} mutableCopy];
       if(weak) {
         NSString *request=recent.length?[self contextualRequestForQuestion:heard recentQuestions:recent]:heard;
         record[@"requestQuestion"]=[request stringByAppendingFormat:@"\n<answer_language>%@</answer_language>",language];
         if(recent.length) record[@"usedContext"]=@YES;
         [waiting addObject:record];
-      } else if(![displayQuestion isEqualToString:heard]) record[@"requestQuestion"]=heard;
+      } else {
+        record[@"requestQuestion"]=[heard stringByAppendingFormat:@"\n<answer_language>%@</answer_language>",language];
+      }
       [(NSMutableArray *)spec[@"records"] addObject:record];
     }
     [self refreshAnswerPanels];

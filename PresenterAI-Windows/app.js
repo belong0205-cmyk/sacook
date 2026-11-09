@@ -10,6 +10,7 @@ const MAX_SPACE_SECONDS = 90;
 const stopWords = new Set('what when where which would could should please your you about tell have with that this from they them think important does into are the and for um uh ah yeah okay gì nào sao khi đâu ai hãy vui lòng của bạn về cho có với này đó từ họ nghĩ quan trọng là và hoặc một những các được'.split(' '));
 
 let qa = [];
+let vietnameseQuestionTranslations = new Map();
 let speechHints = [];
 let answerPolicy = window.SACookB1.DEFAULT_POLICY;
 let studyChunks = [];
@@ -250,6 +251,47 @@ function relevantStudySnippets(question, limit = 3) {
   }).filter(item => item.common >= Math.min(2, query.size)).sort((a, b) => b.score - a.score || b.common - a.common).slice(0, limit).map(item => item.chunk);
 }
 
+function buildVietnameseQuestionTranslations(entries) {
+  const knownVietnameseQuestions = new Set((entries || []).filter(entry => (entry.targetLanguage || '') === 'en').map(entry => normalize(entry.question)));
+  const byAnswer = new Map();
+  for (const entry of entries || []) {
+    if ((entry.targetLanguage || '') === 'vi' && knownVietnameseQuestions.has(normalize(entry.question)) && entry.answer && !byAnswer.has(entry.answer)) byAnswer.set(entry.answer, entry.question);
+  }
+  const translations = new Map();
+  for (const entry of entries || []) {
+    const translated = byAnswer.get(entry.answer);
+    if ((entry.targetLanguage || '') === 'vi' && !knownVietnameseQuestions.has(normalize(entry.question)) && translated) translations.set(normalize(entry.question), translated);
+  }
+  vietnameseQuestionTranslations = translations;
+}
+
+function vietnameseQuestionForDisplay(question, matchedQuestion = '') {
+  const clean = cleanSpeech(question);
+  const direct = vietnameseQuestionTranslations.get(normalize(clean));
+  if (direct) return direct;
+  if (isVietnameseQuestion(clean)) return clean;
+  return vietnameseQuestionTranslations.get(normalize(matchedQuestion)) || clean;
+}
+
+function extractVietnameseQuestionFromAnswer(answer) {
+  const source = String(answer || '');
+  const match = source.match(/^\s*Câu hỏi\s*:\s*([^\r\n]+)/im);
+  return {
+    question: match?.[1]?.trim() || '',
+    answer: source.replace(/^\s*Câu hỏi\s*:[^\r\n]*(?:\r?\n)*/im, '').trim()
+  };
+}
+
+function packTranslatedAnswer(answer, translatedQuestion = '') {
+  return translatedQuestion ? `<translated_question>${translatedQuestion}</translated_question>\n${answer}` : answer;
+}
+
+function unpackTranslatedAnswer(answer) {
+  const source = String(answer || '');
+  const match = source.match(/^<translated_question>([^\r\n]+)<\/translated_question>\s*/);
+  return { question: match?.[1]?.trim() || '', answer: match ? source.slice(match[0].length).trim() : source };
+}
+
 function answerEvidence(question, targetLanguage) {
   const identity = normalize(question);
   let cached = answerEvidenceCache.get(identity);
@@ -425,7 +467,10 @@ async function answerQuestion(question, kind, forceAI = false) {
   const parts = questionParts(question);
   const multipart = parts.length > 1;
   const linkedMultipart = multipart && questionPartsAreLinked(parts);
-  if (!forceAI && !window.SACookProfile.needsPersonalAnswer(question, profile) && !multipart && !needsConversationContext(question) && !requiresBehavioralSynthesis(question) && best && (best.score === 1 || (best.score >= 0.76 && best.common >= 2 && best.recall >= 0.65))) return buildAnswerVariants(best.item.answer, question, targetLanguage);
+  if (!forceAI && !window.SACookProfile.needsPersonalAnswer(question, profile) && !multipart && !needsConversationContext(question) && !requiresBehavioralSynthesis(question) && best && (best.score === 1 || (best.score >= 0.76 && best.common >= 2 && best.recall >= 0.65))) {
+    const localAnswer = buildAnswerVariants(best.item.answer, question, targetLanguage);
+    return respondInVietnamese ? packTranslatedAnswer(localAnswer, vietnameseQuestionForDisplay(question, best.item.question)) : localAnswer;
+  }
 
   const qaReferences = matches.slice(0, 7).map(match => `Q: ${match.item.question}\nA: ${match.item.answer}`);
   const textReferences = evidence.snippets.map(chunk => `${chunk.source}:\n${chunk.text}`);
@@ -445,7 +490,7 @@ async function answerQuestion(question, kind, forceAI = false) {
     model: 'gpt-4.1-mini', store: false,
     max_output_tokens: linkedMultipart ? (respondInVietnamese ? 300 : 220) : Math.min(640, parts.length * (respondInVietnamese ? 320 : 240)),
     instructions: respondInVietnamese
-      ? `Bạn giúp người thuyết trình trả lời phỏng vấn đánh giá kỹ năng nghề Cook/Chef. Chỉ trả lời bằng tiếng Việt. ${vietnameseInstructions} Trả về đúng hai phần có nhãn: "Ngắn:" là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ; "Đầy đủ:" là câu trả lời đủ ý hơn, thường không quá 85 từ. Dùng tiếng Việt tự nhiên, dễ nói. Với câu hỏi hành vi, phần Đầy đủ nêu ngắn gọn tình huống, hành động và kết quả. Dữ liệu tham khảo không chứng minh người dùng từng trải qua sự việc; nếu hồ sơ không có ví dụ thật, hãy dùng “tôi sẽ” và không bịa kinh nghiệm. Với câu hỏi kỹ thuật, giải thích trực tiếp và chỉ nêu đánh đổi khi cần. Nếu câu hỏi mơ hồ, suy ra kỹ năng đang được đánh giá và trả lời thẳng. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh nghề bếp cho phép. Ưu tiên dữ liệu cục bộ, sau đó dùng kiến thức nghề bếp đáng tin cậy. Không nhắc đến nguồn, AI hoặc việc thiếu dữ liệu.`
+      ? `Bạn giúp người thuyết trình trả lời phỏng vấn đánh giá kỹ năng nghề Cook/Chef. Chỉ trả lời bằng tiếng Việt. ${vietnameseInstructions} Dòng đầu tiên phải là "Câu hỏi:" theo sau là bản dịch tiếng Việt ngắn gọn, chính xác của câu hỏi đã nghe. Sau đó trả về đúng hai phần có nhãn: "Ngắn:" là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ; "Đầy đủ:" là câu trả lời đủ ý hơn, thường không quá 85 từ. Dùng tiếng Việt tự nhiên, dễ nói. Với câu hỏi hành vi, phần Đầy đủ nêu ngắn gọn tình huống, hành động và kết quả. Dữ liệu tham khảo không chứng minh người dùng từng trải qua sự việc; nếu hồ sơ không có ví dụ thật, hãy dùng “tôi sẽ” và không bịa kinh nghiệm. Với câu hỏi kỹ thuật, giải thích trực tiếp và chỉ nêu đánh đổi khi cần. Nếu câu hỏi mơ hồ, suy ra kỹ năng đang được đánh giá và trả lời thẳng. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh nghề bếp cho phép. Ưu tiên dữ liệu cục bộ, sau đó dùng kiến thức nghề bếp đáng tin cậy. Không nhắc đến nguồn, AI hoặc việc thiếu dữ liệu.`
       : `You help the presenter answer an Australian Cook skills-assessment interview. Answer only in English. ${instructions} ${answerPolicy} Return exactly two labelled sections: "Short:" with one direct answer the presenter can say immediately, and "Full:" with a fuller answer containing the useful details. Use clear, natural CEFR B2 vocabulary. For a behavioral question, give a concrete situation, action and result in the Full answer. A local reference is not proof that the presenter lived that event: without a real user example, answer with “I would” and never claim “I once”, “I handled”, or “I worked”. For a technical question, explain the idea directly and give a tradeoff only when asked or essential. When a question is vague, infer the skill being tested and answer it directly. Be confident, practical and accurate. Correct an obvious transcript error only when culinary context makes it certain. Use the local references first and reliable general culinary knowledge when they are insufficient. Never mention references, AI, or that data is missing.`,
     input: respondInVietnamese
       ? `CÂU HỎI ĐÃ NGHE:\n${question}${recent ? `\n\nHỘI THOẠI GẦN ĐÂY — chỉ dùng làm ngữ cảnh:\n${recent}` : ''}\n\nDỮ LIỆU SA COOK CỤC BỘ:\n${references || 'Không có mục gần giống.'}`
@@ -462,6 +507,10 @@ async function answerQuestion(question, kind, forceAI = false) {
   }
   const answer = responseText(await api('responses', body));
   if (!answer) throw new ApiError('OpenAI không trả về câu trả lời.');
+  if (respondInVietnamese) {
+    const translated = extractVietnameseQuestionFromAnswer(answer);
+    return packTranslatedAnswer(buildAnswerVariants(translated.answer, question, targetLanguage), translated.question || vietnameseQuestionForDisplay(question, best?.item?.question));
+  }
   return buildAnswerVariants(answer, question, targetLanguage);
 }
 
@@ -512,9 +561,11 @@ async function answerRecord(kind, record, forceAI = false) {
   setLaneLive(kind, kind === 'auto' ? 'V • Đang trả lời…' : 'E • Preparing the answer…');
   renderLane(kind);
   try {
-    const answer = await answerQuestion(record.question, kind, forceAI);
+    const answer = await answerQuestion(record.requestQuestion || record.question, kind, forceAI);
     if (record.requestId !== requestId) return;
-    record.answer = answer;
+    const translated = unpackTranslatedAnswer(answer);
+    record.answer = translated.answer;
+    if (kind === 'auto' && translated.question) record.question = cleanSpeech(translated.question);
     setLaneLive(kind, kind === 'auto' ? 'V • Bấm Space cho câu tiếp theo.' : 'E • Press Space for the next question.');
     if (generation === sessionId) setStatus(recording ? 'Đang nghe…' : 'Sẵn sàng');
   } catch (error) {
@@ -533,7 +584,7 @@ function submitQuestion(kind, question) {
   const identity = normalize(clean);
   if (identity && identity === lane.lastAnswered) return;
   lane.lastAnswered = identity;
-  const record = { question: clean, answer: '' };
+  const record = { question: kind === 'auto' ? vietnameseQuestionForDisplay(clean) : clean, requestQuestion: clean, answer: '' };
   lane.records.push(record);
   if (lane.records.length > 50) lane.records.shift();
   renderLane(kind);
@@ -1180,7 +1231,9 @@ window.saCook.loadResources().then(({ localQA, localQAVi, internetQA, hints, ans
   profileExtractionTemplate = profileExtraction;
   const english = [...(Array.isArray(localQA) ? localQA : []), ...(Array.isArray(internetQA) ? internetQA : [])]
     .map(item => ({...item, targetLanguage: 'en'}));
-  qa = [...english, ...(Array.isArray(localQAVi) ? localQAVi : [])];
+  const vietnamese = Array.isArray(localQAVi) ? localQAVi : [];
+  qa = [...english, ...vietnamese];
+  buildVietnameseQuestionTranslations(vietnamese);
   speechHints = hints.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   if (String(sharedPolicy || '').trim()) answerPolicy = String(sharedPolicy).replace(/\s+/g, ' ').trim();
   buildStudyChunks([['SA Cook Study', knowledge], ['SA Cook Handbook', handbook]]);

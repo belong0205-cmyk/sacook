@@ -144,5 +144,8 @@ assert.match(source, /respondInVietnamese \? 320 : 240/, 'V and E must have comp
 assert.match(source, /targetLanguage \? targetLanguage === 'vi'/, 'V formatting must not depend on guessing the language of an English question');
 assert.match(source, /answerEvidenceCache/, 'V and E must share expensive reference retrieval for one Space turn');
 assert.match(source, /renderedHistoryKey/, 'answer state changes must not rebuild the complete history and freeze the renderer');
+assert.match(source, /buildVietnameseQuestionTranslations/, 'V must translate known English questions from the bundled data');
+assert.match(source, /extractVietnameseQuestionFromAnswer/, 'V must extract a translated question for new AI-synthesized answers');
+assert.match(source, /record\.requestQuestion \|\| record\.question/, 'display translation must not replace the original transcript used to answer');
 
 console.log('Windows B2 answer policy tests passed.');

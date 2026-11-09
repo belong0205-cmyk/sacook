@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "featureVersion": "5.61.0",
+  "featureVersion": "5.62.0",
   "platforms": ["macOS", "Windows"],
   "answerPolicy": {
     "resource": "answer-policy.txt",
@@ -27,6 +27,7 @@
     "bilingualSpaceTranscription": true,
     "vietnameseLane": "V",
     "englishLane": "E",
+    "translatedQuestionPerLane": true,
     "dualAnswerVariants": true,
     "keywordHighlighting": true
   },

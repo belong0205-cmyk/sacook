@@ -194,6 +194,14 @@ int main(int argc,const char *argv[]) {
         Check([parsed[@"success"] boolValue],@"HTTP 200 completed output is accepted");
         for(NSString *part in @[@"Clean first.",@"Then sanitise.",@"Allow contact time."])
             Check([parsed[@"answer"] containsString:part],@"Parser joins all output text blocks rather than truncating after the first");
+        NSString *vietnameseAI=@"Câu hỏi: Bạn ngăn ngừa nhiễm chéo như thế nào?\n\nNgắn: Tôi tách riêng thực phẩm sống và chín.\n\nĐầy đủ: Tôi dùng thớt riêng và vệ sinh bề mặt.";
+        Equal([parser translatedVietnameseQuestionFromAIText:vietnameseAI],@"Bạn ngăn ngừa nhiễm chéo như thế nào?",@"V extracts the translated display question from the same AI response");
+        NSString *vietnameseVisible=[parser answerTextByRemovingVietnameseQuestionLine:vietnameseAI];
+        Check([vietnameseVisible hasPrefix:@"Ngắn:"] && [vietnameseVisible containsString:@"Đầy đủ:"],@"The internal translated-question line is removed from the visible answer");
+        NSString *embedded=[parser answerByEmbeddingTranslatedQuestion:@"Bạn ngăn ngừa nhiễm chéo như thế nào?" answer:vietnameseVisible];
+        NSString *decodedQuestion=@"";
+        Equal([parser visibleAnswerFromEmbeddedTranslation:embedded translatedQuestion:&decodedQuestion],vietnameseVisible,@"V answer envelope is removed before rendering");
+        Equal(decodedQuestion,@"Bạn ngăn ngừa nhiễm chéo như thế nào?",@"V answer envelope updates the displayed question without a second request");
         NSDictionary *webOutput=@{@"status":@"completed",@"output":@[
             @{@"type":@"web_search_call",@"status":@"completed"},
             Message(@[@{@"type":@"output_text",@"text":@"Versatility means being able to adapt to different tasks.",@"annotations":@[@{@"type":@"url_citation",@"url":@"https://example.com/versatility",@"title":@"Versatility reference"}]}])

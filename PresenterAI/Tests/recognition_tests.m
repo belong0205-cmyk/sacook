@@ -285,9 +285,14 @@ int main(int argc, const char *argv[]) {
         NSString *sharedQuestion=@"What is the difference between cleaning and sanitising?";
         [parallelApp appendParallelAnswersForQuestion:sharedQuestion];
         Check(parallelApp.autoRecords.count==1 && parallelApp.manualRecords.count==1,@"One Space submission creates exactly one V record and one E record");
-        Equal(parallelApp.autoRecords.lastObject[@"question"],parallelApp.manualRecords.lastObject[@"question"],@"V and E receive the exact same committed question");
+        Check([parallelApp isVietnameseText:parallelApp.autoRecords.lastObject[@"question"]],@"V translates the committed English question for display");
+        Equal(parallelApp.manualRecords.lastObject[@"question"],sharedQuestion,@"E keeps the exact committed English question");
+        Has(parallelApp.autoRecords.lastObject[@"requestQuestion"],sharedQuestion,@"V still answers from the untouched committed transcript");
         Check([parallelApp.autoRecords.lastObject[@"targetLanguage"] isEqualToString:@"vi"] && [parallelApp.autoRecords.lastObject[@"answer"] containsString:@"Ngắn:"],@"V always produces a Vietnamese answer");
         Check([parallelApp.manualRecords.lastObject[@"targetLanguage"] isEqualToString:@"en"] && [parallelApp.manualRecords.lastObject[@"answer"] containsString:@"Short:"],@"E always produces an English answer");
+        NSString *frenchAccentQuestion=@"Do you serve buffets or à la carte?";
+        NSString *frenchAccentTranslation=[parallelApp vietnameseQuestionForHeardQuestion:frenchAccentQuestion matchedQuestion:@"Do you serve buffets or a la carte?" fallback:frenchAccentQuestion];
+        Check([parallelApp isVietnameseText:frenchAccentTranslation] && [frenchAccentTranslation containsString:@"Bạn phục vụ"],@"A French culinary accent does not stop V from translating an English question");
         NSString *safeProcedure=@"TRẢ LỜI EN: First cool the food from 60°C to 21°C within two hours. Then cool it to 5°C within another four hours. Record the temperature.";
         NSString *safeProcedureDisplay=[app conciseLocalAnswerFromResult:safeProcedure question:@"How do you cool cooked food safely?"];
         Has(safeProcedureDisplay,@"Short:",@"Dual-answer display labels the immediate answer");
