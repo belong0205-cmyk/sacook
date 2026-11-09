@@ -26,9 +26,11 @@ function fn(source, name, async = false) {
   const ctx = vm.createContext({profileReady: Promise.resolve(), presenterProfile: {name: 'Cook A', restaurant: 'Restaurant A', menu: 'Lemon tart'},
     window: {SACookProfile: profilePolicy}, answerEvidence: () => ({matches: [{item: {question: 'Q', answer: 'GENERIC'}, score: 1}], snippets: []}),
     questionParts: q => [q], questionPartsAreLinked: () => false, needsConversationContext: () => false,
-    requiresBehavioralSynthesis: () => false, isVietnameseQuestion: () => false, buildAnswerVariants: a => a, relevantStudySnippets: () => [],
+    requiresBehavioralSynthesis: () => false, isVietnameseQuestion: text => /[ăâđêôơư]|câu hỏi/i.test(text || ''), buildAnswerVariants: a => a, relevantStudySnippets: () => [],
     vietnameseQuestionForDisplay: q => q, packTranslatedAnswer: a => a, extractVietnameseQuestionFromAnswer: a => ({question: '', answer: a}),
-    recentConversation: () => '', answerPolicy: 'English B2', api: async (_, body) => {requests.push(body); return 'personal answer';},
+    packPairedBilingualAnswer: (englishAnswer, vietnameseQuestion, vietnameseAnswer) => JSON.stringify({englishAnswer, vietnameseQuestion, vietnameseAnswer}),
+    ApiError: class ApiError extends Error {},
+    recentConversation: () => '', answerPolicy: 'English B2', api: async (_, body) => {requests.push(body); return body.text ? JSON.stringify({english_short:'Short EN',english_full:'Full EN',vietnamese_question:'Câu hỏi tiếng Việt?',vietnamese_short:'Ngắn VI',vietnamese_full:'Đầy đủ VI'}) : 'personal answer';},
     responseText: value => value});
   vm.runInContext(fn(renderer, 'answerQuestion', true), ctx);
   assert.strictEqual(await ctx.answerQuestion('What is mise en place?', 'auto'), 'GENERIC');

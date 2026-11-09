@@ -276,6 +276,15 @@ int main(int argc,const char *argv[]) {
         Equal(webBody[@"max_output_tokens"],@240,@"English single-question output budget leaves room for a complete Short and Full answer");
         NSDictionary *vietnameseBody=[parser answerRequestBodyForQuestion:@"How do you prevent cross-contamination?\n<answer_language>vi</answer_language>" includeWebSearch:NO];
         Equal(vietnameseBody[@"max_output_tokens"],@320,@"Vietnamese output receives enough tokens to avoid cutting the Full answer mid-sentence");
+        NSDictionary *pairedBody=[parser answerRequestBodyForQuestion:@"How do you prevent cross-contamination?\n<answer_language>en</answer_language>\n<paired_vietnamese>true</paired_vietnamese>" includeWebSearch:NO];
+        Equal(pairedBody[@"max_output_tokens"],@640,@"One paired request has room for E plus its Vietnamese translation");
+        Equal(pairedBody[@"text"][@"format"][@"name"],@"paired_bilingual_answer",@"Paired E/V output uses a strict structured schema");
+        Check([pairedBody[@"instructions"] containsString:@"translation of the English side, not a separate answer"],@"V is explicitly translated from E instead of being answered independently");
+        NSString *packed=[parser pairedBilingualAnswerWithEnglish:@"Short: Keep food separate." vietnameseQuestion:@"Bạn ngăn ngừa nhiễm chéo như thế nào?" vietnameseAnswer:@"Ngắn: Tôi giữ riêng thực phẩm sống và chín."];
+        NSDictionary *unpacked=[parser pairedBilingualPayloadFromAnswer:packed];
+        Equal(unpacked[@"englishAnswer"],@"Short: Keep food separate.",@"Paired answer preserves the E content");
+        Equal(unpacked[@"vietnameseQuestion"],@"Bạn ngăn ngừa nhiễm chéo như thế nào?",@"Paired answer carries a Vietnamese question");
+        Equal(unpacked[@"vietnameseAnswer"],@"Ngắn: Tôi giữ riêng thực phẩm sống và chín.",@"Paired answer carries the direct translation shown in V");
         NSDictionary *multipartBody=[parser answerRequestBodyForQuestion:@"What is cleaning?\nWhat is sanitising?" includeWebSearch:YES];
         Check([multipartBody[@"instructions"] containsString:@"Short: and Full:"],@"Multipart answers retain both answer variants");
         Equal(multipartBody[@"max_output_tokens"],@480,@"Multipart output retains enough tokens for two complete dual answers");

@@ -23,7 +23,8 @@ assert(source.includes('single underlying request'), 'linked or repeated questio
 assert(source.includes('independent questions'), 'genuinely separate questions can still be handled inside one answer record');
 assert(source.includes('questionPartsAreLinked(parts)'), 'AUTO must classify linked follow-ups before answering');
 assert(source.includes('// V and E are both SPACE lanes. Continuous AUTO transcription is disabled.'), 'continuous AUTO submission must be disabled');
-assert(source.includes("submitQuestion('auto', clean)"), 'the shared Space transcript must create a V record');
-assert(source.includes("submitQuestion('manual', clean)"), 'the shared Space transcript must create an E record');
+assert(source.includes("lanes.auto.records.push(vietnamese)"), 'the shared Space transcript must create a V record');
+assert(source.includes("lanes.manual.records.push(english)"), 'the shared Space transcript must create an E record');
+assert(source.includes("answerRecord('manual', english)"), 'E must be answered once and translated into V');
 
 console.log('Windows recognition pipeline tests passed.');

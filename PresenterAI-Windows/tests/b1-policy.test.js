@@ -137,8 +137,10 @@ assert.match(source, /requiresBehavioralSynthesis\(question\)/, 'local fast path
 assert.match(source, /!requiresBehavioralSynthesis\(question\)/, 'behavioral questions must bypass memorized exact answers');
 assert.match(source, /A local reference is not proof that the presenter lived that event/);
 assert.match(source, /const respondInVietnamese = kind === 'auto'/, 'the V lane always selects Vietnamese output');
-assert.match(source, /submitQuestion\('auto', clean\)/, 'one Space transcript must be submitted to V');
-assert.match(source, /submitQuestion\('manual', clean\)/, 'one Space transcript must be submitted to E');
+assert.match(source, /vietnameseRecord: vietnamese/, 'one Space turn must pair V with the authoritative E record');
+assert.match(source, /answerRecord\('manual', english\)/, 'one Space turn must create the answer once through E');
+assert.match(source, /packPairedBilingualAnswer/, 'V must be the Vietnamese translation bundled with the E answer');
+assert.match(source, /The Vietnamese side must be a translation of the English side, not a separate answer/, 'the paired request must forbid an independent V answer');
 assert.doesNotMatch(source, /form\.append\('languages\[\]'/, 'Space transcription must allow spoken Vietnamese or English');
 assert.match(source, /respondInVietnamese \? 320 : 240/, 'V and E must have complete-answer token budgets');
 assert.match(source, /targetLanguage \? targetLanguage === 'vi'/, 'V formatting must not depend on guessing the language of an English question');
