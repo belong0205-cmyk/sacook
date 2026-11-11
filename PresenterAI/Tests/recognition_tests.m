@@ -279,7 +279,7 @@ int main(int argc, const char *argv[]) {
         NSString *vietnameseAnswer=[app conciseLocalAnswerFromResult:[app bestLocalAnswerForQuestion:vietnameseQuestion targetLanguage:@"vi"] question:vietnameseQuestion];
         Check([app isVietnameseText:vietnameseQuestion] && [vietnameseAnswer containsString:@"Ngắn:"] && [vietnameseAnswer containsString:@"Đầy đủ:"] && ![vietnameseAnswer containsString:@"No reliable match"],@"Vietnamese questions resolve locally in the V lane and keep Vietnamese answer labels");
         NSString *englishAnswer=[app conciseLocalAnswerFromResult:[app bestLocalAnswerForQuestion:vietnameseQuestion targetLanguage:@"en"] question:@"What is the difference between cleaning and sanitising?"];
-        Check([englishAnswer containsString:@"Short:"] && [englishAnswer containsString:@"Full:"] && ![englishAnswer containsString:@"No reliable match"],@"The same Vietnamese question resolves locally in English for the E lane");
+        Check([englishAnswer containsString:@"Short:"] && ![englishAnswer containsString:@"No reliable match"] && ![englishAnswer containsString:@"Full: Short:"],@"The same Vietnamese question resolves locally in English without manufacturing a duplicate Full");
         RecognitionTestApp *parallelApp=[RecognitionTestApp new];
         parallelApp.resourceRoot=app.resourceRoot; [parallelApp loadBundledKnowledge];
         NSString *sharedQuestion=@"What is the difference between cleaning and sanitising?";

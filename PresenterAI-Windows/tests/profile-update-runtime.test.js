@@ -18,6 +18,9 @@ function fn(source, name, async = false) {
 (async () => {
   const helpers = vm.createContext({});
   vm.runInContext(fn(renderer, 'parseAnswerVariants'), helpers);
+  vm.runInContext(fn(renderer, 'removeLeadingAnswerVariantLabels'), helpers);
+  vm.runInContext(fn(renderer, 'normalizeSentenceForDeduplication'), helpers);
+  vm.runInContext(fn(renderer, 'stripRepeatedShortFromFull'), helpers);
   vm.runInContext(fn(renderer, 'pairedRetryBody'), helpers);
   const englishVariants = helpers.parseAnswerVariants('Short: Short: Keep food separate.\n\nFull: Full: Store raw food below ready-to-eat food.');
   assert.strictEqual(englishVariants.short, 'Keep food separate.');
@@ -25,6 +28,9 @@ function fn(source, name, async = false) {
   const vietnameseVariants = helpers.parseAnswerVariants('Ngắn: Ngắn: Giữ riêng thực phẩm sống.\n\nĐầy đủ: Đầy đủ: Bảo quản thực phẩm sống ở kệ dưới.');
   assert.strictEqual(vietnameseVariants.short, 'Giữ riêng thực phẩm sống.');
   assert.strictEqual(vietnameseVariants.full, 'Bảo quản thực phẩm sống ở kệ dưới.');
+  assert.strictEqual(helpers.stripRepeatedShortFromFull('I keep raw food separate.', 'I keep raw food separate. I use separate boards.'), 'I use separate boards.');
+  assert.strictEqual(helpers.stripRepeatedShortFromFull('Tôi giữ riêng thực phẩm sống.', 'Tôi giữ riêng thực phẩm sống. Tôi dùng thớt riêng.'), 'Tôi dùng thớt riêng.');
+  assert.strictEqual(helpers.stripRepeatedShortFromFull('I keep raw food separate.', 'I label containers clearly.'), 'I label containers clearly.');
   const fastBody = {max_output_tokens: 420, text: {format: {name: 'paired_bilingual_answer'}}};
   assert.strictEqual(helpers.pairedRetryBody(fastBody, {status: 'completed'}), null, 'A completed fast response must not retry');
   assert.strictEqual(helpers.pairedRetryBody(fastBody, {status: 'incomplete'}).max_output_tokens, 640, 'An incomplete fast response retries at 640');
@@ -45,9 +51,9 @@ function fn(source, name, async = false) {
     vietnameseQuestionForDisplay: q => q, cleanSpeech: q => String(q || '').trim(), packTranslatedAnswer: a => a, extractVietnameseQuestionFromAnswer: a => ({question: '', answer: a}),
     packPairedBilingualAnswer: (englishAnswer, vietnameseQuestion, vietnameseAnswer) => JSON.stringify({englishAnswer, vietnameseQuestion, vietnameseAnswer}),
     ApiError: class ApiError extends Error {},
-    recentConversation: () => '', answerPolicy: 'English B2', api: async (_, body) => {requests.push(body); return body.text ? JSON.stringify({english_short:'Short EN',english_full:'Full EN',vietnamese_question:'Câu hỏi tiếng Việt?',vietnamese_short:'Ngắn VI',vietnamese_full:'Đầy đủ VI'}) : 'personal answer';},
+    recentConversation: () => '', answerPolicy: 'English B2', api: async (_, body) => {requests.push(body); return body.text ? JSON.stringify({english_short:'Short EN',english_full:'Short EN. Extra EN',vietnamese_question:'Câu hỏi tiếng Việt?',vietnamese_short:'Ngắn VI',vietnamese_full:'Ngắn VI. Chi tiết VI'}) : 'personal answer';},
     responseText: value => value, pairedRetryBody: helpers.pairedRetryBody});
-  for (const name of ['parseAnswerVariants', 'removeLeadingAnswerVariantLabels', 'buildShortAnswerDisplay', 'pairedShortAnswerBody', 'pairedFullAnswerBody']) vm.runInContext(fn(renderer, name), ctx);
+  for (const name of ['parseAnswerVariants', 'removeLeadingAnswerVariantLabels', 'normalizeSentenceForDeduplication', 'stripRepeatedShortFromFull', 'buildShortAnswerDisplay', 'pairedShortAnswerBody', 'pairedFullAnswerBody']) vm.runInContext(fn(renderer, name), ctx);
   vm.runInContext(fn(renderer, 'requestAnswerBody', true), ctx);
   vm.runInContext(fn(renderer, 'answerQuestion', true), ctx);
   assert.strictEqual(await ctx.answerQuestion('What is mise en place?', 'auto'), 'GENERIC');
@@ -70,7 +76,10 @@ function fn(source, name, async = false) {
   assert.strictEqual(requests[2].model, 'gpt-5.6-luna');
   assert.strictEqual(requests[2].service_tier, undefined);
   assert(requests[2].input.includes('APPROVED SHORT ANSWERS'));
-  assert(finalPaired.includes('Full EN'), 'The terminal result adds Full after Short');
+  assert(requests[2].instructions.includes('Do not repeat, restate, or paraphrase'));
+  const finalPayload=JSON.parse(finalPaired);
+  assert(finalPayload.englishAnswer.includes('Full: Extra EN') && !finalPayload.englishAnswer.includes('Full: Short EN'), 'English Full contains only details after Short');
+  assert(finalPayload.vietnameseAnswer.includes('Đầy đủ: Chi tiết VI') && !finalPayload.vietnameseAnswer.includes('Đầy đủ: Ngắn VI'), 'Vietnamese Full contains only details after Short');
   let failureCall=0;
   ctx.api=async () => {
     failureCall += 1;

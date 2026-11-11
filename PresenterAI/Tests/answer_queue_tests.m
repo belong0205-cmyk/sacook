@@ -225,7 +225,7 @@ int main(int argc,const char *argv[]) {
         Check([webBody[@"instructions"] containsString:@"general culinary"],@"Fallback can answer from general knowledge when local study data is absent");
         Check([webBody[@"instructions"] containsString:@"words the presenter can say aloud"],@"AI output is written as the presenter's ready-to-speak answer");
         Check([webBody[@"instructions"] containsString:@"Short must be one direct answer"],@"Single-question AI answers include an immediate answer");
-        Check([webBody[@"instructions"] containsString:@"Full must be a fuller answer"],@"Single-question AI answers include a fuller version with detail");
+        Check([webBody[@"instructions"] containsString:@"Full must contain only useful additional details"],@"Single-question AI Full adds detail without repeating Short");
         Check([webBody[@"instructions"] containsString:@"situation, task, action, and result"],@"Behavioral answers are shaped into a concise STAR response");
         Check([webBody[@"instructions"] containsString:@"tradeoff only when the question asks"],@"Technical answers avoid unrequested tradeoff padding");
         Check([webBody[@"instructions"] containsString:@"infer the competency or signal"],@"Vague questions target the interview signal being evaluated");
@@ -297,6 +297,12 @@ int main(int argc,const char *argv[]) {
         Check(fullPaired[@"service_tier"]==nil,@"Only the urgent Short answer pays for Fast mode");
         Equal(fullPaired[@"text"][@"format"][@"name"],@"paired_bilingual_full_answer",@"The second request contains only the paired Full schema");
         Check([fullPaired[@"input"] containsString:@"APPROVED SHORT ANSWERS"],@"Full must expand the Short answer already shown to the user");
+        Check([fullPaired[@"instructions"] containsString:@"Do not repeat, restate, or paraphrase"],@"Full is explicitly limited to new details after Short");
+        Equal([parser fullAnswerByRemovingRepeatedShort:@"I keep raw food separate." full:@"I keep raw food separate. I use separate boards and utensils."],@"I use separate boards and utensils.",@"An exact repeated English Short sentence is removed from Full");
+        Equal([parser fullAnswerByRemovingRepeatedShort:@"Tôi giữ riêng thực phẩm sống." full:@"Tôi giữ riêng thực phẩm sống. Tôi dùng thớt và dụng cụ riêng."],@"Tôi dùng thớt và dụng cụ riêng.",@"An exact repeated Vietnamese Short sentence is removed from Full");
+        Equal([parser fullAnswerByRemovingRepeatedShort:@"I keep raw food separate." full:@"I label containers and store raw meat below ready-to-eat food."],@"I label containers and store raw meat below ready-to-eat food.",@"A different Full opening is preserved");
+        NSString *deduplicatedFull=[parser answerVariantsFromText:@"Short: I keep raw food separate.\n\nFull: I keep raw food separate. I use separate boards and utensils." question:@"How do you prevent cross-contamination?" targetLanguage:@"en"];
+        Check([deduplicatedFull containsString:@"Full: I use separate boards and utensils."] && ![deduplicatedFull containsString:@"Full: I keep raw food separate"],@"Final displayed Full contains only its additional detail");
         NSDictionary *expandedPaired=[parser expandedPairedRetryBodyForBody:pairedBody responseJSON:@{@"status":@"incomplete"}];
         Equal(expandedPaired[@"max_output_tokens"],@640,@"An incomplete fast response retries once with a safe expanded budget");
         Check([parser expandedPairedRetryBodyForBody:pairedBody responseJSON:@{@"status":@"completed"}]==nil,@"A completed fast response is never delayed by a retry");

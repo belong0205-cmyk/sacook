@@ -345,9 +345,28 @@ function formatAnswerVariants(shortAnswer, fullAnswer, targetLanguage = '') {
   const vietnamese = targetLanguage ? targetLanguage === 'vi' : isVietnameseQuestion(`${short}\n${full}`);
   const shortLabel = vietnamese ? 'Ngắn' : 'Short';
   const fullLabel = vietnamese ? 'Đầy đủ' : 'Full';
-  const readyShort = short || full;
-  const readyFull = full || readyShort;
-  return `${shortLabel}: ${readyShort}\n\n${fullLabel}: ${readyFull}`;
+  if (short && full) return `${shortLabel}: ${short}\n\n${fullLabel}: ${full}`;
+  if (short) return `${shortLabel}: ${short}`;
+  return `${fullLabel}: ${full}`;
+}
+
+function normalizeSentenceForDeduplication(value) {
+  return removeLeadingAnswerVariantLabels(value).toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+function stripRepeatedShortFromFull(shortAnswer, fullAnswer) {
+  const short = removeLeadingAnswerVariantLabels(shortAnswer).replace(/\s+/g, ' ').trim();
+  const full = removeLeadingAnswerVariantLabels(fullAnswer).replace(/\s+/g, ' ').trim();
+  if (!short || !full) return full;
+  if (full.toLocaleLowerCase().startsWith(short.toLocaleLowerCase())) {
+    const boundary = full.slice(short.length, short.length + 1);
+    if (!boundary) return '';
+    if (/[\s.!?]/u.test(boundary)) return full.slice(short.length).replace(/^[\s.!?;,:\-–—]+/u, '').trim();
+  }
+  const first = full.match(/^.*?[.!?](?:\s|$)/u)?.[0] || '';
+  if (first && normalizeSentenceForDeduplication(first) === normalizeSentenceForDeduplication(short))
+    return full.slice(first.length).replace(/^[\s.!?;,:\-–—]+/u, '').trim();
+  return full;
 }
 
 function buildAnswerVariants(answer, question = '', targetLanguage = '') {
@@ -361,7 +380,7 @@ function buildAnswerVariants(answer, question = '', targetLanguage = '') {
   };
   const vietnamese = targetLanguage ? targetLanguage === 'vi' : isVietnameseQuestion(question);
   const short = vietnamese ? trimWords(shortSource, 28) : simplifyAnswerOutput(shortSource, question, 28);
-  const full = vietnamese ? trimWords(fullSource, 85) : simplifyAnswerOutput(fullSource, question, 85);
+  const full = stripRepeatedShortFromFull(short, vietnamese ? trimWords(fullSource, 85) : simplifyAnswerOutput(fullSource, question, 85));
   return formatAnswerVariants(short, full, targetLanguage);
 }
 
@@ -518,8 +537,8 @@ async function answerQuestion(question, kind, forceAI = false, onPartial = null)
     model: 'gpt-4.1-mini', store: false,
     max_output_tokens: linkedMultipart ? (respondInVietnamese ? 300 : 220) : Math.min(640, parts.length * (respondInVietnamese ? 320 : 240)),
     instructions: respondInVietnamese
-      ? `Bạn giúp người thuyết trình trả lời phỏng vấn đánh giá kỹ năng nghề Cook/Chef. Chỉ trả lời bằng tiếng Việt. ${vietnameseInstructions} Dòng đầu tiên phải là "Câu hỏi:" theo sau là bản dịch tiếng Việt ngắn gọn, chính xác của câu hỏi đã nghe. Sau đó trả về đúng hai phần có nhãn: "Ngắn:" là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ; "Đầy đủ:" là câu trả lời đủ ý hơn, thường không quá 85 từ. Dùng tiếng Việt tự nhiên, dễ nói. Với câu hỏi hành vi, phần Đầy đủ nêu ngắn gọn tình huống, hành động và kết quả. Dữ liệu tham khảo không chứng minh người dùng từng trải qua sự việc; nếu hồ sơ không có ví dụ thật, hãy dùng “tôi sẽ” và không bịa kinh nghiệm. Với câu hỏi kỹ thuật, giải thích trực tiếp và chỉ nêu đánh đổi khi cần. Nếu câu hỏi mơ hồ, suy ra kỹ năng đang được đánh giá và trả lời thẳng. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh nghề bếp cho phép. Ưu tiên dữ liệu cục bộ, sau đó dùng kiến thức nghề bếp đáng tin cậy. Không nhắc đến nguồn, AI hoặc việc thiếu dữ liệu.`
-      : `You help the presenter answer an Australian Cook skills-assessment interview. Answer only in English. ${instructions} ${answerPolicy} Return exactly two labelled sections: "Short:" with one direct answer the presenter can say immediately, and "Full:" with a fuller answer containing the useful details. Use clear, natural CEFR B2 vocabulary. For a behavioral question, give a concrete situation, action and result in the Full answer. A local reference is not proof that the presenter lived that event: without a real user example, answer with “I would” and never claim “I once”, “I handled”, or “I worked”. For a technical question, explain the idea directly and give a tradeoff only when asked or essential. When a question is vague, infer the skill being tested and answer it directly. Be confident, practical and accurate. Correct an obvious transcript error only when culinary context makes it certain. Use the local references first and reliable general culinary knowledge when they are insufficient. Never mention references, AI, or that data is missing.`,
+      ? `Bạn giúp người thuyết trình trả lời phỏng vấn đánh giá kỹ năng nghề Cook/Chef. Chỉ trả lời bằng tiếng Việt. ${vietnameseInstructions} Dòng đầu tiên phải là "Câu hỏi:" theo sau là bản dịch tiếng Việt ngắn gọn, chính xác của câu hỏi đã nghe. Sau đó trả về đúng hai phần có nhãn: "Ngắn:" là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ; "Đầy đủ:" chỉ chứa ý bổ sung để nói tiếp sau Ngắn, thường không quá 85 từ, không lặp hoặc diễn đạt lại nội dung Ngắn. Dùng tiếng Việt tự nhiên, dễ nói. Với câu hỏi hành vi, phần Đầy đủ nêu ngắn gọn tình huống, hành động và kết quả. Dữ liệu tham khảo không chứng minh người dùng từng trải qua sự việc; nếu hồ sơ không có ví dụ thật, hãy dùng “tôi sẽ” và không bịa kinh nghiệm. Với câu hỏi kỹ thuật, giải thích trực tiếp và chỉ nêu đánh đổi khi cần. Nếu câu hỏi mơ hồ, suy ra kỹ năng đang được đánh giá và trả lời thẳng. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh nghề bếp cho phép. Ưu tiên dữ liệu cục bộ, sau đó dùng kiến thức nghề bếp đáng tin cậy. Không nhắc đến nguồn, AI hoặc việc thiếu dữ liệu.`
+      : `You help the presenter answer an Australian Cook skills-assessment interview. Answer only in English. ${instructions} ${answerPolicy} Return exactly two labelled sections: "Short:" with one direct answer the presenter can say immediately, and "Full:" containing only useful additional details to say after Short; never repeat, restate, or paraphrase Short. Use clear, natural CEFR B2 vocabulary. For a behavioral question, give a concrete situation, action and result in the Full answer. A local reference is not proof that the presenter lived that event: without a real user example, answer with “I would” and never claim “I once”, “I handled”, or “I worked”. For a technical question, explain the idea directly and give a tradeoff only when asked or essential. When a question is vague, infer the skill being tested and answer it directly. Be confident, practical and accurate. Correct an obvious transcript error only when culinary context makes it certain. Use the local references first and reliable general culinary knowledge when they are insufficient. Never mention references, AI, or that data is missing.`,
     input: respondInVietnamese
       ? `CÂU HỎI ĐÃ NGHE:\n${question}${recent ? `\n\nHỘI THOẠI GẦN ĐÂY — chỉ dùng làm ngữ cảnh:\n${recent}` : ''}\n\nDỮ LIỆU SA COOK CỤC BỘ:\n${references || 'Không có mục gần giống.'}`
       : `HEARD QUESTION:\n${question}${recent ? `\n\nRECENT CONVERSATION — context only:\n${recent}` : ''}\n\nLOCAL SA COOK REFERENCES:\n${references || 'No close local reference.'}`
@@ -574,8 +593,8 @@ async function answerQuestion(question, kind, forceAI = false, onPartial = null)
     let fullPair;
     try { fullPair = JSON.parse(fullText); }
     catch (_) { return partial; }
-    const englishFull = removeLeadingAnswerVariantLabels(fullPair?.english_full);
-    const vietnameseFull = removeLeadingAnswerVariantLabels(fullPair?.vietnamese_full);
+    const englishFull = stripRepeatedShortFromFull(englishValue, fullPair?.english_full);
+    const vietnameseFull = stripRepeatedShortFromFull(vietnameseValue, fullPair?.vietnamese_full);
     if (!englishFull || !vietnameseFull) return partial;
     const englishAnswer = buildAnswerVariants(`Short: ${englishValue}\n\nFull: ${englishFull}`, question, 'en');
     const vietnameseAnswer = buildAnswerVariants(`Ngắn: ${vietnameseValue}\n\nĐầy đủ: ${vietnameseFull}`, vietnameseQuestion, 'vi');
@@ -620,14 +639,14 @@ function pairedShortAnswerBody(base) {
 
 function pairedFullAnswerBody(base, englishShort, vietnameseShort) {
   return {...base,
-    instructions: `${base.instructions || ''} Expand the approved Short answer into the Full answer without changing its conclusion or facts. Return only the two Full field values, with no visible labels. The Vietnamese Full answer must translate the English Full answer exactly.`,
+    instructions: `${base.instructions || ''} Write only the additional details that should be spoken after the approved Short answer. Do not repeat, restate, or paraphrase any sentence or claim already present in Short. Begin with the first new detail. Return only the two Full field values, with no visible labels. The Vietnamese Full answer must translate the English Full answer exactly.`,
     input: `${base.input || ''}\n\nAPPROVED SHORT ANSWERS — AUTHORITATIVE:\nEnglish: ${englishShort || ''}\nVietnamese: ${vietnameseShort || ''}`,
     max_output_tokens: 360,
     text: {format: {type: 'json_schema', name: 'paired_bilingual_full_answer', strict: true, schema: {
       type: 'object', additionalProperties: false,
       properties: {
-        english_full: {type: 'string', description: 'Full English answer content only, under 55 words and without a label.'},
-        vietnamese_full: {type: 'string', description: 'Exact natural Vietnamese translation of english_full, without a label.'}
+        english_full: {type: 'string', description: 'Only new English details to say after Short; never repeat or paraphrase Short; under 55 words and without a label.'},
+        vietnamese_full: {type: 'string', description: 'Exact natural Vietnamese translation of the additional english_full details, without repeating Vietnamese Short or adding a label.'}
       }, required: ['english_full', 'vietnamese_full']
     }}}
   };

@@ -140,6 +140,12 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 @property NSButton *smallerTextButton;
 @property NSButton *largerTextButton;
 @property NSPopUpButton *moreButton;
+@property NSMenu *audioSourceMenu;
+@property NSArray<NSMenuItem *> *audioSourceMenuItems;
+@property NSMenuItem *statusMenuItem;
+@property NSMenuItem *levelMenuItem;
+@property NSTextField *vHeaderLabel;
+@property NSTextField *eHeaderLabel;
 @property NSScrollView *manualHistoryScroll;
 @property NSScrollView *autoHistoryScroll;
 @property NSLayoutConstraint *manualHistoryHeight;
@@ -183,6 +189,9 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 - (NSDictionary *)pairedBilingualPayloadFromAnswer:(NSString *)answer;
 - (void)performAnswerRequest:(NSString *)question progress:(SCAnswerProgress)progress completion:(SCAnswerCompletion)completion;
 - (void)sendAnswerBody:(NSDictionary *)body apiKey:(NSString *)apiKey allowModelFallback:(BOOL)allowFallback completion:(void (^)(NSDictionary *parsed))completion;
+- (void)setAudioLevelText:(NSString *)text color:(NSColor *)color toolTip:(NSString *)toolTip;
+- (void)protectWindowFromCapture:(NSWindow *)window;
+- (void)protectAllApplicationWindows;
 @end
 
 @implementation AppDelegate
@@ -190,6 +199,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 - (void)applicationDidFinishLaunching:(NSNotification *)n {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
     [self buildMenu]; [self buildUI]; [self loadAudioDevices]; [self loadSavedAPIKey]; [self loadBundledKnowledge];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWindowBecameKey:) name:NSWindowDidBecomeKeyNotification object:nil];
     __weak typeof(self) weakSelf=self;
     self.spaceKeyMonitor=[NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent *(NSEvent *event) {
       NSEventModifierFlags blocked = NSEventModifierFlagCommand | NSEventModifierFlagOption | NSEventModifierFlagControl;
@@ -201,7 +211,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       }
       return event;
     }];
-    self.window.sharingType = NSWindowSharingNone;
+    [self protectAllApplicationWindows];
     [NSApp activateIgnoringOtherApps:YES]; [self.window makeKeyAndOrderFront:nil];
     NSString *pendingUpdate=[[NSUserDefaults standardUserDefaults] stringForKey:@"PresenterAI.pendingUpdateVersion"];
     if(pendingUpdate.length) {
@@ -218,9 +228,24 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     }
 }
 
+- (void)protectWindowFromCapture:(NSWindow *)window {
+    if(window) window.sharingType=NSWindowSharingNone;
+}
+- (void)protectAllApplicationWindows {
+    for(NSWindow *window in NSApp.windows) [self protectWindowFromCapture:window];
+    [self protectWindowFromCapture:self.window]; [self protectWindowFromCapture:self.profileWindow];
+}
+- (void)applicationWindowBecameKey:(NSNotification *)notification {
+    NSWindow *window=[notification.object isKindOfClass:NSWindow.class]?notification.object:nil;
+    if(window && [NSApp.windows containsObject:window]) [self protectWindowFromCapture:window];
+}
+- (void)applicationDidBecomeActive:(NSNotification *)notification { (void)notification; [self protectAllApplicationWindows]; }
+- (void)windowDidBecomeKey:(NSNotification *)notification { [self protectWindowFromCapture:notification.object]; }
+
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)hasVisibleWindows {
     (void)sender;
     if (!hasVisibleWindows) {
+      [self protectWindowFromCapture:self.window];
       [self.window deminiaturize:nil];
       [self.window makeKeyAndOrderFront:nil];
       [NSApp activateIgnoringOtherApps:YES];
@@ -248,6 +273,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSAlert *alert=[NSAlert new]; alert.messageText=@"OpenAI API Key"; alert.informativeText=@"Key sẽ được lưu trong app settings trên máy này để không hiện lại hộp hỏi mật khẩu Keychain. Ứng dụng dùng dữ liệu SA Cook làm ngữ cảnh rồi nhờ ChatGPT tổng hợp câu trả lời tiếng Anh.";
     NSSecureTextField *field=[[NSSecureTextField alloc] initWithFrame:NSMakeRect(0,0,360,24)]; field.placeholderString=@"sk-proj-…"; field.stringValue=self.keyField.stringValue ?: @""; alert.accessoryView=field;
     [alert addButtonWithTitle:@"Lưu"]; [alert addButtonWithTitle:@"Hủy"];
+    [self protectWindowFromCapture:alert.window];
     if ([alert runModal]==NSAlertFirstButtonReturn) {
       NSString *clean=[[[field.stringValue componentsSeparatedByCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"length > 0"]] componentsJoinedByString:@""];
       if(![clean hasPrefix:@"sk-"]){[self showUpdateAlert:@"Key không đúng định dạng" detail:@"OpenAI API key thường bắt đầu bằng sk- hoặc sk-proj-. Hãy tạo key tại platform.openai.com."];return;}
@@ -275,10 +301,10 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     return NO;
 }
 - (void)configurePresenterProfile:(id)sender {
-    if(self.profileWindow.visible) { [self.profileWindow makeKeyAndOrderFront:nil]; return; }
+    if(self.profileWindow.visible) { [self protectWindowFromCapture:self.profileWindow]; [self.profileWindow makeKeyAndOrderFront:nil]; return; }
     self.profileWindow=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,620,650) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable backing:NSBackingStoreBuffered defer:NO];
     self.profileWindow.releasedWhenClosed=NO; self.profileWindow.delegate=self; self.profileWindow.title=@"Thông tin của bạn"; self.profileWindow.level=self.window.level;
-    self.profileWindow.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]; self.profileWindow.sharingType=self.window.sharingType;
+    self.profileWindow.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]; [self protectWindowFromCapture:self.profileWindow];
     NSView *root=self.profileWindow.contentView;
     root.wantsLayer=YES; root.layer.backgroundColor=[NSColor colorWithWhite:0.10 alpha:1].CGColor;
     NSTextField *intro=[NSTextField wrappingLabelWithString:@"Đồng bộ hồ sơ từ thiladau.com hoặc nhập riêng trên máy. Mật khẩu chỉ dùng để đăng nhập và không được lưu."];
@@ -349,10 +375,10 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSAlert *alert=[NSAlert new]; alert.messageText=@"Thông tin đã chọn lọc"; alert.informativeText=profile[@"warnings"] ?: @"";
     NSScrollView *scroll=[[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,500,300)]; scroll.hasVerticalScroller=YES;
     NSTextView *text=[[NSTextView alloc] initWithFrame:NSMakeRect(0,0,480,300)]; text.editable=NO; text.font=[NSFont systemFontOfSize:13]; text.string=[self profileSourceForEditor:profile]; scroll.documentView=text; alert.accessoryView=scroll;
-    [alert beginSheetModalForWindow:self.profileWindow completionHandler:nil];
+    [self protectWindowFromCapture:alert.window]; [alert beginSheetModalForWindow:self.profileWindow completionHandler:nil];
 }
 - (void)importPresenterDocument:(id)sender {
-    NSOpenPanel *panel=[NSOpenPanel openPanel]; panel.allowedFileTypes=@[@"docx",@"txt",@"md"]; panel.allowsMultipleSelection=NO; panel.canChooseDirectories=NO;
+    NSOpenPanel *panel=[NSOpenPanel openPanel]; panel.allowedFileTypes=@[@"docx",@"txt",@"md"]; panel.allowsMultipleSelection=NO; panel.canChooseDirectories=NO; [self protectWindowFromCapture:panel];
     [panel beginSheetModalForWindow:self.profileWindow completionHandler:^(NSModalResponse result) {
       if(result!=NSModalResponseOK) return;
       NSError *error=nil; NSString *text=SCReadProfileDocument(panel.URL,&error);
@@ -442,7 +468,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 }
 
 - (void)showUpdateAlert:(NSString *)title detail:(NSString *)detail {
-    NSAlert *alert=[NSAlert new];alert.messageText=title;alert.informativeText=detail;[alert addButtonWithTitle:@"OK"];[alert runModal];
+    NSAlert *alert=[NSAlert new];alert.messageText=title;alert.informativeText=detail;[alert addButtonWithTitle:@"OK"];[self protectWindowFromCapture:alert.window];[alert runModal];
 }
 
 - (NSArray<NSNumber *> *)semanticVersionParts:(NSString *)version {
@@ -519,7 +545,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
         NSDictionary *asset=[self macOSAssetInRelease:release version:tag];
         NSURL *assetURL=[NSURL URLWithString:[asset[@"browser_download_url"] isKindOfClass:NSString.class]?asset[@"browser_download_url"]:@""];
         if(!assetURL){[self showUpdateAlert:@"Release thiếu file macOS" detail:[NSString stringWithFormat:@"Release %@ cần đúng file SA-Cook-Assistant-macOS-v%@.zip (hoặc tên macOS cũ khớp chính xác).",latest,latest]];return;}
-        NSAlert *confirm=[NSAlert new];confirm.messageText=[NSString stringWithFormat:@"Cập nhật lên %@?",latest];confirm.informativeText=@"Ứng dụng sẽ tải bản mới, tự thay thế rồi mở lại.";[confirm addButtonWithTitle:@"Update"];[confirm addButtonWithTitle:@"Hủy"];
+        NSAlert *confirm=[NSAlert new];confirm.messageText=[NSString stringWithFormat:@"Cập nhật lên %@?",latest];confirm.informativeText=@"Ứng dụng sẽ tải bản mới, tự thay thế rồi mở lại.";[confirm addButtonWithTitle:@"Update"];[confirm addButtonWithTitle:@"Hủy"];[self protectWindowFromCapture:confirm.window];
         if([confirm runModal]==NSAlertFirstButtonReturn)[self downloadAndInstallUpdate:assetURL version:latest digest:[asset[@"digest"] isKindOfClass:NSString.class]?asset[@"digest"]:@""];
       });
     }] resume];
@@ -655,7 +681,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     return 0.02;
 }
 - (CGFloat)dockBackdropAlpha {
-    return 0.10;
+    return 0.0;
 }
 - (NSColor *)readingSurfaceColor {
     // The plain window has no system blur. This local veil is adjustable and
@@ -693,12 +719,20 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSMenuItem *item=[[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""];
     item.target=self; item.tag=tag; return item;
 }
+- (void)selectAudioSourceFromMenu:(NSMenuItem *)sender {
+    if(sender.tag<0 || sender.tag>=(NSInteger)self.inputDeviceIDs.count) return;
+    [self.deviceButton selectItemAtIndex:sender.tag];
+    for(NSMenuItem *item in self.audioSourceMenuItems) item.state=item.tag==sender.tag?NSControlStateValueOn:NSControlStateValueOff;
+}
 - (NSScrollView *)textBox:(NSTextView **)out editable:(BOOL)editable {
     NSScrollView *scroll=[NSScrollView new]; scroll.translatesAutoresizingMaskIntoConstraints=NO;
     scroll.hasVerticalScroller=YES; scroll.autohidesScrollers=YES; scroll.hasHorizontalScroller=NO;
+    // Keep these conversation surfaces vertical-only. A trackpad pan can
+    // otherwise leave a hidden horizontal offset on a small display.
+    scroll.horizontalScrollElasticity=NSScrollElasticityNone;
     scroll.scrollerStyle=NSScrollerStyleOverlay; scroll.verticalScrollElasticity=NSScrollElasticityAllowed;
     scroll.borderType=NSNoBorder; scroll.wantsLayer=YES;
-    scroll.layer.cornerRadius=14; scroll.layer.masksToBounds=YES;
+    scroll.layer.cornerRadius=0; scroll.layer.masksToBounds=YES;
     scroll.layer.borderWidth=0;
     // One translucent layer is enough. Previously both the scroll view and
     // text view painted the same black tint, making each lane look heavy.
@@ -712,7 +746,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     text.autoresizingMask=NSViewWidthSizable;
     text.textContainer.containerSize=NSMakeSize(400,CGFLOAT_MAX);
     text.textContainer.widthTracksTextView=YES;
-    text.font=[NSFont systemFontOfSize:16]; text.textContainerInset=NSMakeSize(14,12);
+    text.font=[NSFont systemFontOfSize:16]; text.textContainerInset=NSMakeSize(6,5);
     text.drawsBackground=YES; text.backgroundColor=[self readingSurfaceColor];
     text.textColor=[NSColor colorWithWhite:0.94 alpha:1]; text.insertionPointColor=NSColor.whiteColor;
     text.menu=nil;
@@ -722,13 +756,13 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSColor *accent=[self laneAccent:automatic];
     NSView *card=[NSView new]; card.translatesAutoresizingMaskIntoConstraints=NO; card.wantsLayer=YES;
     card.layer.backgroundColor=NSColor.clearColor.CGColor;
-    card.layer.cornerRadius=18; card.layer.borderWidth=0;
+    card.layer.cornerRadius=0; card.layer.borderWidth=0;
     card.layer.shadowOpacity=0;
     card.identifier=automatic?@"vietnameseConversationLane":@"englishConversationLane";
     card.accessibilityLabel=automatic?@"V — câu trả lời tiếng Việt":@"E — English answers";
     NSTextView *answer=nil,*transcript=nil,*history=nil;
     NSScrollView *answerScroll=[self textBox:&answer editable:NO];
-    answer.textContainerInset=NSMakeSize(14,10);
+    answer.textContainerInset=NSMakeSize(6,5);
     answer.accessibilityLabel=automatic?@"V Vietnamese conversation":@"E English conversation";
     NSScrollView *liveScroll=[self textBox:&transcript editable:NO];
     transcript.font=[NSFont systemFontOfSize:14 weight:NSFontWeightRegular];
@@ -758,8 +792,8 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     // remain state holders only and are deliberately not shown as extra boxes.
     [card addSubview:answerScroll];
     [NSLayoutConstraint activateConstraints:@[
-        [answerScroll.topAnchor constraintEqualToAnchor:card.topAnchor],[answerScroll.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:8],
-        [answerScroll.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-8],[answerScroll.bottomAnchor constraintEqualToAnchor:card.bottomAnchor]
+        [answerScroll.topAnchor constraintEqualToAnchor:card.topAnchor],[answerScroll.leadingAnchor constraintEqualToAnchor:card.leadingAnchor],
+        [answerScroll.trailingAnchor constraintEqualToAnchor:card.trailingAnchor],[answerScroll.bottomAnchor constraintEqualToAnchor:card.bottomAnchor]
     ]];
     return card;
 }
@@ -799,9 +833,13 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 - (void)buildUI {
     self.readingFontSize=[[NSUserDefaults standardUserDefaults] doubleForKey:@"PresenterAI.readingFontSize.v2"];
     self.backdropStrength=[self initialBackdropStrength];
-    self.window=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,1080,700)
+    NSRect visible=NSScreen.mainScreen.visibleFrame;
+    CGFloat initialWidth=NSWidth(visible)>0?MIN(NSWidth(visible)<1500?960:1080,MAX(720,NSWidth(visible)-32)):1080;
+    CGFloat initialHeight=NSHeight(visible)>0?MIN(700,MAX(520,NSHeight(visible)-48)):700;
+    self.window=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,initialWidth,initialHeight)
         styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable|NSWindowStyleMaskFullSizeContentView backing:NSBackingStoreBuffered defer:NO];
-    self.window.title=@"SA Cook Assistant"; self.window.contentMinSize=NSMakeSize(900,600);
+    self.window.title=@"SA Cook Assistant"; self.window.contentMinSize=NSMakeSize(720,520);
+    [self protectWindowFromCapture:self.window];
     self.window.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
     self.window.titleVisibility=NSWindowTitleHidden; self.window.titlebarAppearsTransparent=YES;
     self.window.movableByWindowBackground=YES; self.window.opaque=NO; self.window.alphaValue=1.0; self.window.backgroundColor=NSColor.clearColor; self.window.hasShadow=YES;
@@ -842,6 +880,13 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     [self.moreButton addItemWithTitle:@"•••"];
     NSMenu *secondary=self.moreButton.menu;
     NSMenuItem *about=[[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"SA Cook Assistant · v%@",version] action:nil keyEquivalent:@""]; about.enabled=NO; [secondary addItem:about];
+    self.statusMenuItem=[[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Trạng thái: %@",self.status.stringValue] action:nil keyEquivalent:@""]; self.statusMenuItem.enabled=NO; [secondary addItem:self.statusMenuItem];
+    self.levelMenuItem=[[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Âm thanh: %@",self.levelLabel.stringValue] action:nil keyEquivalent:@""]; self.levelMenuItem.enabled=NO; [secondary addItem:self.levelMenuItem];
+    [secondary addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *sourceRoot=[[NSMenuItem alloc] initWithTitle:@"Nguồn âm thanh" action:nil keyEquivalent:@""];
+    self.audioSourceMenu=[[NSMenu alloc] initWithTitle:@"Nguồn âm thanh"];
+    sourceRoot.submenu=self.audioSourceMenu; [secondary addItem:sourceRoot];
+    [secondary addItem:[self secondaryMenuItem:@"Chốt câu hỏi V + E (Space)" action:@selector(commitCurrentQuestionFromSpace) tag:0]];
     [secondary addItem:[NSMenuItem separatorItem]];
     NSMenuItem *smaller=[self secondaryMenuItem:@"Chữ nhỏ hơn" action:@selector(changeReadingFont:) tag:-1]; smaller.keyEquivalent=@"-"; [secondary addItem:smaller];
     NSMenuItem *larger=[self secondaryMenuItem:@"Chữ lớn hơn" action:@selector(changeReadingFont:) tag:1]; larger.keyEquivalent=@"="; [secondary addItem:larger];
@@ -865,24 +910,24 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     [secondary addItem:[self secondaryMenuItem:@"Hồ sơ & menu riêng…" action:@selector(configurePresenterProfile:) tag:0]];
     [secondary addItem:[self secondaryMenuItem:@"Kiểm tra cập nhật…" action:@selector(checkForUpdates:) tag:0]];
     NSView *automatic=[self buildReadingLane:YES],*manual=[self buildReadingLane:NO];
-    NSView *dock=[NSView new]; dock.translatesAutoresizingMaskIntoConstraints=NO; dock.wantsLayer=YES;
-    dock.identifier=@"bottomControlBar";
-    dock.accessibilityLabel=@"Bottom control bar"; dock.layer.cornerRadius=12; dock.layer.borderWidth=0; dock.layer.masksToBounds=YES;
-    dock.layer.backgroundColor=[NSColor colorWithWhite:0.025 alpha:[self dockBackdropAlpha]].CGColor;
-    self.controlDock=dock;
-    for(NSView *view in @[self.listenButton,self.deviceButton,self.commitButton,self.status,self.levelLabel,self.moreButton]) [dock addSubview:view];
-    for(NSView *view in @[automatic,manual,dock]) [root addSubview:view];
+    NSView *topBar=[NSView new]; topBar.translatesAutoresizingMaskIntoConstraints=NO; topBar.wantsLayer=YES;
+    topBar.identifier=@"topControlBar";
+    topBar.accessibilityLabel=@"Compact top control bar"; topBar.layer.cornerRadius=0; topBar.layer.borderWidth=0; topBar.layer.masksToBounds=NO;
+    topBar.layer.backgroundColor=NSColor.clearColor.CGColor;
+    self.controlDock=topBar;
+    self.vHeaderLabel=[self label:@"V" size:13 weight:NSFontWeightHeavy]; self.vHeaderLabel.textColor=[self laneAccent:YES]; self.vHeaderLabel.identifier=@"vietnameseLaneLabel";
+    self.eHeaderLabel=[self label:@"E" size:13 weight:NSFontWeightHeavy]; self.eHeaderLabel.textColor=[self laneAccent:NO]; self.eHeaderLabel.identifier=@"englishLaneLabel";
+    for(NSView *view in @[self.vHeaderLabel,self.eHeaderLabel,self.listenButton,self.moreButton]) [topBar addSubview:view];
+    for(NSView *view in @[automatic,manual,topBar]) [root addSubview:view];
     [NSLayoutConstraint activateConstraints:@[
-        [dock.leadingAnchor constraintEqualToAnchor:root.leadingAnchor constant:14],[dock.trailingAnchor constraintEqualToAnchor:root.trailingAnchor constant:-14],[dock.bottomAnchor constraintEqualToAnchor:root.bottomAnchor constant:-10],[dock.heightAnchor constraintEqualToConstant:54],
-        [self.listenButton.leadingAnchor constraintEqualToAnchor:dock.leadingAnchor constant:12],[self.listenButton.centerYAnchor constraintEqualToAnchor:dock.centerYAnchor],[self.listenButton.widthAnchor constraintEqualToConstant:108],[self.listenButton.heightAnchor constraintEqualToConstant:30],
-        [self.deviceButton.leadingAnchor constraintEqualToAnchor:self.listenButton.trailingAnchor constant:6],[self.deviceButton.centerYAnchor constraintEqualToAnchor:self.listenButton.centerYAnchor],[self.deviceButton.widthAnchor constraintEqualToConstant:155],
-        [self.commitButton.leadingAnchor constraintEqualToAnchor:self.deviceButton.trailingAnchor constant:8],[self.commitButton.centerYAnchor constraintEqualToAnchor:self.listenButton.centerYAnchor],[self.commitButton.widthAnchor constraintEqualToConstant:118],[self.commitButton.heightAnchor constraintEqualToConstant:28],
-        [self.moreButton.trailingAnchor constraintEqualToAnchor:dock.trailingAnchor constant:-10],[self.moreButton.centerYAnchor constraintEqualToAnchor:dock.centerYAnchor],[self.moreButton.widthAnchor constraintEqualToConstant:44],[self.moreButton.heightAnchor constraintEqualToConstant:30],
-        [self.levelLabel.trailingAnchor constraintEqualToAnchor:self.moreButton.leadingAnchor constant:-10],[self.levelLabel.centerYAnchor constraintEqualToAnchor:dock.centerYAnchor],[self.levelLabel.widthAnchor constraintEqualToConstant:116],
-        [self.status.leadingAnchor constraintEqualToAnchor:self.commitButton.trailingAnchor constant:14],[self.status.trailingAnchor constraintLessThanOrEqualToAnchor:self.levelLabel.leadingAnchor constant:-8],[self.status.centerYAnchor constraintEqualToAnchor:dock.centerYAnchor],
-        [automatic.topAnchor constraintEqualToAnchor:root.topAnchor constant:34],[automatic.leadingAnchor constraintEqualToAnchor:root.leadingAnchor constant:14],
-        [manual.topAnchor constraintEqualToAnchor:automatic.topAnchor],[manual.leadingAnchor constraintEqualToAnchor:automatic.trailingAnchor constant:12],[manual.trailingAnchor constraintEqualToAnchor:root.trailingAnchor constant:-14],
-        [automatic.widthAnchor constraintEqualToAnchor:manual.widthAnchor],[automatic.bottomAnchor constraintEqualToAnchor:dock.topAnchor constant:-8],[manual.bottomAnchor constraintEqualToAnchor:automatic.bottomAnchor]
+        [topBar.leadingAnchor constraintEqualToAnchor:root.leadingAnchor constant:6],[topBar.trailingAnchor constraintEqualToAnchor:root.trailingAnchor constant:-6],[topBar.topAnchor constraintEqualToAnchor:root.topAnchor constant:26],[topBar.heightAnchor constraintEqualToConstant:30],
+        [self.vHeaderLabel.leadingAnchor constraintEqualToAnchor:automatic.leadingAnchor constant:6],[self.vHeaderLabel.centerYAnchor constraintEqualToAnchor:topBar.centerYAnchor],
+        [self.eHeaderLabel.leadingAnchor constraintEqualToAnchor:manual.leadingAnchor constant:6],[self.eHeaderLabel.centerYAnchor constraintEqualToAnchor:topBar.centerYAnchor],
+        [self.moreButton.trailingAnchor constraintEqualToAnchor:topBar.trailingAnchor],[self.moreButton.centerYAnchor constraintEqualToAnchor:topBar.centerYAnchor],[self.moreButton.widthAnchor constraintEqualToConstant:40],[self.moreButton.heightAnchor constraintEqualToConstant:28],
+        [self.listenButton.trailingAnchor constraintEqualToAnchor:self.moreButton.leadingAnchor constant:-6],[self.listenButton.centerYAnchor constraintEqualToAnchor:topBar.centerYAnchor],[self.listenButton.widthAnchor constraintEqualToConstant:108],[self.listenButton.heightAnchor constraintEqualToConstant:28],
+        [automatic.topAnchor constraintEqualToAnchor:topBar.bottomAnchor constant:2],[automatic.leadingAnchor constraintEqualToAnchor:root.leadingAnchor constant:6],
+        [manual.topAnchor constraintEqualToAnchor:automatic.topAnchor],[manual.leadingAnchor constraintEqualToAnchor:automatic.trailingAnchor constant:6],[manual.trailingAnchor constraintEqualToAnchor:root.trailingAnchor constant:-6],
+        [automatic.widthAnchor constraintEqualToAnchor:manual.widthAnchor],[automatic.bottomAnchor constraintEqualToAnchor:root.bottomAnchor constant:-6],[manual.bottomAnchor constraintEqualToAnchor:automatic.bottomAnchor]
     ]];
     [self refreshBackdropAppearance]; [self refreshReadingTypography];
 }
@@ -892,7 +937,8 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     UInt32 size = 0; AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &listAddress, 0, NULL, &size);
     UInt32 count = size / sizeof(AudioDeviceID); AudioDeviceID *devices = calloc(count, sizeof(AudioDeviceID));
     AudioObjectGetPropertyData(kAudioObjectSystemObject, &listAddress, 0, NULL, &size, devices);
-    NSMutableArray *ids=[NSMutableArray array]; NSInteger blackHoleIndex=-1;
+    [self.deviceButton removeAllItems]; [self.audioSourceMenu removeAllItems];
+    NSMutableArray *ids=[NSMutableArray array]; NSMutableArray<NSMenuItem *> *sourceItems=[NSMutableArray array]; NSInteger blackHoleIndex=-1;
     for (UInt32 i=0; i<count; i++) {
       AudioObjectPropertyAddress streamAddress = { kAudioDevicePropertyStreamConfiguration, kAudioDevicePropertyScopeInput, kAudioObjectPropertyElementMain };
       UInt32 configSize=0; if (AudioObjectGetPropertyDataSize(devices[i], &streamAddress, 0, NULL, &configSize) != noErr) continue;
@@ -902,14 +948,21 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       AudioObjectGetPropertyData(devices[i], &nameAddress, 0, NULL, &nameSize, &name);
       NSString *deviceName = CFBridgingRelease(name) ?: [NSString stringWithFormat:@"Audio device %u",devices[i]];
       [self.deviceButton addItemWithTitle:[NSString stringWithFormat:@"Nguồn: %@",deviceName]]; [ids addObject:@(devices[i])];
+      NSMenuItem *sourceItem=[self secondaryMenuItem:deviceName action:@selector(selectAudioSourceFromMenu:) tag:(NSInteger)ids.count-1];
+      [self.audioSourceMenu addItem:sourceItem]; [sourceItems addObject:sourceItem];
       if ([deviceName rangeOfString:@"BlackHole" options:NSCaseInsensitiveSearch].location != NSNotFound) blackHoleIndex=ids.count-1;
     }
-    free(devices); self.inputDeviceIDs=ids;
-    if (blackHoleIndex >= 0) [self.deviceButton selectItemAtIndex:blackHoleIndex];
+    free(devices); self.inputDeviceIDs=ids; self.audioSourceMenuItems=sourceItems;
+    NSInteger selected=blackHoleIndex>=0?blackHoleIndex:(ids.count?0:-1);
+    if(selected>=0) {
+      [self.deviceButton selectItemAtIndex:selected];
+      for(NSMenuItem *item in self.audioSourceMenuItems) item.state=item.tag==selected?NSControlStateValueOn:NSControlStateValueOff;
+    }
 }
 
 - (void)importData:(id)sender {
     NSOpenPanel *panel = [NSOpenPanel openPanel]; panel.allowsMultipleSelection = YES; panel.canChooseDirectories = NO;
+    [self protectWindowFromCapture:panel];
     panel.message = @"Chọn dữ liệu dùng làm căn cứ trả lời (.txt, .md, .pdf)";
     panel.allowedFileTypes = @[@"txt", @"md", @"pdf"];
     [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse result) {
@@ -1018,7 +1071,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       float db=rms>0?20.0f*log10f(rms):-100.0f; NSInteger bars=(NSInteger)((db+60.0f)/5.0f); bars=MAX(0,MIN(10,bars));
       NSMutableString *meter=[NSMutableString string]; for(NSInteger i=0;i<10;i++) [meter appendString:i<bars?@"▮":@"▯"];
       NSString *detail=bars?[NSString stringWithFormat:@"%@  %.0f dB",meter,db]:@"Không có tín hiệu âm thanh";
-      dispatch_async(dispatch_get_main_queue(), ^{ weak.levelLabel.stringValue=bars?@"● Có âm thanh":@"○ Im lặng"; weak.levelLabel.toolTip=detail; weak.levelLabel.textColor=bars?NSColor.systemGreenColor:NSColor.systemOrangeColor; });
+      dispatch_async(dispatch_get_main_queue(), ^{ [weak setAudioLevelText:bars?@"● Có âm thanh":@"○ Im lặng" color:bars?NSColor.systemGreenColor:NSColor.systemOrangeColor toolTip:detail]; });
     }];
     self.inputTapInstalled=YES;
     self.listening=YES;
@@ -1036,9 +1089,10 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     self.listening = YES; self.listenButton.title = @"Dừng nghe";
     self.listenButton.layer.backgroundColor=[NSColor colorWithRed:0.96 green:0.33 blue:0.40 alpha:0.20].CGColor;
     self.listenButton.layer.borderColor=[NSColor colorWithRed:1 green:0.42 blue:0.48 alpha:0.42].CGColor;
-    self.levelLabel.stringValue=@"○ Đang chờ âm thanh"; [self setStatus:@"● Đang nghe • Space để lấy gợi ý" color:NSColor.systemRedColor];
+    [self setAudioLevelText:@"○ Đang chờ âm thanh" color:NSColor.systemOrangeColor toolTip:@"Đang chờ tín hiệu từ nguồn đã chọn"];
+    [self setStatus:@"● Đang nghe • Space để lấy gợi ý" color:NSColor.systemRedColor];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2*NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-      if (self.listening && self.lastLevelUpdate <= started) { self.levelLabel.stringValue=@"○ Không có âm thanh"; self.levelLabel.toolTip=@"Không nhận được buffer từ BlackHole"; self.levelLabel.textColor=NSColor.systemRedColor; }
+      if (self.listening && self.lastLevelUpdate <= started) [self setAudioLevelText:@"○ Không có âm thanh" color:NSColor.systemRedColor toolTip:@"Không nhận được buffer từ BlackHole"];
     });
 }
 - (NSArray<NSString *> *)recognitionContextualStrings {
@@ -1202,8 +1256,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       AudioObjectSetPropertyData(kAudioObjectSystemObject,&address,0,NULL,sizeof(restore),&restore);
       self.originalInputDevice=kAudioObjectUnknown;
     }
-    self.levelLabel.stringValue=@"○ Đã dừng";
-    self.levelLabel.textColor=[NSColor colorWithWhite:0.76 alpha:1];
+    [self setAudioLevelText:@"○ Đã dừng" color:[NSColor colorWithWhite:0.76 alpha:1] toolTip:@"Nhận diện âm thanh đã dừng"];
     self.listenButton.title=@"Bắt đầu nghe";
     self.listenButton.layer.backgroundColor=[NSColor colorWithRed:0.18 green:0.75 blue:0.55 alpha:0.22].CGColor;
     self.listenButton.layer.borderColor=[NSColor colorWithRed:0.30 green:0.92 blue:0.69 alpha:0.40].CGColor;
@@ -1931,23 +1984,28 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 }
 - (void)showPanelQuestion:(NSString *)question answer:(NSString *)answer inTextView:(NSTextView *)view accentColor:(NSColor *)accent answerSize:(CGFloat)answerSize {
     if(!view) return;
+    NSScrollView *conversationScroll=view.enclosingScrollView;
+    NSPoint pinnedOrigin=conversationScroll.contentView.bounds.origin;
+    if(fabs(pinnedOrigin.x)>0.01) {
+        pinnedOrigin.x=0;
+        [view scrollPoint:pinnedOrigin];
+        [conversationScroll reflectScrolledClipView:conversationScroll.contentView];
+    }
     NSString *q=question ?: @"", *a=answer ?: @"";
     BOOL automatic=view==self.autoAnswerView;
     NSArray<NSDictionary *> *records=automatic?self.autoRecords:self.manualRecords;
     // Keep the live interview readable without wasting vertical space. Section
     // breaks carry the hierarchy; individual speaker and body rows stay tight.
-    NSMutableParagraphStyle *sectionStyle=[NSMutableParagraphStyle new]; sectionStyle.paragraphSpacing=3; sectionStyle.paragraphSpacingBefore=2;
-    NSMutableParagraphStyle *questionStyle=[NSMutableParagraphStyle new]; questionStyle.lineSpacing=1.5; questionStyle.paragraphSpacing=5;
-    NSMutableParagraphStyle *answerStyle=[NSMutableParagraphStyle new]; answerStyle.lineSpacing=MAX(1.5,answerSize*0.08); answerStyle.paragraphSpacing=6;
-    NSMutableParagraphStyle *compactStyle=[NSMutableParagraphStyle new]; compactStyle.lineSpacing=1.5; compactStyle.paragraphSpacing=5;
-    NSShadow *textShadow=[NSShadow new]; textShadow.shadowColor=[NSColor colorWithWhite:0 alpha:0.96]; textShadow.shadowBlurRadius=3.0; textShadow.shadowOffset=NSZeroSize;
+    NSMutableParagraphStyle *sectionStyle=[NSMutableParagraphStyle new]; sectionStyle.paragraphSpacing=3; sectionStyle.paragraphSpacingBefore=2; sectionStyle.lineBreakMode=NSLineBreakByWordWrapping;
+    NSMutableParagraphStyle *questionStyle=[NSMutableParagraphStyle new]; questionStyle.lineSpacing=1.5; questionStyle.paragraphSpacing=5; questionStyle.lineBreakMode=NSLineBreakByWordWrapping;
+    NSMutableParagraphStyle *answerStyle=[NSMutableParagraphStyle new]; answerStyle.lineSpacing=MAX(1.5,answerSize*0.08); answerStyle.paragraphSpacing=6; answerStyle.lineBreakMode=NSLineBreakByWordWrapping;
+    NSMutableParagraphStyle *compactStyle=[NSMutableParagraphStyle new]; compactStyle.lineSpacing=1.5; compactStyle.paragraphSpacing=5; compactStyle.lineBreakMode=NSLineBreakByWordWrapping;
     NSMutableAttributedString *display=[NSMutableAttributedString new];
-    NSDictionary *sectionAttributes=@{NSFontAttributeName:[NSFont systemFontOfSize:10 weight:NSFontWeightBold],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.66 alpha:1],NSKernAttributeName:@1.35,NSParagraphStyleAttributeName:sectionStyle,NSShadowAttributeName:textShadow};
-    [display appendAttributedString:[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"%@\n",automatic?@"V":@"E"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:13 weight:NSFontWeightHeavy],NSForegroundColorAttributeName:accent,NSKernAttributeName:@1.4,NSParagraphStyleAttributeName:sectionStyle,NSShadowAttributeName:textShadow}]];
+    NSDictionary *sectionAttributes=@{NSFontAttributeName:[NSFont systemFontOfSize:10 weight:NSFontWeightBold],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.66 alpha:1],NSKernAttributeName:@1.35,NSParagraphStyleAttributeName:sectionStyle};
     if(q.length) {
-        [display appendAttributedString:[[NSAttributedString alloc] initWithString:[q stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:MAX(18,answerSize*0.76) weight:NSFontWeightSemibold],NSForegroundColorAttributeName:[accent colorWithAlphaComponent:1],NSParagraphStyleAttributeName:questionStyle,NSShadowAttributeName:textShadow}]];
+        [display appendAttributedString:[[NSAttributedString alloc] initWithString:[q stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:MAX(18,answerSize*0.76) weight:NSFontWeightSemibold],NSForegroundColorAttributeName:[accent colorWithAlphaComponent:1],NSParagraphStyleAttributeName:questionStyle}]];
     }
-    if(a.length) [display appendAttributedString:[self answerText:a attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:answerSize weight:NSFontWeightMedium],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.97 alpha:1],NSParagraphStyleAttributeName:answerStyle,NSShadowAttributeName:textShadow} question:q]];
+    if(a.length) [display appendAttributedString:[self answerText:a attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:answerSize weight:NSFontWeightMedium],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.97 alpha:1],NSParagraphStyleAttributeName:answerStyle} question:q]];
     if(records.count>1) {
         CGFloat previousSize=MAX(15,answerSize*0.62);
         NSInteger first=MAX(0,(NSInteger)records.count-51);
@@ -1969,8 +2027,8 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
                     [fresh appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n\n" attributes:sectionAttributes]];
                     appendedHistory=YES;
                 }
-                [fresh appendAttributedString:[[NSAttributedString alloc] initWithString:[previousQuestion stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightSemibold],NSForegroundColorAttributeName:[accent colorWithAlphaComponent:0.92],NSParagraphStyleAttributeName:compactStyle,NSShadowAttributeName:textShadow}]];
-                [fresh appendAttributedString:[self answerText:[previousAnswer stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightRegular],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.94 alpha:1],NSParagraphStyleAttributeName:compactStyle,NSShadowAttributeName:textShadow} question:previousQuestion]];
+                [fresh appendAttributedString:[[NSAttributedString alloc] initWithString:[previousQuestion stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightSemibold],NSForegroundColorAttributeName:[accent colorWithAlphaComponent:0.92],NSParagraphStyleAttributeName:compactStyle}]];
+                [fresh appendAttributedString:[self answerText:[previousAnswer stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightRegular],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.94 alpha:1],NSParagraphStyleAttributeName:compactStyle} question:previousQuestion]];
             }
             history=fresh.copy;
             if(automatic) { self.autoConversationHistoryState=historyState; self.autoConversationHistory=history; }
@@ -1979,12 +2037,14 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
         if(history.length) [display appendAttributedString:history];
     }
     if([view.textStorage isEqualToAttributedString:display]) return;
-    NSString *questionPrefix=[NSString stringWithFormat:@"%@\n%@\n",automatic?@"V":@"E",q];
+    NSString *questionPrefix=[q stringByAppendingString:@"\n"];
     BOOL sameQuestion=q.length && [view.string hasPrefix:questionPrefix];
     NSPoint previous=view.enclosingScrollView.contentView.bounds.origin;
+    previous.x=0;
     [view.textStorage setAttributedString:display];
     [view.layoutManager ensureLayoutForTextContainer:view.textContainer];
     [view scrollPoint:sameQuestion?previous:NSZeroPoint];
+    [view.enclosingScrollView reflectScrolledClipView:view.enclosingScrollView.contentView];
     if(!sameQuestion && view.window.isVisible) {
       view.alphaValue=0.84;
       [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
@@ -2358,6 +2418,32 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSRegularExpression *labels=[NSRegularExpression regularExpressionWithPattern:@"(?i)^(?:(?:short(?:\\s+answer)?|full(?:\\s+answer)?|ngắn|đầy\\s+đủ)\\s*:\\s*)+" options:0 error:nil];
     return [[labels stringByReplacingMatchesInString:clean options:0 range:NSMakeRange(0,clean.length) withTemplate:@""] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
 }
+- (NSString *)normalisedSentenceForDeduplication:(NSString *)text {
+    NSString *clean=[[self textByRemovingLeadingAnswerVariantLabels:text] lowercaseString];
+    clean=[clean stringByReplacingOccurrencesOfString:@"[^\\p{L}\\p{N}]+" withString:@" " options:NSRegularExpressionSearch range:NSMakeRange(0,clean.length)];
+    return [clean stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+}
+- (NSString *)fullAnswerByRemovingRepeatedShort:(NSString *)shortAnswer full:(NSString *)fullAnswer {
+    NSString *shortText=[self textByRemovingLeadingAnswerVariantLabels:shortAnswer];
+    NSString *fullText=[self textByRemovingLeadingAnswerVariantLabels:fullAnswer];
+    if(!shortText.length || !fullText.length) return fullText ?: @"";
+    NSRegularExpression *leadingSeparators=[NSRegularExpression regularExpressionWithPattern:@"^[\\s.!?;,:\\-–—]+" options:0 error:nil];
+    NSRange direct=[fullText rangeOfString:shortText options:NSCaseInsensitiveSearch|NSAnchoredSearch];
+    if(direct.location!=NSNotFound) {
+      NSUInteger end=NSMaxRange(direct);
+      if(end==fullText.length) return @"";
+      unichar boundary=[fullText characterAtIndex:end];
+      if([[NSCharacterSet whitespaceAndNewlineCharacterSet] characterIsMember:boundary] || [[NSCharacterSet characterSetWithCharactersInString:@".!?"] characterIsMember:boundary])
+        { NSString *remainder=[fullText substringFromIndex:end]; return [leadingSeparators stringByReplacingMatchesInString:remainder options:0 range:NSMakeRange(0,remainder.length) withTemplate:@""]; }
+    }
+    NSRange sentenceEnd=[fullText rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@".!?"]];
+    if(sentenceEnd.location!=NSNotFound) {
+      NSString *first=[fullText substringToIndex:NSMaxRange(sentenceEnd)];
+      if([[self normalisedSentenceForDeduplication:first] isEqualToString:[self normalisedSentenceForDeduplication:shortText]])
+        { NSString *remainder=[fullText substringFromIndex:NSMaxRange(sentenceEnd)]; return [leadingSeparators stringByReplacingMatchesInString:remainder options:0 range:NSMakeRange(0,remainder.length) withTemplate:@""]; }
+    }
+    return fullText;
+}
 - (NSDictionary<NSString *,NSString *> *)parseAnswerVariants:(NSString *)text {
     NSString *clean=[text ?: @"" stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     if(!clean.length) return @{};
@@ -2405,12 +2491,13 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSString *fullAnswer=[self answerByReplacingComplexPhrases:fullSource ?: @""];
     fullAnswer=[self answerByUsingFirstPersonWhenSafe:fullAnswer question:question];
     fullAnswer=[self textByLimitingToWords:fullAnswer count:85];
+    fullAnswer=[self fullAnswerByRemovingRepeatedShort:shortAnswer full:fullAnswer];
     if(!shortAnswer.length && !fullAnswer.length) return @"";
     BOOL vietnamese=targetLanguage.length?[targetLanguage isEqualToString:@"vi"]:([self isVietnameseText:question] || [self isVietnameseText:fullAnswer]);
     NSString *shortLabel=vietnamese?@"Ngắn":@"Short",*fullLabel=vietnamese?@"Đầy đủ":@"Full";
-    NSString *readyShort=shortAnswer.length?shortAnswer:fullAnswer;
-    NSString *readyFull=fullAnswer.length?fullAnswer:readyShort;
-    return [NSString stringWithFormat:@"%@: %@\n\n%@: %@",shortLabel,readyShort,fullLabel,readyFull];
+    if(shortAnswer.length && fullAnswer.length) return [NSString stringWithFormat:@"%@: %@\n\n%@: %@",shortLabel,shortAnswer,fullLabel,fullAnswer];
+    if(shortAnswer.length) return [NSString stringWithFormat:@"%@: %@",shortLabel,shortAnswer];
+    return [NSString stringWithFormat:@"%@: %@",fullLabel,fullAnswer];
 }
 - (NSArray<NSString *> *)highlightTermsForQuestion:(NSString *)question answer:(NSString *)answer {
     NSMutableOrderedSet<NSString *> *terms=[NSMutableOrderedSet orderedSetWithArray:@[@"HACCP",@"FIFO",@"mise en place",@"à la carte",@"sous-vide",@"roux",@"béchamel",@"velouté",@"hollandaise",@"béarnaise",@"mirepoix",@"julienne",@"brunoise",@"bain-marie",@"cross-contamination",@"sanitising",@"sanitiser",@"stock",@"temperature",@"danger zone",@"chef's knife",@"grill",@"grilled",@"poultry",@"seafood"]];
@@ -2456,6 +2543,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     // A new answer must not pull a reader away from an older answer in this lane.
     BOOL nativeView=[view isKindOfClass:NSTextView.class];
     NSPoint position=nativeView?view.enclosingScrollView.contentView.bounds.origin:NSZeroPoint;
+    position.x=0;
     NSString *oldText=view.string.copy;
     view.string=@"";
     if(!entries.count) { view.string=automatic?@"Chưa có câu trả lời trước.":@"No previous answer yet."; return; }
@@ -2470,6 +2558,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
             }
         }
         [view scrollPoint:position];
+        [view.enclosingScrollView reflectScrolledClipView:view.enclosingScrollView.contentView];
     }
 }
 - (void)applyPairedPayloadToManualRecord:(NSMutableDictionary *)record {
@@ -2621,8 +2710,8 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       : (linkedMultipart?@"Help with cook interview practice and presentation questions. Answer in English. The HEARD TURN contains linked, repeated, or clarifying question fragments from one speaking turn. Infer the single underlying request from all lines and RECENT CONVERSATION, then give ONE direct answer without numbering. Later fragments may clarify the subject instead of creating a new question.":@"Help with cook interview practice and presentation questions. Answer in English. The HEARD TURN contains multiple independent questions, one per line. Answer EVERY line in the same order, clearly numbered 1 and 2 (and onward). Do not merge, omit, or replace any subject.");
     NSMutableString *instructions=[NSMutableString stringWithString:multipart?multipartInstructions:(vietnamese?@"Bạn hỗ trợ luyện phỏng vấn và thuyết trình nghề bếp. Chỉ trả lời bằng tiếng Việt. Câu hỏi vừa nghe là nội dung chính; không được đổi chủ đề theo một câu tham khảo gần giống.":@"Help with cook interview practice and presentation questions. Answer in English. The HEARD QUESTION is authoritative; a similar reference question must not replace its subject.")];
     [instructions appendString:vietnamese
-      ? @" Chỉ trả lời bằng tiếng Việt. Dòng đầu tiên phải có dạng Câu hỏi: theo sau là bản dịch tiếng Việt ngắn gọn, chính xác của câu hỏi đã nghe. Sau đó trả về đúng hai phần có nhãn Ngắn: và Đầy đủ:. Ngắn là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ. Đầy đủ chứa các ý hữu ích hơn, thường không quá 85 từ. Chỉ viết lời người thuyết trình có thể nói. Dùng ngôi thứ nhất cho hành động, lựa chọn, kinh nghiệm và quan điểm; nêu định nghĩa trực tiếp. Ưu tiên dữ liệu học cục bộ, sau đó dùng kiến thức nghề bếp và nơi làm việc đáng tin cậy. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh cho phép. Không bịa chi tiết và không nhắc đến nguồn hoặc AI."
-      : @" Return exactly two labelled sections: Short: and Full:. Short must be one direct answer the presenter can say immediately, normally under 28 words. Full must be a fuller answer with the useful details, normally under 85 words. Return only the words the presenter can say aloud after each label. Write actions, experience, choices, and opinions in the presenter's first person using I/my or we/our; state factual definitions directly. Never say 'you can say', 'I suggest', 'the answer is', 'according to the references', or explain how to answer. Use the provided local study references first. If they are insufficient, answer from reliable general culinary and workplace knowledge. Use web search only for a missing, niche, uncertain, or current fact. Never say that the references do not provide information when the question can be answered reliably. Correct or briefly clarify an obvious speech-recognition error when context makes the intended term clear. Do not invent uncertain details. No source labels in the answer text."];
+      ? @" Chỉ trả lời bằng tiếng Việt. Dòng đầu tiên phải có dạng Câu hỏi: theo sau là bản dịch tiếng Việt ngắn gọn, chính xác của câu hỏi đã nghe. Sau đó trả về đúng hai phần có nhãn Ngắn: và Đầy đủ:. Ngắn là câu trả lời trực tiếp có thể nói ngay, thường không quá 28 từ. Đầy đủ chỉ chứa các ý bổ sung để nói tiếp sau Ngắn, thường không quá 85 từ; không lặp hoặc diễn đạt lại nội dung Ngắn. Chỉ viết lời người thuyết trình có thể nói. Dùng ngôi thứ nhất cho hành động, lựa chọn, kinh nghiệm và quan điểm; nêu định nghĩa trực tiếp. Ưu tiên dữ liệu học cục bộ, sau đó dùng kiến thức nghề bếp và nơi làm việc đáng tin cậy. Sửa lỗi nhận diện rõ ràng khi ngữ cảnh cho phép. Không bịa chi tiết và không nhắc đến nguồn hoặc AI."
+      : @" Return exactly two labelled sections: Short: and Full:. Short must be one direct answer the presenter can say immediately, normally under 28 words. Full must contain only useful additional details to say after Short, normally under 85 words; never repeat, restate, or paraphrase Short. Return only the words the presenter can say aloud after each label. Write actions, experience, choices, and opinions in the presenter's first person using I/my or we/our; state factual definitions directly. Never say 'you can say', 'I suggest', 'the answer is', 'according to the references', or explain how to answer. Use the provided local study references first. If they are insufficient, answer from reliable general culinary and workplace knowledge. Use web search only for a missing, niche, uncertain, or current fact. Never say that the references do not provide information when the question can be answered reliably. Correct or briefly clarify an obvious speech-recognition error when context makes the intended term clear. Do not invent uncertain details. No source labels in the answer text."];
     [instructions replaceOccurrencesOfString:@"Use one short sentence per numbered answer, with no more than 30 words per answer." withString:@"Use up to three concise sentences per numbered answer, with no more than 45 words per answer. Use clear, natural B2 vocabulary and enough relevant detail to make the answer complete." options:0 range:NSMakeRange(0,instructions.length)];
     [instructions replaceOccurrencesOfString:@"Give the direct answer in 1–2 short sentences and no more than 30 words." withString:@"Give the direct answer in two or three concise sentences and no more than 45 words. Use clear, natural B2 vocabulary and enough relevant detail to make the answer complete." options:0 range:NSMakeRange(0,instructions.length)];
     [instructions appendString:@" For a behavioral question, use the strongest concrete example supported by the local references or recent conversation and compress situation, task, action, and result into the same short limit. For a technical or role-specific question, answer the concept directly and mention a tradeoff only when the question asks for one or it is essential. When wording is vague, infer the competency or signal being evaluated and answer it confidently without sounding arrogant or robotic. If a crucial detail is genuinely missing, ask one short clarifying question; otherwise state one reasonable assumption and answer. When explicitly asked to suggest questions for the interviewer, offer two or three concise questions about the role, team, success criteria, product, or company."];
@@ -2681,15 +2770,15 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 }
 - (NSDictionary *)pairedFullAnswerBodyFromBody:(NSDictionary *)base englishShort:(NSString *)englishShort vietnameseShort:(NSString *)vietnameseShort {
     NSMutableDictionary *body=[base mutableCopy];
-    body[@"instructions"]=[(body[@"instructions"] ?: @"") stringByAppendingString:@" Expand the approved Short answer into the Full answer without changing its conclusion or facts. Return only the two Full field values, with no visible labels. The Vietnamese Full answer must translate the English Full answer exactly."];
+    body[@"instructions"]=[(body[@"instructions"] ?: @"") stringByAppendingString:@" Write only the additional details that should be spoken after the approved Short answer. Do not repeat, restate, or paraphrase any sentence or claim already present in Short. Begin with the first new detail. Return only the two Full field values, with no visible labels. The Vietnamese Full answer must translate the English Full answer exactly."];
     body[@"input"]=[NSString stringWithFormat:@"%@\n\nAPPROVED SHORT ANSWERS — AUTHORITATIVE:\nEnglish: %@\nVietnamese: %@",body[@"input"] ?: @"",englishShort ?: @"",vietnameseShort ?: @""];
     body[@"max_output_tokens"]=@360;
     body[@"text"]=@{@"format":@{
       @"type":@"json_schema",@"name":@"paired_bilingual_full_answer",@"strict":@YES,
       @"schema":@{@"type":@"object",@"additionalProperties":@NO,
         @"properties":@{
-          @"english_full":@{@"type":@"string",@"description":@"Full English answer content only, under 55 words and without a label."},
-          @"vietnamese_full":@{@"type":@"string",@"description":@"Exact natural Vietnamese translation of english_full, without a label."}},
+          @"english_full":@{@"type":@"string",@"description":@"Only new English details to say after Short; never repeat or paraphrase Short; under 55 words and without a label."},
+          @"vietnamese_full":@{@"type":@"string",@"description":@"Exact natural Vietnamese translation of the additional english_full details, without repeating Vietnamese Short or adding a label."}},
         @"required":@[@"english_full",@"vietnamese_full"]}}};
     return body;
 }
@@ -2773,8 +2862,8 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
           NSDictionary *fullBody=[self pairedFullAnswerBodyFromBody:body englishShort:englishValue vietnameseShort:vietnameseValue];
           [self sendAnswerBody:fullBody apiKey:apiKey allowModelFallback:YES completion:^(NSDictionary *fullParsed) {
             NSDictionary *fullPair=[self pairedDictionaryFromParsedAnswer:fullParsed];
-            NSString *englishFull=[self textByRemovingLeadingAnswerVariantLabels:fullPair[@"english_full"]];
-            NSString *vietnameseFull=[self textByRemovingLeadingAnswerVariantLabels:fullPair[@"vietnamese_full"]];
+            NSString *englishFull=[self fullAnswerByRemovingRepeatedShort:englishValue full:fullPair[@"english_full"]];
+            NSString *vietnameseFull=[self fullAnswerByRemovingRepeatedShort:vietnameseValue full:fullPair[@"vietnamese_full"]];
             if(!englishFull.length || !vietnameseFull.length) {
               dispatch_async(dispatch_get_main_queue(), ^{
                 completion(partial,YES);
@@ -2892,7 +2981,14 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 - (void)showErrorTitle:(NSString *)title detail:(NSString *)detail {
     [self setStatus:title color:NSColor.systemRedColor]; [self showUpdateAlert:title detail:detail];
 }
-- (void)setStatus:(NSString *)s color:(NSColor *)c { self.status.stringValue=s; self.status.toolTip=s; self.status.textColor=c; }
+- (void)setAudioLevelText:(NSString *)text color:(NSColor *)color toolTip:(NSString *)toolTip {
+    self.levelLabel.stringValue=text ?: @""; self.levelLabel.textColor=color ?: NSColor.secondaryLabelColor; self.levelLabel.toolTip=toolTip;
+    self.levelMenuItem.title=[NSString stringWithFormat:@"Âm thanh: %@",text ?: @""]; self.levelMenuItem.toolTip=toolTip;
+}
+- (void)setStatus:(NSString *)s color:(NSColor *)c {
+    self.status.stringValue=s; self.status.toolTip=s; self.status.textColor=c;
+    self.statusMenuItem.title=[NSString stringWithFormat:@"Trạng thái: %@",s ?: @""]; self.statusMenuItem.toolTip=s;
+}
 - (void)buildMenu {
     NSMenu *bar=[NSMenu new];
     NSMenuItem *appRoot=[[NSMenuItem alloc] initWithTitle:@"Presenter AI" action:nil keyEquivalent:@""]; NSMenu *appMenu=[NSMenu new]; appRoot.submenu=appMenu; [bar addItem:appRoot];

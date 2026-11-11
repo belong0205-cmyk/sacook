@@ -84,9 +84,9 @@ static void CheckText(NSTextView *view, CGFloat fontSize, NSString *question, NS
     NSScrollView *scroll=view.enclosingScrollView;
     Check([view.string containsString:question],@"The full multipart question is displayed");
     Check([view.string containsString:answer],@"The complete long answer is displayed");
-    BOOL hasLanePrefix=[view.string hasPrefix:[@"V\n" stringByAppendingString:[question stringByAppendingString:@"\n"]]] || [view.string hasPrefix:[@"E\n" stringByAppendingString:[question stringByAppendingString:@"\n"]]];
+    BOOL hasQuestionPrefix=[view.string hasPrefix:[question stringByAppendingString:@"\n"]];
     BOOL noSpaceGuidance=[view.string rangeOfString:@"• SPACE" options:NSCaseInsensitiveSearch].location==NSNotFound && [view.string rangeOfString:@"press Space" options:NSCaseInsensitiveSearch].location==NSNotFound && [view.string rangeOfString:@"bấm Space" options:NSCaseInsensitiveSearch].location==NSNotFound;
-    Check(hasLanePrefix && noSpaceGuidance,@"Conversation shows the answer below its compact V/E marker without Space guidance");
+    Check(hasQuestionPrefix && noSpaceGuidance,@"Conversation starts directly with the question while V/E stays in the compact top row");
     Check([view.string rangeOfString:@"CURRENT\n"].location==NSNotFound && [view.string rangeOfString:@"\nPREVIOUS\n"].location==NSNotFound,@"Conversation omits the CURRENT and PREVIOUS labels");
     Check([view.string rangeOfString:@"\nTHEM\n"].location==NSNotFound && [view.string rangeOfString:@"\nME\n"].location==NSNotFound,@"Question and answer use colour instead of THEM and ME rows");
     Check(!view.editable && !view.selectable,@"Reading content does not enter text selection mode");
@@ -98,19 +98,25 @@ static void CheckText(NSTextView *view, CGFloat fontSize, NSString *question, NS
     NSColor *answerColor=answerRange.location!=NSNotFound?[view.textStorage attribute:NSForegroundColorAttributeName atIndex:answerRange.location effectiveRange:NULL]:nil;
     NSShadow *questionShadow=questionRange.location!=NSNotFound?[view.textStorage attribute:NSShadowAttributeName atIndex:questionRange.location effectiveRange:NULL]:nil;
     NSShadow *answerShadow=answerRange.location!=NSNotFound?[view.textStorage attribute:NSShadowAttributeName atIndex:answerRange.location effectiveRange:NULL]:nil;
+    __block BOOL hasAnyShadow=NO;
+    [view.textStorage enumerateAttribute:NSShadowAttributeName inRange:NSMakeRange(0,view.textStorage.length) options:0 usingBlock:^(id value,NSRange range,BOOL *stop) {
+        (void)range;
+        if(value) { hasAnyShadow=YES; *stop=YES; }
+    }];
     Check(fabs(font.pointSize-fontSize)<0.01,@"Answer respects selected reading size");
     Check(answerParagraph.lineSpacing<=MAX(1.5,fontSize*0.08)+0.01 && answerParagraph.paragraphSpacing<=6.01,@"Current answer typography stays vertically compact");
     Check(questionColor && answerColor && ![questionColor isEqual:answerColor],@"Question colour is visibly distinct from answer colour");
-    Check(questionColor.alphaComponent>0.99 && answerColor.alphaComponent>0.99 && questionShadow.shadowBlurRadius>=2 && answerShadow.shadowBlurRadius>=2,@"Opaque reading text retains a subtle shadow over bright or busy slides");
+    Check(questionColor.alphaComponent>0.99 && answerColor.alphaComponent>0.99 && !questionShadow && !answerShadow && !hasAnyShadow,@"Reading text stays opaque without the doubled-looking shadow seen on small MacBooks");
     Check(view.verticallyResizable && !view.horizontallyResizable,@"Answers resize vertically, not horizontally");
     Check(view.textContainer.widthTracksTextView,@"Answer wrapping tracks its text view");
     Check(!scroll.hasHorizontalScroller,@"Reading does not require horizontal scrolling");
+    Check(scroll.horizontalScrollElasticity==NSScrollElasticityNone,@"Trackpad gestures cannot shift a conversation horizontally");
     Check(fabs(view.frame.size.width-scroll.contentSize.width)<2,@"Text document fits the available column width");
     NSRect used=[view.layoutManager usedRectForTextContainer:view.textContainer];
     Check(used.size.width<=view.textContainer.containerSize.width+1,@"Long answer glyphs stay inside the text container");
     Check(view.frame.size.height+2>=NSMaxY(used)+view.textContainerInset.height*2,@"The text document reaches the final line");
     Check(used.size.height>fontSize*5,@"Long fixture actually wraps across many lines");
-    Check(scroll.frame.size.height>=445,@"The single conversation surface uses nearly the full lane height");
+    Check(scroll.frame.size.height>=390,@"The single conversation surface uses nearly the full lane height on a compact MacBook window");
 }
 
 int main(int argc,const char *argv[]) {
@@ -119,16 +125,30 @@ int main(int argc,const char *argv[]) {
         ReadingUITestApp *app=[ReadingUITestApp new];
         [app buildMenu];
         [app buildUI];
-        NSView *dock=nil,*autoLane=nil,*spaceLane=nil;
+        NSView *topBar=nil,*autoLane=nil,*spaceLane=nil;
         for(NSView *view in app.window.contentView.subviews) {
-            if([view.identifier isEqualToString:@"bottomControlBar"]) dock=view;
+            if([view.identifier isEqualToString:@"topControlBar"]) topBar=view;
             else if([view.identifier isEqualToString:@"vietnameseConversationLane"]) autoLane=view;
             else if([view.identifier isEqualToString:@"englishConversationLane"]) spaceLane=view;
         }
-        Check(dock!=nil && autoLane!=nil && spaceLane!=nil,@"Two reading lanes and the bottom control dock are explicit layout regions");
-        Check(app.listenButton.superview==dock && app.deviceButton.superview==dock && app.autoButton.superview==nil && app.commitButton.superview==dock,@"Listening, source, and the shared V/E Space control live in the bottom dock without AUTO");
-        Check(app.status.superview==dock && app.levelLabel.superview==dock && app.moreButton.superview==dock,@"Status and one compact secondary-actions menu live in the bottom dock");
-        Check(dock.subviews.count==6,@"Bottom dock exposes three primary controls, two compact states, and one overflow menu");
+        Check(topBar!=nil && autoLane!=nil && spaceLane!=nil,@"Two reading lanes and one compact top control row are explicit layout regions");
+        Check(app.listenButton.superview==topBar && app.moreButton.superview==topBar && app.vHeaderLabel.superview==topBar && app.eHeaderLabel.superview==topBar,@"V, E, Start listening, and overflow share the top row");
+        Check(app.deviceButton.superview==nil && app.commitButton.superview==nil && app.status.superview==nil && app.levelLabel.superview==nil && app.autoButton.superview==nil,@"Source, Space, status, level, and AUTO no longer consume visible chrome");
+        Check(topBar.subviews.count==4 && [app.vHeaderLabel.stringValue isEqual:@"V"] && [app.eHeaderLabel.stringValue isEqual:@"E"],@"Top row contains only the two lane labels and two controls");
+        Check(app.audioSourceMenu!=nil && MenuHasAction(app.moreButton.menu,@selector(commitCurrentQuestionFromSpace)),@"Overflow contains the audio source submenu and Space action");
+        Check(app.statusMenuItem && !app.statusMenuItem.enabled && app.levelMenuItem && !app.levelMenuItem.enabled,@"Overflow keeps read-only listening status and audio level from the removed bottom bar");
+        [app setStatus:@"● Test status" color:NSColor.systemGreenColor]; [app setAudioLevelText:@"● Test audio" color:NSColor.systemGreenColor toolTip:@"Test meter"];
+        Check([app.statusMenuItem.title containsString:@"Test status"] && [app.levelMenuItem.title containsString:@"Test audio"],@"Hidden status and audio state update live inside overflow");
+        Check(app.window.sharingType==NSWindowSharingNone,@"Main assistant window is capture-protected immediately after construction");
+        app.window.sharingType=NSWindowSharingReadOnly; [app applicationDidBecomeActive:[NSNotification notificationWithName:NSApplicationDidBecomeActiveNotification object:NSApp]];
+        Check(app.window.sharingType==NSWindowSharingNone,@"Activation reapplies capture protection to the assistant window");
+        NSPanel *protectedPanel=[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,120,80) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
+        [app protectWindowFromCapture:protectedPanel]; Check(protectedPanel.sharingType==NSWindowSharingNone,@"Capture protection helper also covers panels and sheets"); [protectedPanel close];
+        app.inputDeviceIDs=@[@(101),@(202)]; [app.deviceButton addItemsWithTitles:@[@"Nguồn: A",@"Nguồn: B"]];
+        NSMenuItem *sourceA=[app secondaryMenuItem:@"A" action:@selector(selectAudioSourceFromMenu:) tag:0],*sourceB=[app secondaryMenuItem:@"B" action:@selector(selectAudioSourceFromMenu:) tag:1];
+        [app.audioSourceMenu addItem:sourceA]; [app.audioSourceMenu addItem:sourceB]; app.audioSourceMenuItems=@[sourceA,sourceB];
+        [app selectAudioSourceFromMenu:sourceB];
+        Check(app.deviceButton.indexOfSelectedItem==1 && sourceB.state==NSControlStateValueOn && sourceA.state==NSControlStateValueOff,@"Choosing a source in overflow updates the hidden audio-device state");
         for(NSString *selectorName in @[@"retryAutoAnswer:",@"retryManualAnswer:",@"clearAutoHistory:",@"clearManualHistory:",@"checkForUpdates:",@"configureAI:",@"changeReadingFont:",@"changeBackdropStrength:"])
             Check(MenuHasAction(app.moreButton.menu,NSSelectorFromString(selectorName)),[NSString stringWithFormat:@"Secondary menu exposes %@",selectorName]);
         Check(app.backdropMenuItems.count==3 && app.backdropStrength==1,@"Background menu offers three levels and starts at the balanced level");
@@ -144,14 +164,16 @@ int main(int argc,const char *argv[]) {
         }
         Check(globalCopy && globalSelectAll,@"Application menu routes Command-C and Command-A to the selected conversation text");
         Check(autoLane.subviews.count==1 && spaceLane.subviews.count==1,@"Each reading lane contains only its continuous conversation surface and no lane heading");
-        Check(app.window.contentView.layer.borderWidth==0 && dock.layer.borderWidth==0 && autoLane.layer.borderWidth==0 && spaceLane.layer.borderWidth==0 && app.autoAnswerView.enclosingScrollView.layer.borderWidth==0 && app.currentAnswerView.enclosingScrollView.layer.borderWidth==0,@"Shell, dock, and reading surfaces have no grey rounded border");
+        Check(app.window.contentView.layer.borderWidth==0 && topBar.layer.borderWidth==0 && autoLane.layer.borderWidth==0 && spaceLane.layer.borderWidth==0 && app.autoAnswerView.enclosingScrollView.layer.borderWidth==0 && app.currentAnswerView.enclosingScrollView.layer.borderWidth==0,@"Shell, top row, and reading surfaces have no grey border");
+        Check(topBar.layer.cornerRadius==0 && autoLane.layer.cornerRadius==0 && spaceLane.layer.cornerRadius==0 && app.autoAnswerView.enclosingScrollView.layer.cornerRadius==0 && app.currentAnswerView.enclosingScrollView.layer.cornerRadius==0,@"Inner reading surfaces and top row have no rounded frame");
+        Check(app.autoAnswerView.textContainerInset.width<=6.1 && app.autoAnswerView.textContainerInset.height<=5.1 && app.currentAnswerView.textContainerInset.width<=6.1 && app.currentAnswerView.textContainerInset.height<=5.1,@"Question and answer text sits close to the lane edges");
         Check(!app.autoAnswerView.enclosingScrollView.drawsBackground && !app.currentAnswerView.enclosingScrollView.drawsBackground && !app.autoAnswerView.enclosingScrollView.contentView.drawsBackground && !app.currentAnswerView.enclosingScrollView.contentView.drawsBackground,@"Conversation uses one translucent paint layer with clear scroll and clip views");
         Check([app.autoAnswerView.string rangeOfString:@"Start listening" options:NSCaseInsensitiveSearch].location==NSNotFound && [app.autoAnswerView.string rangeOfString:@"AUTO will detect" options:NSCaseInsensitiveSearch].location==NSNotFound,@"AUTO startup copy does not occupy the answer area");
         Check(!ContainsVisualEffectView(app.window.contentView) && !app.window.opaque && app.window.backgroundColor.alphaComponent<0.001,@"Entire shell uses genuinely clear views instead of an opaque macOS blur material");
         Check(fabs(app.window.alphaValue-1.0)<0.001 && [app readingSurfaceColor].alphaComponent<0.50,@"Only the local reading veil changes while text remains fully opaque");
         Check(fabs([app readingSurfaceColor].alphaComponent-0.28)<0.011,@"Conversation starts with the balanced twenty-eight-percent reading veil");
         CGFloat rootAlpha=CGColorGetAlpha(app.window.contentView.layer.backgroundColor), surfaceAlpha=[app readingSurfaceColor].alphaComponent;
-        Check(fabs(rootAlpha-0.02)<0.011 && fabs(CGColorGetAlpha(dock.layer.backgroundColor)-0.10)<0.011,@"Shell and dock use genuinely light transparent tints");
+        Check(fabs(rootAlpha-0.02)<0.011 && CGColorGetAlpha(topBar.layer.backgroundColor)<0.001,@"Shell stays translucent and the compact top row has no background strip");
         Check(1-(1-rootAlpha)*(1-surfaceAlpha)>0.28 && 1-(1-rootAlpha)*(1-surfaceAlpha)<0.31,@"Balanced reading area keeps about seventy percent of the backdrop visible");
         Check(!app.window.contentView.layer.opaque && !autoLane.layer.opaque && !spaceLane.layer.opaque && autoLane.layer.shadowOpacity==0 && spaceLane.layer.shadowOpacity==0,@"No hidden opaque lane or shadow can darken the slide");
         for(NSTextView *conversation in @[app.autoAnswerView,app.currentAnswerView])
@@ -200,27 +222,42 @@ int main(int argc,const char *argv[]) {
             [app.autoRecords insertObject:[@{@"question":@"What is mise en place?",@"answer":@"Mise en place means having everything in its place: preparing and organising ingredients, equipment and the work area before cooking or service.",@"state":@"complete",@"lane":@"auto"} mutableCopy] atIndex:app.autoRecords.count-1];
         }
         Check(app.manualHistoryScroll.hidden && app.autoHistoryScroll.hidden,@"Legacy history boxes stay hidden because previous turns render in the main conversation");
-        Check(fabs(app.window.contentView.frame.size.width-1080)<1 && fabs(app.window.contentView.frame.size.height-700)<1,@"Default content size is compact 1080 by 700");
-        for(NSValue *sizeValue in @[[NSValue valueWithSize:NSMakeSize(900,600)],[NSValue valueWithSize:NSMakeSize(1080,700)]]) {
+        NSRect visible=NSScreen.mainScreen.visibleFrame;
+        BOOL defaultWidthFits=app.window.contentView.frame.size.width>=720 && app.window.contentView.frame.size.width<=1080 && (NSWidth(visible)<=0 || app.window.contentView.frame.size.width<=NSWidth(visible)-31);
+        BOOL defaultHeightFits=app.window.contentView.frame.size.height>=520 && app.window.contentView.frame.size.height<=700 && (NSHeight(visible)<=0 || app.window.contentView.frame.size.height<=NSHeight(visible)-47);
+        Check(defaultWidthFits,@"Default window adapts to the visible MacBook screen width");
+        Check(defaultHeightFits,@"Default window adapts to the visible MacBook screen height");
+        Check(app.window.contentMinSize.width<=720 && app.window.contentMinSize.height<=520,@"The app can shrink to a compact MacBook-friendly size");
+        for(NSValue *sizeValue in @[[NSValue valueWithSize:NSMakeSize(720,520)],[NSValue valueWithSize:NSMakeSize(800,560)],[NSValue valueWithSize:NSMakeSize(900,600)],[NSValue valueWithSize:NSMakeSize(1080,700)]]) {
             [app.window setContentSize:sizeValue.sizeValue];
             for(NSNumber *size in @[@20,@26,@40]) {
                 app.readingFontSize=size.doubleValue;
                 [app refreshReadingTypography];
                 Layout(app);
-                Check(NSMinY(dock.frame)<=11.1,@"Control dock remains anchored to the bottom edge");
-                Check(dock.frame.size.height<=54.1,@"Bottom dock remains a compact single row");
-                Check(app.window.contentView.bounds.size.height-NSMaxY(autoLane.frame)<=35.1 && app.window.contentView.bounds.size.height-NSMaxY(spaceLane.frame)<=35.1,@"Both question-and-answer lanes begin near the top edge");
-                NSArray<NSView *> *primary=@[app.listenButton,app.deviceButton,app.commitButton,app.status,app.levelLabel,app.moreButton];
-                for(NSView *control in primary) Check(NSContainsRect(NSInsetRect(dock.bounds,-1,-1),control.frame),@"Every visible dock control stays inside the compact bar");
+                Check(app.window.contentView.bounds.size.height-NSMaxY(topBar.frame)<=26.1,@"Compact controls stay at the top edge");
+                Check(topBar.frame.size.height<=30.1,@"Top controls remain a compact single row");
+                Check(fabs(NSMaxY(autoLane.frame)-(NSMinY(topBar.frame)-2))<=1.1 && fabs(NSMaxY(spaceLane.frame)-NSMaxY(autoLane.frame))<=1.1,@"Both reading lanes begin immediately below the top controls");
+                Check(NSMinY(autoLane.frame)<=6.1 && NSMinY(spaceLane.frame)<=6.1,@"Both reading lanes extend to the bottom edge without a menu bar");
+                Check(NSContainsRect(NSInsetRect(app.window.contentView.bounds,-1,-1),autoLane.frame) && NSContainsRect(NSInsetRect(app.window.contentView.bounds,-1,-1),spaceLane.frame),@"Both reading lanes remain fully inside a narrow MacBook window");
+                NSArray<NSView *> *primary=@[app.vHeaderLabel,app.eHeaderLabel,app.listenButton,app.moreButton];
+                for(NSView *control in primary) Check(NSContainsRect(NSInsetRect(topBar.bounds,-1,-1),control.frame),@"Every visible top control stays inside the compact row");
                 for(NSUInteger i=0;i<primary.count;i++) for(NSUInteger j=i+1;j<primary.count;j++) {
                     NSRect intersection=NSIntersectionRect(primary[i].frame,primary[j].frame);
-                    Check(NSIsEmptyRect(intersection) || intersection.size.width*intersection.size.height<1,@"Compact dock controls never overlap");
+                    Check(NSIsEmptyRect(intersection) || intersection.size.width*intersection.size.height<1,@"Compact top controls never overlap");
                 }
-                Check(app.listenButton.frame.size.width>=84 && app.listenButton.frame.size.height>=28 && app.commitButton.frame.size.width>=84 && app.commitButton.frame.size.height>=28,@"The two primary action buttons retain comfortable targets");
+                Check(app.listenButton.frame.size.width>=84 && app.listenButton.frame.size.height>=28,@"Start listening retains a comfortable target");
                 Check(app.moreButton.frame.size.width>=28 && app.moreButton.frame.size.height>=28,@"Secondary-actions menu retains a comfortable target");
                 CheckLayoutTree(app.window.contentView);
                 CheckText(app.currentAnswerView,size.doubleValue,question,answer);
                 CheckText(app.autoAnswerView,size.doubleValue,autoQuestion,autoAnswer);
+                Check(fabs(app.currentAnswerView.enclosingScrollView.frame.size.width-spaceLane.frame.size.width)<=1.1 && fabs(app.autoAnswerView.enclosingScrollView.frame.size.width-autoLane.frame.size.width)<=1.1,@"Reading surfaces use the full lane width without inner side padding");
+                for(NSTextView *conversation in @[app.currentAnswerView,app.autoAnswerView]) {
+                    NSClipView *clip=conversation.enclosingScrollView.contentView;
+                    NSPoint shifted=clip.bounds.origin; shifted.x=80; [clip setBoundsOrigin:shifted];
+                    if(conversation==app.currentAnswerView) [app refreshManualAnswerPanel]; else [app refreshAutoAnswerPanel];
+                    Layout(app);
+                    Check(fabs(clip.bounds.origin.x)<0.01,@"Refreshing a conversation always repairs a hidden horizontal offset");
+                }
                 Check(fabs(app.currentAnswerView.enclosingScrollView.frame.size.width-app.autoAnswerView.enclosingScrollView.frame.size.width)<=1.1,@"AUTO and SPACE have equal reading widths within pixel rounding");
                 Check(![app.currentAnswerView.string containsString:autoQuestion],@"AUTO question never appears in SPACE answer");
                 Check(![app.autoAnswerView.string containsString:question],@"SPACE question never appears in AUTO answer");
@@ -269,8 +306,8 @@ int main(int argc,const char *argv[]) {
             [records addObject:[@{@"question":@"What should I prepare before service?",@"answer":@"I organise my ingredients, equipment and work station before service.",@"state":@"complete",@"lane":automatic?@"auto":@"manual"} mutableCopy]];
             if(automatic) [app refreshAutoAnswerPanel]; else [app refreshManualAnswerPanel];
             Layout(app);
-            NSString *latestPrefix=[NSString stringWithFormat:@"%@\nWhat should I prepare before service?\n",automatic?@"V":@"E"];
-            Check([conversation.string hasPrefix:latestPrefix],@"The latest exchange starts directly below its compact V/E marker");
+            NSString *latestPrefix=@"What should I prepare before service?\n";
+            Check([conversation.string hasPrefix:latestPrefix],@"The latest exchange starts directly with the question below the V/E top row");
             NSRange latestRange=[conversation.string rangeOfString:@"What should I prepare before service?"];
             NSRange formerRange=[conversation.string rangeOfString:formerQuestion];
             BOOL noGuidance=[conversation.string rangeOfString:@"• SPACE" options:NSCaseInsensitiveSearch].location==NSNotFound && [conversation.string rangeOfString:@"press Space" options:NSCaseInsensitiveSearch].location==NSNotFound && [conversation.string rangeOfString:@"bấm Space" options:NSCaseInsensitiveSearch].location==NSNotFound;
@@ -292,12 +329,13 @@ int main(int argc,const char *argv[]) {
             [app.currentAnswerView scrollPoint:NSZeroPoint]; [app.autoAnswerView scrollPoint:NSZeroPoint];
             Check(app.manualHistoryScroll.hidden && app.autoHistoryScroll.hidden,@"Preview contains no separate history boxes");
             Render(app,path);
-            [app.window setContentSize:NSMakeSize(900,600)];
+            [app.window setContentSize:NSMakeSize(720,520)];
             Layout(app);
             [app.currentAnswerView scrollPoint:NSZeroPoint]; [app.autoAnswerView scrollPoint:NSZeroPoint];
             Render(app,[[path stringByDeletingPathExtension] stringByAppendingString:@"-minimum-histories.png"]);
         }
         [app configurePresenterProfile:nil];
+        Check(app.profileWindow.sharingType==NSWindowSharingNone,@"Personal profile window receives the same capture-protection flag");
         Check(app.profileSourceView.editable && !app.profileSourceView.richText,@"Profile editor has one plain-text input");
         Check([app.profileImportButton.title isEqual:@"Chọn Word…"] && [app.profileSaveButton.title isEqual:@"Xử lý & lưu"],@"Profile supports document import and automatic extraction");
         Check(NSContainsRect(app.profileWindow.contentView.bounds,app.profileSaveButton.frame),@"Profile save button remains inside the compact window");
