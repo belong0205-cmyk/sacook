@@ -106,6 +106,10 @@ static void CheckText(NSTextView *view, CGFloat fontSize, NSString *question, NS
     Check(fabs(font.pointSize-fontSize)<0.01,@"Answer respects selected reading size");
     Check(answerParagraph.lineSpacing<=MAX(1.5,fontSize*0.08)+0.01 && answerParagraph.paragraphSpacing<=6.01,@"Current answer typography stays vertically compact");
     Check(questionColor && answerColor && ![questionColor isEqual:answerColor],@"Question colour is visibly distinct from answer colour");
+    if([view.accessibilityLabel hasPrefix:@"V "]) {
+        NSColor *rgb=[questionColor colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
+        Check(rgb.redComponent>0.98 && rgb.greenComponent>0.98 && rgb.blueComponent>0.98,@"Vietnamese question text uses clean white instead of the hard-to-read purple tint");
+    }
     Check(questionColor.alphaComponent>0.99 && answerColor.alphaComponent>0.99 && !questionShadow && !answerShadow && !hasAnyShadow,@"Reading text stays opaque without the doubled-looking shadow seen on small MacBooks");
     Check(view.verticallyResizable && !view.horizontallyResizable,@"Answers resize vertically, not horizontally");
     Check(view.textContainer.widthTracksTextView,@"Answer wrapping tracks its text view");
@@ -198,6 +202,13 @@ int main(int argc,const char *argv[]) {
         [app.autoAnswerView.textStorage setAttributedString:savedAuto]; [app.currentAnswerView.textStorage setAttributedString:savedSpace]; Layout(app);
         Check(app.window.titlebarAppearsTransparent && app.window.titleVisibility==NSWindowTitleHidden,@"Floating shell has an integrated transparent titlebar");
         Check(app.window.movableByWindowBackground && app.window.level==NSFloatingWindowLevel,@"Compact assistant can be dragged and stays above presentation windows");
+        Check((app.window.styleMask&NSWindowStyleMaskResizable)==0 && app.window.acceptsMouseMovedEvents,@"Main window has no native resize edge cursor and tracks arrow-cursor updates");
+        NSEvent *cursorEvent=[NSEvent otherEventWithType:NSEventTypeApplicationDefined location:NSZeroPoint modifierFlags:0 timestamp:0 windowNumber:0 context:nil subtype:0 data1:0 data2:0];
+        for(NSTextView *conversation in @[app.autoAnswerView,app.currentAnswerView]) {
+            Check([conversation isKindOfClass:SCArrowTextView.class],@"Every visible conversation uses the arrow-only text view");
+            [NSCursor.IBeamCursor set]; [(SCArrowTextView *)conversation cursorUpdate:cursorEvent];
+            Check(NSCursor.currentCursor==NSCursor.arrowCursor,@"Conversation hover resets an I-beam or link cursor to the normal arrow");
+        }
         Check((app.window.collectionBehavior&NSWindowCollectionBehaviorFullScreenAuxiliary)!=0,@"Assistant remains available beside full-screen presentation apps");
         [app.deviceButton addItemWithTitle:@"Nguồn: BlackHole 2ch"];
         app.status.stringValue=@"● Đang nghe";

@@ -44,6 +44,19 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     [super mouseMoved:event];
     [NSCursor.arrowCursor set];
 }
+- (void)mouseEntered:(NSEvent *)event {
+    [super mouseEntered:event];
+    [NSCursor.arrowCursor set];
+}
+- (void)cursorUpdate:(NSEvent *)event {
+    (void)event;
+    [NSCursor.arrowCursor set];
+}
+- (void)mouseDown:(NSEvent *)event {
+    [NSCursor.arrowCursor set];
+    [super mouseDown:event];
+    [NSCursor.arrowCursor set];
+}
 @end
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
@@ -837,11 +850,12 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     CGFloat initialWidth=NSWidth(visible)>0?MIN(NSWidth(visible)<1500?960:1080,MAX(720,NSWidth(visible)-32)):1080;
     CGFloat initialHeight=NSHeight(visible)>0?MIN(700,MAX(520,NSHeight(visible)-48)):700;
     self.window=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,initialWidth,initialHeight)
-        styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable|NSWindowStyleMaskFullSizeContentView backing:NSBackingStoreBuffered defer:NO];
+        styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskFullSizeContentView backing:NSBackingStoreBuffered defer:NO];
     self.window.title=@"SA Cook Assistant"; self.window.contentMinSize=NSMakeSize(720,520);
     [self protectWindowFromCapture:self.window];
     self.window.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
     self.window.titleVisibility=NSWindowTitleHidden; self.window.titlebarAppearsTransparent=YES;
+    self.window.acceptsMouseMovedEvents=YES;
     self.window.movableByWindowBackground=YES; self.window.opaque=NO; self.window.alphaValue=1.0; self.window.backgroundColor=NSColor.clearColor; self.window.hasShadow=YES;
     self.window.level=NSFloatingWindowLevel;
     self.window.collectionBehavior=NSWindowCollectionBehaviorCanJoinAllSpaces|NSWindowCollectionBehaviorFullScreenAuxiliary;
@@ -2002,8 +2016,10 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSMutableParagraphStyle *compactStyle=[NSMutableParagraphStyle new]; compactStyle.lineSpacing=1.5; compactStyle.paragraphSpacing=5; compactStyle.lineBreakMode=NSLineBreakByWordWrapping;
     NSMutableAttributedString *display=[NSMutableAttributedString new];
     NSDictionary *sectionAttributes=@{NSFontAttributeName:[NSFont systemFontOfSize:10 weight:NSFontWeightBold],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.66 alpha:1],NSKernAttributeName:@1.35,NSParagraphStyleAttributeName:sectionStyle};
+    NSColor *questionColor=automatic?[NSColor colorWithWhite:1 alpha:1]:[accent colorWithAlphaComponent:1];
+    NSColor *previousQuestionColor=automatic?[NSColor colorWithWhite:0.94 alpha:1]:[accent colorWithAlphaComponent:0.92];
     if(q.length) {
-        [display appendAttributedString:[[NSAttributedString alloc] initWithString:[q stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:MAX(18,answerSize*0.76) weight:NSFontWeightSemibold],NSForegroundColorAttributeName:[accent colorWithAlphaComponent:1],NSParagraphStyleAttributeName:questionStyle}]];
+        [display appendAttributedString:[[NSAttributedString alloc] initWithString:[q stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:MAX(18,answerSize*0.76) weight:NSFontWeightSemibold],NSForegroundColorAttributeName:questionColor,NSParagraphStyleAttributeName:questionStyle}]];
     }
     if(a.length) [display appendAttributedString:[self answerText:a attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:answerSize weight:NSFontWeightMedium],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.97 alpha:1],NSParagraphStyleAttributeName:answerStyle} question:q]];
     if(records.count>1) {
@@ -2027,7 +2043,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
                     [fresh appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n\n" attributes:sectionAttributes]];
                     appendedHistory=YES;
                 }
-                [fresh appendAttributedString:[[NSAttributedString alloc] initWithString:[previousQuestion stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightSemibold],NSForegroundColorAttributeName:[accent colorWithAlphaComponent:0.92],NSParagraphStyleAttributeName:compactStyle}]];
+                [fresh appendAttributedString:[[NSAttributedString alloc] initWithString:[previousQuestion stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightSemibold],NSForegroundColorAttributeName:previousQuestionColor,NSParagraphStyleAttributeName:compactStyle}]];
                 [fresh appendAttributedString:[self answerText:[previousAnswer stringByAppendingString:@"\n"] attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:previousSize weight:NSFontWeightRegular],NSForegroundColorAttributeName:[NSColor colorWithWhite:0.94 alpha:1],NSParagraphStyleAttributeName:compactStyle} question:previousQuestion]];
             }
             history=fresh.copy;
