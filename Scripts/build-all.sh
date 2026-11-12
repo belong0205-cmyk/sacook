@@ -6,7 +6,7 @@ ROOT="${0:A:h:h}"
 /bin/zsh "$ROOT/PresenterAI/Scripts/release.sh" --package-only
 MAC_RESOURCES="$ROOT/PresenterAI/dist/Presenter AI.app/Contents/Resources"
 WIN_RESOURCES="$ROOT/PresenterAI-Windows/resources"
-for name in sa-cook-qa.json sa-cook-qa-vi.json internet-qa.json speech-hints.txt sa-cook-knowledge.txt sa-cook-handbook.txt; do
+for name in sa-cook-qa.json sa-cook-qa-vi.json internet-qa.json speech-hints.txt french-speech-hints.txt sa-cook-knowledge.txt sa-cook-handbook.txt; do
   test -s "$MAC_RESOURCES/$name"
   cp "$MAC_RESOURCES/$name" "$WIN_RESOURCES/$name"
 done

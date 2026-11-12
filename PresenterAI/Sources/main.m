@@ -59,6 +59,91 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 }
 @end
 
+typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
+    SCWindowResizeEdgeNone   = 0,
+    SCWindowResizeEdgeLeft   = 1 << 0,
+    SCWindowResizeEdgeRight  = 1 << 1,
+    SCWindowResizeEdgeBottom = 1 << 2,
+    SCWindowResizeEdgeTop    = 1 << 3
+};
+
+// AppKit owns the cursor on a native resizable window edge and always changes
+// it to a resize symbol. Keep that style disabled, then handle the outer eight
+// pixels ourselves so resizing works while the pointer remains an arrow.
+@interface SCWindowResizeView : NSView
+@property SCWindowResizeEdges dragEdges;
+@property NSRect dragStartFrame;
+@property NSPoint dragStartScreenPoint;
+- (SCWindowResizeEdges)resizeEdgesAtPoint:(NSPoint)point;
+- (NSRect)frameByResizingFrame:(NSRect)start edges:(SCWindowResizeEdges)edges delta:(NSPoint)delta visibleFrame:(NSRect)visible minimumSize:(NSSize)minimum;
+@end
+
+@implementation SCWindowResizeView
+- (SCWindowResizeEdges)resizeEdgesAtPoint:(NSPoint)point {
+    const CGFloat edge=8.0;
+    NSRect bounds=self.bounds;
+    if(!NSPointInRect(point,bounds)) return SCWindowResizeEdgeNone;
+    SCWindowResizeEdges result=SCWindowResizeEdgeNone;
+    if(point.x<=NSMinX(bounds)+edge) result|=SCWindowResizeEdgeLeft;
+    if(point.x>=NSMaxX(bounds)-edge) result|=SCWindowResizeEdgeRight;
+    if(point.y<=NSMinY(bounds)+edge) result|=SCWindowResizeEdgeBottom;
+    if(point.y>=NSMaxY(bounds)-edge) result|=SCWindowResizeEdgeTop;
+    return result;
+}
+- (NSView *)hitTest:(NSPoint)point {
+    if([self resizeEdgesAtPoint:point]!=SCWindowResizeEdgeNone) return self;
+    return [super hitTest:point];
+}
+- (void)resetCursorRects {
+    [super resetCursorRects];
+    [self addCursorRect:self.bounds cursor:NSCursor.arrowCursor];
+}
+- (void)cursorUpdate:(NSEvent *)event { (void)event; [NSCursor.arrowCursor set]; }
+- (void)mouseMoved:(NSEvent *)event { [super mouseMoved:event]; [NSCursor.arrowCursor set]; }
+- (void)mouseEntered:(NSEvent *)event { [super mouseEntered:event]; [NSCursor.arrowCursor set]; }
+- (BOOL)acceptsFirstMouse:(NSEvent *)event { (void)event; return YES; }
+- (NSRect)frameByResizingFrame:(NSRect)start edges:(SCWindowResizeEdges)edges delta:(NSPoint)delta visibleFrame:(NSRect)visible minimumSize:(NSSize)minimum {
+    CGFloat minWidth=MAX(1,minimum.width),minHeight=MAX(1,minimum.height);
+    NSRect frame=start;
+    if(edges&SCWindowResizeEdgeLeft) {
+        CGFloat left=MAX(NSMinX(visible),MIN(NSMaxX(start)-minWidth,NSMinX(start)+delta.x));
+        frame.origin.x=left; frame.size.width=NSMaxX(start)-left;
+    } else if(edges&SCWindowResizeEdgeRight) {
+        CGFloat right=MIN(NSMaxX(visible),MAX(NSMinX(start)+minWidth,NSMaxX(start)+delta.x));
+        frame.size.width=right-NSMinX(start);
+    }
+    if(edges&SCWindowResizeEdgeBottom) {
+        CGFloat bottom=MAX(NSMinY(visible),MIN(NSMaxY(start)-minHeight,NSMinY(start)+delta.y));
+        frame.origin.y=bottom; frame.size.height=NSMaxY(start)-bottom;
+    } else if(edges&SCWindowResizeEdgeTop) {
+        CGFloat top=MIN(NSMaxY(visible),MAX(NSMinY(start)+minHeight,NSMaxY(start)+delta.y));
+        frame.size.height=top-NSMinY(start);
+    }
+    return frame;
+}
+- (void)mouseDown:(NSEvent *)event {
+    NSPoint local=[self convertPoint:event.locationInWindow fromView:nil];
+    self.dragEdges=[self resizeEdgesAtPoint:local];
+    [NSCursor.arrowCursor set];
+    if(self.dragEdges==SCWindowResizeEdgeNone) { [self.window performWindowDragWithEvent:event]; return; }
+    self.dragStartFrame=self.window.frame;
+    self.dragStartScreenPoint=NSEvent.mouseLocation;
+}
+- (void)mouseDragged:(NSEvent *)event {
+    (void)event;
+    if(self.dragEdges==SCWindowResizeEdgeNone || !self.window) return;
+    NSPoint current=NSEvent.mouseLocation;
+    NSPoint delta=NSMakePoint(current.x-self.dragStartScreenPoint.x,current.y-self.dragStartScreenPoint.y);
+    NSScreen *screen=self.window.screen ?: NSScreen.mainScreen;
+    NSRect visible=screen.visibleFrame;
+    NSRect minimumFrame=[self.window frameRectForContentRect:NSMakeRect(0,0,self.window.contentMinSize.width,self.window.contentMinSize.height)];
+    NSRect frame=[self frameByResizingFrame:self.dragStartFrame edges:self.dragEdges delta:delta visibleFrame:visible minimumSize:minimumFrame.size];
+    [self.window setFrame:frame display:YES animate:NO];
+    [NSCursor.arrowCursor set];
+}
+- (void)mouseUp:(NSEvent *)event { (void)event; self.dragEdges=SCWindowResizeEdgeNone; [NSCursor.arrowCursor set]; }
+@end
+
 @interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 @property NSWindow *window;
 @property NSSecureTextField *keyField;
@@ -118,6 +203,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 @property NSDictionary<NSString *,NSArray<NSDictionary *> *> *qaTermIndex;
 @property NSDictionary<NSString *,NSString *> *vietnameseQuestionTranslations;
 @property NSArray<NSString *> *speechHints;
+@property NSArray<NSString *> *frenchSpeechHints;
 @property NSSet<NSString *> *speechLexicon;
 @property NSMutableDictionary<NSString *,NSString *> *answerCache;
 @property id spaceKeyMonitor;
@@ -212,7 +298,11 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 - (void)applicationDidFinishLaunching:(NSNotification *)n {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
     [self buildMenu]; [self buildUI]; [self loadAudioDevices]; [self loadSavedAPIKey]; [self loadBundledKnowledge];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWindowBecameKey:) name:NSWindowDidBecomeKeyNotification object:nil];
+    NSNotificationCenter *notifications=NSNotificationCenter.defaultCenter;
+    [notifications addObserver:self selector:@selector(applicationWindowBecameKey:) name:NSWindowDidBecomeKeyNotification object:nil];
+    [notifications addObserver:self selector:@selector(applicationWindowUpdated:) name:NSWindowDidExposeNotification object:nil];
+    [notifications addObserver:self selector:@selector(applicationWindowUpdated:) name:NSWindowDidUpdateNotification object:nil];
+    [notifications addObserver:self selector:@selector(applicationMenuBeganTracking:) name:NSMenuDidBeginTrackingNotification object:nil];
     __weak typeof(self) weakSelf=self;
     self.spaceKeyMonitor=[NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent *(NSEvent *event) {
       NSEventModifierFlags blocked = NSEventModifierFlagCommand | NSEventModifierFlagOption | NSEventModifierFlagControl;
@@ -242,7 +332,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 }
 
 - (void)protectWindowFromCapture:(NSWindow *)window {
-    if(window) window.sharingType=NSWindowSharingNone;
+    if(window && window.sharingType!=NSWindowSharingNone) window.sharingType=NSWindowSharingNone;
 }
 - (void)protectAllApplicationWindows {
     for(NSWindow *window in NSApp.windows) [self protectWindowFromCapture:window];
@@ -250,7 +340,16 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 }
 - (void)applicationWindowBecameKey:(NSNotification *)notification {
     NSWindow *window=[notification.object isKindOfClass:NSWindow.class]?notification.object:nil;
-    if(window && [NSApp.windows containsObject:window]) [self protectWindowFromCapture:window];
+    [self protectWindowFromCapture:window];
+}
+- (void)applicationWindowUpdated:(NSNotification *)notification {
+    NSWindow *window=[notification.object isKindOfClass:NSWindow.class]?notification.object:nil;
+    [self protectWindowFromCapture:window];
+}
+- (void)applicationMenuBeganTracking:(NSNotification *)notification {
+    (void)notification;
+    [self protectAllApplicationWindows];
+    dispatch_async(dispatch_get_main_queue(),^{ [self protectAllApplicationWindows]; });
 }
 - (void)applicationDidBecomeActive:(NSNotification *)notification { (void)notification; [self protectAllApplicationWindows]; }
 - (void)windowDidBecomeKey:(NSNotification *)notification { [self protectWindowFromCapture:notification.object]; }
@@ -650,6 +749,9 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     self.vietnameseQuestionTranslations=translations.copy;
     NSString *internetPath=[self knowledgeResourcePath:@"internet-qa" extension:@"json"];NSData *internetData=internetPath?[NSData dataWithContentsOfFile:internetPath]:nil;id internetQA=internetData?[NSJSONSerialization JSONObjectWithData:internetData options:0 error:nil]:nil;if([internetQA isKindOfClass:NSArray.class])for(NSDictionary *entry in internetQA){NSMutableDictionary *copy=[entry mutableCopy];copy[@"targetLanguage"]=@"en";[qa addObject:copy];}
     NSString *hintsPath=[self knowledgeResourcePath:@"speech-hints" extension:@"txt"];NSString *hints=hintsPath?[NSString stringWithContentsOfFile:hintsPath encoding:NSUTF8StringEncoding error:nil]:nil;if(hints.length){NSMutableArray *items=[NSMutableArray array];for(NSString *line in [hints componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]){NSString *item=[line stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];if(item.length)[items addObject:item];}self.speechHints=items;self.speechLexicon=nil;}
+    NSString *frenchHintsPath=[self knowledgeResourcePath:@"french-speech-hints" extension:@"txt"];
+    NSString *frenchHints=frenchHintsPath?[NSString stringWithContentsOfFile:frenchHintsPath encoding:NSUTF8StringEncoding error:nil]:nil;
+    if(frenchHints.length){NSMutableOrderedSet<NSString *> *french=[NSMutableOrderedSet orderedSet];for(NSString *line in [frenchHints componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]){NSString *item=[line stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];if(item.length)[french addObject:item];}self.frenchSpeechHints=french.array;NSMutableOrderedSet<NSString *> *all=[NSMutableOrderedSet orderedSetWithArray:self.speechHints ?: @[]];[all addObjectsFromArray:self.frenchSpeechHints];self.speechHints=all.array;self.speechLexicon=nil;}
     [qa addObject:@{@"question":@"List three ways people may define their cultural identity.",@"answer":@"People may define their cultural identity through their ethnicity or nationality, their language and traditions, and their religion or beliefs.",@"targetLanguage":@"en"}];
     [qa addObject:@{@"question":@"In what ways can problems or misunderstandings with customers or colleagues from different cultural backgrounds be avoided?",@"answer":@"I avoid misunderstandings by communicating clearly and respectfully, listening actively, asking polite clarifying questions, avoiding assumptions or stereotypes, and showing cultural awareness and empathy.",@"targetLanguage":@"en"}];
     [qa addObject:@{@"question":@"What is the difference between cleaning and sanitising?",@"answer":@"Cleaning removes dirt, grease and food residue, while sanitising reduces harmful bacteria to a safe level; I always clean first, then sanitise."}];
@@ -843,12 +945,46 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     if(!self.manualHistoryScroll.hidden) [self renderHistoryRecords:self.manualRecords inView:self.answerView];
     if(!self.autoHistoryScroll.hidden) [self renderHistoryRecords:self.autoRecords inView:self.autoHistoryView];
 }
+- (NSSize)adaptiveWindowContentSizeForVisibleFrame:(NSRect)visible {
+    CGFloat width=NSWidth(visible)>0?MIN(NSWidth(visible)<1500?960:1080,MAX(720,NSWidth(visible)-32)):1080;
+    CGFloat height=NSHeight(visible)>0?MIN(700,MAX(520,NSHeight(visible)-48)):700;
+    return NSMakeSize(width,height);
+}
+- (void)changeWindowSize:(NSMenuItem *)sender {
+    NSScreen *screen=self.window.screen ?: NSScreen.mainScreen;
+    NSRect visible=screen.visibleFrame,current=self.window.frame;
+    NSRect minimumFrame=[self.window frameRectForContentRect:NSMakeRect(0,0,self.window.contentMinSize.width,self.window.contentMinSize.height)];
+    NSSize target=current.size;
+    BOOL hasVisibleBounds=NSWidth(visible)>0 && NSHeight(visible)>0;
+    if(sender.tag==0) {
+        NSSize content=[self adaptiveWindowContentSizeForVisibleFrame:visible];
+        target=[self.window frameRectForContentRect:NSMakeRect(0,0,content.width,content.height)].size;
+    } else {
+        target.width+=sender.tag*120.0;
+        target.height+=sender.tag*80.0;
+    }
+    target.width=MAX(minimumFrame.size.width,target.width);
+    target.height=MAX(minimumFrame.size.height,target.height);
+    if(hasVisibleBounds) {
+        target.width=MIN(NSWidth(visible),target.width);
+        target.height=MIN(NSHeight(visible),target.height);
+    }
+    NSRect frame=NSMakeRect(NSMinX(current),NSMaxY(current)-target.height,target.width,target.height);
+    if(hasVisibleBounds) {
+        if(NSMaxX(frame)>NSMaxX(visible)) frame.origin.x=NSMaxX(visible)-NSWidth(frame);
+        if(NSMinX(frame)<NSMinX(visible)) frame.origin.x=NSMinX(visible);
+        if(NSMinY(frame)<NSMinY(visible)) frame.origin.y=NSMinY(visible);
+        if(NSMaxY(frame)>NSMaxY(visible)) frame.origin.y=NSMaxY(visible)-NSHeight(frame);
+    }
+    [self.window setFrame:frame display:YES animate:NO];
+    [NSCursor.arrowCursor set];
+}
 - (void)buildUI {
     self.readingFontSize=[[NSUserDefaults standardUserDefaults] doubleForKey:@"PresenterAI.readingFontSize.v2"];
     self.backdropStrength=[self initialBackdropStrength];
     NSRect visible=NSScreen.mainScreen.visibleFrame;
-    CGFloat initialWidth=NSWidth(visible)>0?MIN(NSWidth(visible)<1500?960:1080,MAX(720,NSWidth(visible)-32)):1080;
-    CGFloat initialHeight=NSHeight(visible)>0?MIN(700,MAX(520,NSHeight(visible)-48)):700;
+    NSSize initialSize=[self adaptiveWindowContentSizeForVisibleFrame:visible];
+    CGFloat initialWidth=initialSize.width,initialHeight=initialSize.height;
     self.window=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,initialWidth,initialHeight)
         styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskFullSizeContentView backing:NSBackingStoreBuffered defer:NO];
     self.window.title=@"SA Cook Assistant"; self.window.contentMinSize=NSMakeSize(720,520);
@@ -863,7 +999,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     // NSVisualEffectView keeps painting a dark system material even when its
     // layer colour is nearly clear. Use a plain layer-backed view for a truly
     // see-through overlay instead of a frosted/blurred sheet.
-    NSView *root=[NSView new]; self.window.contentView=root;
+    SCWindowResizeView *root=[SCWindowResizeView new]; self.window.contentView=root;
     root.wantsLayer=YES; root.layer.backgroundColor=[NSColor colorWithWhite:0 alpha:[self rootBackdropAlpha]].CGColor; root.layer.cornerRadius=20; root.layer.masksToBounds=YES;
     root.layer.borderWidth=0;
     NSString *version=[[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"]?:@"5.47";
@@ -901,6 +1037,13 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     self.audioSourceMenu=[[NSMenu alloc] initWithTitle:@"Nguồn âm thanh"];
     sourceRoot.submenu=self.audioSourceMenu; [secondary addItem:sourceRoot];
     [secondary addItem:[self secondaryMenuItem:@"Chốt câu hỏi V + E (Space)" action:@selector(commitCurrentQuestionFromSpace) tag:0]];
+    [secondary addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *windowSizeRoot=[[NSMenuItem alloc] initWithTitle:@"Kích thước khung" action:nil keyEquivalent:@""];
+    NSMenu *windowSizeMenu=[[NSMenu alloc] initWithTitle:@"Kích thước khung"];
+    [windowSizeMenu addItem:[self secondaryMenuItem:@"Thu nhỏ khung" action:@selector(changeWindowSize:) tag:-1]];
+    [windowSizeMenu addItem:[self secondaryMenuItem:@"Mở rộng khung" action:@selector(changeWindowSize:) tag:1]];
+    [windowSizeMenu addItem:[self secondaryMenuItem:@"Vừa màn hình" action:@selector(changeWindowSize:) tag:0]];
+    windowSizeRoot.submenu=windowSizeMenu; [secondary addItem:windowSizeRoot];
     [secondary addItem:[NSMenuItem separatorItem]];
     NSMenuItem *smaller=[self secondaryMenuItem:@"Chữ nhỏ hơn" action:@selector(changeReadingFont:) tag:-1]; smaller.keyEquivalent=@"-"; [secondary addItem:smaller];
     NSMenuItem *larger=[self secondaryMenuItem:@"Chữ lớn hơn" action:@selector(changeReadingFont:) tag:1]; larger.keyEquivalent=@"="; [secondary addItem:larger];
@@ -1119,6 +1262,7 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     NSArray<NSString *> *recognitionPriority=@[
       @"stock",@"grill",@"grilled",@"grilling",@"grill pan",@"stockpot",@"stock rotation",@"beef stock",@"chicken stock",@"fish stock",@"vegetable stock",
       @"mise en place",@"à la carte",@"table d'hôte",@"consommé",@"sous-vide",@"roux",@"béchamel",@"velouté",@"hollandaise",@"béarnaise",@"demi-glace",@"mirepoix",@"bouquet garni",@"bain-marie",@"beurre blanc",@"beurre manié",@"au gratin",@"confit",@"flambé",@"sauté",@"hors d'oeuvre",@"amuse-bouche",@"crème brûlée",@"crème pâtissière",@"julienne",@"brunoise",@"chiffonade",@"duxelles",@"en papillote",@"profiterole",@"vichyssoise",@"vol-au-vent",@"garde manger",@"chef de partie",@"commis chef",
+      @"chef de cuisine",@"saucier",@"poissonnier",@"pâtissier",@"jardinière",@"batonnet",@"déglacer",@"en croûte",@"meunière",@"court bouillon",@"pâte à choux",@"soufflé",@"croquembouche",@"mille-feuille",@"bœuf bourguignon",
       @"HACCP",@"FIFO",@"food safety plan",@"temperature danger zone",@"two-hour four-hour rule",@"cross-contamination",@"cross-contact",@"potentially hazardous food",@"probe thermometer",@"cleaning and sanitising",@"air-dry",@"allergen",@"anaphylaxis",@"coeliac",@"gluten-free",
       @"chef's knife",@"paring knife",@"boning knife",@"filleting knife",@"serrated knife",@"mandoline",@"colour-coded chopping board",@"personal protective equipment",
       @"standard recipe card",@"portion control",@"food cost percentage",@"yield test",@"cultural sensitivity",@"anti-discrimination"
@@ -1308,6 +1452,15 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
       @"duke sells":@"duxelles",@"on pap ee oat":@"en papillote",@"cream patisserie":@"crème pâtissière",
       @"guard manger":@"garde manger",@"gard manger":@"garde manger",@"chef de party":@"chef de partie",@"chef duh party":@"chef de partie",@"commie chef":@"commis chef",
       @"eye oli":@"aioli",@"a oli":@"aioli",@"gremolada":@"gremolata",@"vol au vent":@"vol-au-vent",
+      @"rotisseur":@"rôtisseur",@"roti sir":@"rôtisseur",@"sauce yay":@"saucier",@"poisson yay":@"poissonnier",@"grill ar din":@"grillardin",@"free tour yay":@"friturier",@"on tremet yay":@"entremetier",
+      @"patissier":@"pâtissier",@"patiss yay":@"pâtissier",@"boo lon jay":@"boulanger",@"plon jur":@"plongeur",@"ah boy eur":@"aboyeur",
+      @"jardiniere":@"jardinière",@"garden air":@"jardinière",@"baton nay":@"batonnet",@"pay zan":@"paysanne",@"macedoine":@"macédoine",@"emince":@"émincé",@"a min say":@"émincé",
+      @"deglacer":@"déglacer",@"de glaze":@"déglacer",@"en croute":@"en croûte",@"on croat":@"en croûte",@"meuniere":@"meunière",@"moon yair":@"meunière",@"a la minute":@"à la minute",@"ah la minute":@"à la minute",
+      @"say nyon":@"saignant",@"a point":@"à point",@"ah pwan":@"à point",@"byen kwee":@"bien cuit",@"mon tay oh burr":@"monter au beurre",@"foo may":@"fumet",@"core bullion":@"court bouillon",@"espan yol":@"espagnole",
+      @"bear noisette":@"beurre noisette",@"remoulade":@"rémoulade",@"ray moo lad":@"rémoulade",@"puree":@"purée",@"pat bree zay":@"pâte brisée",@"pat sue cray":@"pâte sucrée",@"pat fwayetay":@"pâte feuilletée",@"pat a shoe":@"pâte à choux",
+      @"creme chantilly":@"crème chantilly",@"creme caramel":@"crème caramel",@"souffle":@"soufflé",@"genoise":@"génoise",@"eclair":@"éclair",@"crepe":@"crêpe",@"croc em boosh":@"croquembouche",@"mill foy":@"mille-feuille",@"tart ta tan":@"tarte Tatin",
+      @"pre fix":@"prix fixe",@"degustation":@"dégustation",@"day goo station":@"dégustation",@"plot do zhoor":@"plat du jour",@"oh cuisine":@"haute cuisine",@"new vell cuisine":@"nouvelle cuisine",@"maitre d":@"maître d'",@"may truh dee":@"maître d'",
+      @"aperitif":@"apéritif",@"ah pear a teef":@"apéritif",@"crudites":@"crudités",@"crew dee tay":@"crudités",@"crouton":@"croûton",@"crew ton":@"croûton",@"boeuf bourguignon":@"bœuf bourguignon",@"beef borg in yon":@"bœuf bourguignon",@"shin wah":@"chinois",@"ta mee":@"tamis",
       @"sanitizing":@"sanitising",@"sanitize":@"sanitise",@"sanitizer":@"sanitiser",
       @"paltry":@"poultry",@"poetry seafood":@"poultry seafood",@"culture identity":@"cultural identity",@"culture background":@"cultural background",
       @"chief knife":@"chef knife",@"chef's nice":@"chef's knife",@"shift knife":@"chef knife",
@@ -1499,7 +1652,9 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
     [data appendData:[part dataUsingEncoding:NSUTF8StringEncoding]];
 }
 - (NSString *)autoTranscriptionPrompt {
-    NSString *vocabulary=[[self recognitionContextualStrings] componentsJoinedByString:@", "];
+    NSMutableOrderedSet<NSString *> *terms=[NSMutableOrderedSet orderedSetWithArray:[self recognitionContextualStrings]];
+    [terms addObjectsFromArray:self.frenchSpeechHints ?: @[]];
+    NSString *vocabulary=[terms.array componentsJoinedByString:@", "];
     NSString *recent=[self recentAutoQuestionContext];
     return [NSString stringWithFormat:@"Bilingual Vietnamese or Australian English commercial cookery skills-assessment interview. Detect the spoken language and transcribe in that same language. Preserve the exact question, numbers, and culinary terminology, including French loanwords. Vocabulary: %@.%@",vocabulary,recent.length?[NSString stringWithFormat:@" Recent conversation: %@",recent]:@""];
 }
@@ -2999,11 +3154,14 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 }
 - (void)setAudioLevelText:(NSString *)text color:(NSColor *)color toolTip:(NSString *)toolTip {
     self.levelLabel.stringValue=text ?: @""; self.levelLabel.textColor=color ?: NSColor.secondaryLabelColor; self.levelLabel.toolTip=toolTip;
-    self.levelMenuItem.title=[NSString stringWithFormat:@"Âm thanh: %@",text ?: @""]; self.levelMenuItem.toolTip=toolTip;
+    self.levelMenuItem.title=[NSString stringWithFormat:@"Âm thanh: %@",text ?: @""];
+    // A menu-item tooltip became a second floating black dB panel beside the
+    // compact menu. Keep the live meter on the hidden label only.
+    self.levelMenuItem.toolTip=nil;
 }
 - (void)setStatus:(NSString *)s color:(NSColor *)c {
     self.status.stringValue=s; self.status.toolTip=s; self.status.textColor=c;
-    self.statusMenuItem.title=[NSString stringWithFormat:@"Trạng thái: %@",s ?: @""]; self.statusMenuItem.toolTip=s;
+    self.statusMenuItem.title=[NSString stringWithFormat:@"Trạng thái: %@",s ?: @""]; self.statusMenuItem.toolTip=nil;
 }
 - (void)buildMenu {
     NSMenu *bar=[NSMenu new];

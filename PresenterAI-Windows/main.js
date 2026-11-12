@@ -458,6 +458,7 @@ ipcMain.handle('resources:get', event => {
       localQA: JSON.parse(readResource('sa-cook-qa.json', '[]')),
       internetQA: JSON.parse(readResource('internet-qa.json', '[]')),
       hints: readResource('speech-hints.txt'),
+      frenchHints: readResource('french-speech-hints.txt'),
       answerPolicy: readResource('answer-policy.txt'),
       knowledge: readResource('sa-cook-knowledge.txt'),
       handbook: readResource('sa-cook-handbook.txt'),

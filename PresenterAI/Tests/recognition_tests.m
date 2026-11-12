@@ -82,6 +82,16 @@ int main(int argc, const char *argv[]) {
         Check(app.qaEntries.count>1000,@"Load the complete bundled Q&A dataset through the resource hook");
         Check(app.speechHints.count>0,@"Load bundled speech vocabulary");
         Check([app.speechHints containsObject:@"stock"],@"Bundled speech vocabulary includes the standalone culinary word stock");
+        NSString *frenchSource=@"brigade de cuisine|chef de cuisine|sous chef|chef de partie|demi chef de partie|commis chef|saucier|poissonnier|rôtisseur|grillardin|friturier|entremetier|garde manger|pâtissier|boulanger|tournant|plongeur|aboyeur|mise en place|julienne|brunoise|macédoine|jardinière|batonnet|paysanne|chiffonade|mirepoix|concassé|tourné|émincé|parisienne|duxelles|bouquet garni|farce|panade|sauté|blanchir|déglacer|flambé|confit|sous vide|en papillote|en croûte|au gratin|meunière|à la minute|bleu|saignant|à point|bien cuit|nappe|monter au beurre|fond|fumet|court bouillon|bouillon|consommé|roux|béchamel|velouté|espagnole|sauce tomate|hollandaise|béarnaise|demi-glace|jus|beurre blanc|beurre noisette|beurre manié|liaison|mayonnaise|vinaigrette|rémoulade|coulis|purée|bisque|potage|vichyssoise|pâte brisée|pâte sucrée|pâte feuilletée|pâte à choux|crème pâtissière|crème anglaise|crème chantilly|crème brûlée|crème caramel|ganache|mousse|soufflé|parfait|sorbet|tuile|génoise|meringue|macaron|éclair|profiterole|croquembouche|mille-feuille|tarte Tatin|petit four|sabayon|couverture|bavarois|crêpe|praline|brioche|croissant|à la carte|table d'hôte|prix fixe|dégustation|hors d'œuvre|amuse-bouche|entrée|canapé|plat du jour|cuisine|haute cuisine|nouvelle cuisine|maître d'|sommelier|apéritif|crudités|croûton|pâté|terrine|galantine|ballotine|rillettes|quiche|tartare|ratatouille|bouillabaisse|coq au vin|bœuf bourguignon|cassoulet|vol-au-vent|bain-marie|chinois|mandoline|sauteuse|cocotte|ramekin|tamis";
+        NSArray<NSString *> *documentFrenchTerms=[frenchSource componentsSeparatedByString:@"|"];
+        Check(documentFrenchTerms.count==146,@"The supplied Word document contributes all 146 French culinary terms");
+        Check(app.frenchSpeechHints.count==146,@"The dedicated French recognition resource contains all 146 terms");
+        for(NSString *term in documentFrenchTerms) {
+            Check([app.speechHints containsObject:term],[NSString stringWithFormat:@"French Word-document term is bundled for speech: %@",term]);
+            Check([app.frenchSpeechHints containsObject:term],[NSString stringWithFormat:@"French term is available to the cloud transcription prompt: %@",term]);
+            NSString *once=[app correctCulinaryTerms:term];
+            Equal([app correctCulinaryTerms:once],once,[NSString stringWithFormat:@"French term remains stable after repeated correction: %@",term]);
+        }
 
         NSArray *canonicalTerms=@[@"julienne",@"à la carte",@"a la carte",@"mise en place",@"sous-vide",@"béchamel",@"velouté",@"consommé",@"béarnaise",@"demi-glace",@"mirepoix",@"bouquet garni",@"bain-marie",@"beurre blanc",@"beurre manié",@"hors d'oeuvre",@"amuse-bouche",@"crème brûlée",@"chiffonade",@"duxelles",@"en papillote",@"garde manger"];
         for (NSString *term in canonicalTerms) {
@@ -122,7 +132,8 @@ int main(int argc, const char *argv[]) {
         Equal([app correctCulinaryTerms:@"What does a gorilla eat in the wild?"],@"What does a gorilla eat in the wild?",@"Preserve a literal animal question containing gorilla");
         Equal([app correctCulinaryTerms:@"How do you grill chicken?"],@"How do you grill chicken?",@"Correctly heard grill is never changed");
         NSDictionary<NSString *,NSString *> *frenchCorrections=@{
-          @"How do you make demi glass?":@"demi-glace",@"What is mirror paw?":@"mirepoix",@"Explain bouquet garney":@"bouquet garni",@"Use a ban marie":@"bain-marie",@"Serve with bear blank":@"beurre blanc",@"Prepare horse derv":@"hors d'oeuvre",@"Make cream brulee":@"crème brûlée",@"Cut a chiffon aid":@"chiffonade",@"What does a commie chef do?":@"commis chef",@"Cook it on pap ee oat":@"en papillote"
+          @"How do you make demi glass?":@"demi-glace",@"What is mirror paw?":@"mirepoix",@"Explain bouquet garney":@"bouquet garni",@"Use a ban marie":@"bain-marie",@"Serve with bear blank":@"beurre blanc",@"Prepare horse derv":@"hors d'oeuvre",@"Make cream brulee":@"crème brûlée",@"Cut a chiffon aid":@"chiffonade",@"What does a commie chef do?":@"commis chef",@"Cook it on pap ee oat":@"en papillote",
+          @"What does a sauce yay prepare?":@"saucier",@"What does the poisson yay do?":@"poissonnier",@"Cut it garden air":@"jardinière",@"Make baton nay cuts":@"batonnet",@"How do you de glaze the pan?":@"déglacer",@"Cook salmon on croat":@"en croûte",@"Prepare fish moon yair":@"meunière",@"Use core bullion":@"court bouillon",@"Finish with bear noisette":@"beurre noisette",@"Make pat a shoe":@"pâte à choux",@"Build a croc em boosh":@"croquembouche",@"Slice the mill foy":@"mille-feuille",@"Explain beef borg in yon":@"bœuf bourguignon",@"Pass it through a shin wah":@"chinois",@"Use a ta mee":@"tamis"
         };
         [frenchCorrections enumerateKeysAndObjectsUsingBlock:^(NSString *heard,NSString *canonical,BOOL *stop) {
             Has([app correctCulinaryTerms:heard],canonical,[NSString stringWithFormat:@"Correct French culinary speech variant: %@",heard]);
@@ -133,10 +144,14 @@ int main(int argc, const char *argv[]) {
         NSArray<NSString *> *highestPriority=[contextual subarrayWithRange:NSMakeRange(0,MIN((NSUInteger)15,contextual.count))];
         for(NSString *term in @[@"grill",@"grilled",@"grilling"])
             Check([highestPriority containsObject:term],[NSString stringWithFormat:@"%@ is inside the first 15 recognition hints",term]);
-        for(NSString *term in @[@"mise en place",@"béarnaise",@"beurre manié",@"duxelles",@"en papillote",@"crème pâtissière"])
+        for(NSString *term in @[@"mise en place",@"béarnaise",@"beurre manié",@"duxelles",@"en papillote",@"crème pâtissière",@"saucier",@"pâte à choux"])
             Check([contextual containsObject:term],[NSString stringWithFormat:@"French term is prioritised for recognition: %@",term]);
         for(NSString *term in @[@"HACCP",@"cross-contamination",@"allergen",@"chef's knife",@"boning knife",@"cultural sensitivity"])
             Check([contextual containsObject:term],[NSString stringWithFormat:@"Balanced recognition vocabulary retains common assessment term: %@",term]);
+        NSString *cloudPrompt=[app autoTranscriptionPrompt];
+        for(NSString *term in @[@"poissonnier",@"croquembouche",@"bœuf bourguignon",@"tamis"])
+            Has(cloudPrompt,term,[NSString stringWithFormat:@"Cloud transcription prompt includes rare Word-document term: %@",term]);
+        Check([cloudPrompt rangeOfString:@"/ˌ"].location==NSNotFound,@"IPA notation is not sent as a speech hint");
         Equal([app preferredCulinaryAlternativeForPrimary:@"How do you cook chicken on a gorilla?"
                                              alternatives:@[@"How do you cook chicken on a gorilla?",@"How do you cook chicken on a grill?"]],
               @"How do you cook chicken on a grill?",@"Choose a grill alternative over the gorilla primary in culinary context");

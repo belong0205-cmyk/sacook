@@ -243,3 +243,103 @@ profiterole
 vichyssoise
 vol-au-vent
 crème pâtissière
+brigade de cuisine
+chef de cuisine
+demi chef de partie
+saucier
+poissonnier
+rôtisseur
+grillardin
+friturier
+entremetier
+pâtissier
+boulanger
+tournant
+plongeur
+aboyeur
+jardinière
+batonnet
+paysanne
+tourné
+émincé
+parisienne
+farce
+panade
+blanchir
+déglacer
+sous vide
+en croûte
+meunière
+à la minute
+bleu
+saignant
+à point
+bien cuit
+nappe
+monter au beurre
+fond
+fumet
+court bouillon
+bouillon
+espagnole
+sauce tomate
+beurre noisette
+vinaigrette
+rémoulade
+coulis
+purée
+bisque
+potage
+pâte brisée
+pâte sucrée
+pâte feuilletée
+pâte à choux
+crème chantilly
+crème caramel
+mousse
+soufflé
+parfait
+sorbet
+tuile
+génoise
+meringue
+macaron
+éclair
+croquembouche
+mille-feuille
+tarte Tatin
+petit four
+sabayon
+couverture
+bavarois
+crêpe
+praline
+brioche
+croissant
+prix fixe
+dégustation
+hors d'œuvre
+plat du jour
+cuisine
+haute cuisine
+nouvelle cuisine
+maître d'
+sommelier
+apéritif
+crudités
+croûton
+galantine
+ballotine
+rillettes
+quiche
+tartare
+ratatouille
+bouillabaisse
+coq au vin
+bœuf bourguignon
+cassoulet
+chinois
+sauteuse
+cocotte
+ramekin
+tamis

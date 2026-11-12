@@ -2,6 +2,8 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 const source = fs.readFileSync(require('path').join(__dirname, '../app.js'), 'utf8');
+const frenchSpeechHints = fs.readFileSync(require('path').join(__dirname, '../resources/french-speech-hints.txt'), 'utf8').split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+assert.strictEqual(new Set(frenchSpeechHints).size, 146, 'French speech resource must contain the 146 supplied culinary terms');
 // Execute the actual application functions with a controlled clock and network.
 function applicationFunction(name) {
   const start = source.indexOf(`function ${name}(`);
@@ -31,6 +33,14 @@ function fixture() {
   }};
 }
 let f = fixture();
+for (const [heard, expected] of [
+  ['What does a sauce yay prepare?', 'saucier'], ['What does the poisson yay do?', 'poissonnier'],
+  ['Cut it garden air.', 'jardinière'], ['How do you de glaze the pan?', 'déglacer'],
+  ['Cook salmon on croat.', 'en croûte'], ['Prepare fish moon yair.', 'meunière'],
+  ['Use core bullion.', 'court bouillon'], ['Make pat a shoe.', 'pâte à choux'],
+  ['Build a croc em boosh.', 'croquembouche'], ['Slice the mill foy.', 'mille-feuille'],
+  ['Explain beef borg in yon.', 'bœuf bourguignon'], ['Pass it through a shin wah.', 'chinois'], ['Use a ta mee.', 'tamis']
+]) assert(f.ctx.cleanSpeech(heard).includes(expected), `French speech alias should resolve to ${expected}`);
 assert(f.ctx.isLikelyCompleteQuestion('What is stock?'), 'Three-word culinary questions must be accepted');
 assert(f.ctx.isLikelyCompleteQuestion('How can we use a thermometer?'), 'Embedded we use is not an answer');
 assert(f.ctx.isLikelyCompleteQuestion('Bạn ngăn ngừa nhiễm chéo như thế nào?'), 'Vietnamese AUTO questions must be accepted');
@@ -83,7 +93,7 @@ console.log('AUTO runtime regression tests passed.');
 
 (async () => {
   const requests = [];
-  const context = vm.createContext({FormData, Blob, speechHints: [], cleanSpeech: value => value,
+  const context = vm.createContext({FormData, Blob, speechHints: [], frenchDocumentHints: () => [], cleanSpeech: value => value,
     transcriptionPrompt: () => 'Cooking interview',
     api: async (_, form) => {
       requests.push(form);

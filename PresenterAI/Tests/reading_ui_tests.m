@@ -143,17 +143,22 @@ int main(int argc,const char *argv[]) {
         Check(app.statusMenuItem && !app.statusMenuItem.enabled && app.levelMenuItem && !app.levelMenuItem.enabled,@"Overflow keeps read-only listening status and audio level from the removed bottom bar");
         [app setStatus:@"● Test status" color:NSColor.systemGreenColor]; [app setAudioLevelText:@"● Test audio" color:NSColor.systemGreenColor toolTip:@"Test meter"];
         Check([app.statusMenuItem.title containsString:@"Test status"] && [app.levelMenuItem.title containsString:@"Test audio"],@"Hidden status and audio state update live inside overflow");
+        Check(!app.statusMenuItem.toolTip.length && !app.levelMenuItem.toolTip.length,@"Opening the menu does not create an extra floating status or dB tooltip");
         Check(app.window.sharingType==NSWindowSharingNone,@"Main assistant window is capture-protected immediately after construction");
         app.window.sharingType=NSWindowSharingReadOnly; [app applicationDidBecomeActive:[NSNotification notificationWithName:NSApplicationDidBecomeActiveNotification object:NSApp]];
         Check(app.window.sharingType==NSWindowSharingNone,@"Activation reapplies capture protection to the assistant window");
         NSPanel *protectedPanel=[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,120,80) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
         [app protectWindowFromCapture:protectedPanel]; Check(protectedPanel.sharingType==NSWindowSharingNone,@"Capture protection helper also covers panels and sheets"); [protectedPanel close];
+        NSPanel *latePopup=[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,120,80) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
+        latePopup.sharingType=NSWindowSharingReadOnly;
+        [app applicationWindowUpdated:[NSNotification notificationWithName:NSWindowDidExposeNotification object:latePopup]];
+        Check(latePopup.sharingType==NSWindowSharingNone,@"A menu-like window created after launch is protected as soon as it is exposed"); [latePopup close];
         app.inputDeviceIDs=@[@(101),@(202)]; [app.deviceButton addItemsWithTitles:@[@"Nguồn: A",@"Nguồn: B"]];
         NSMenuItem *sourceA=[app secondaryMenuItem:@"A" action:@selector(selectAudioSourceFromMenu:) tag:0],*sourceB=[app secondaryMenuItem:@"B" action:@selector(selectAudioSourceFromMenu:) tag:1];
         [app.audioSourceMenu addItem:sourceA]; [app.audioSourceMenu addItem:sourceB]; app.audioSourceMenuItems=@[sourceA,sourceB];
         [app selectAudioSourceFromMenu:sourceB];
         Check(app.deviceButton.indexOfSelectedItem==1 && sourceB.state==NSControlStateValueOn && sourceA.state==NSControlStateValueOff,@"Choosing a source in overflow updates the hidden audio-device state");
-        for(NSString *selectorName in @[@"retryAutoAnswer:",@"retryManualAnswer:",@"clearAutoHistory:",@"clearManualHistory:",@"checkForUpdates:",@"configureAI:",@"changeReadingFont:",@"changeBackdropStrength:"])
+        for(NSString *selectorName in @[@"retryAutoAnswer:",@"retryManualAnswer:",@"clearAutoHistory:",@"clearManualHistory:",@"checkForUpdates:",@"configureAI:",@"changeReadingFont:",@"changeWindowSize:",@"changeBackdropStrength:"])
             Check(MenuHasAction(app.moreButton.menu,NSSelectorFromString(selectorName)),[NSString stringWithFormat:@"Secondary menu exposes %@",selectorName]);
         Check(app.backdropMenuItems.count==3 && app.backdropStrength==1,@"Background menu offers three levels and starts at the balanced level");
         for(NSUInteger i=0;i<app.backdropMenuItems.count;i++) Check(app.backdropMenuItems[i].tag==(NSInteger)i && app.backdropMenuItems[i].state==(i==1?NSControlStateValueOn:NSControlStateValueOff),@"Exactly the balanced background item starts checked");
@@ -204,6 +209,18 @@ int main(int argc,const char *argv[]) {
         Check(app.window.movableByWindowBackground && app.window.level==NSFloatingWindowLevel,@"Compact assistant can be dragged and stays above presentation windows");
         Check((app.window.styleMask&NSWindowStyleMaskResizable)==0 && app.window.acceptsMouseMovedEvents,@"Main window has no native resize edge cursor and tracks arrow-cursor updates");
         NSEvent *cursorEvent=[NSEvent otherEventWithType:NSEventTypeApplicationDefined location:NSZeroPoint modifierFlags:0 timestamp:0 windowNumber:0 context:nil subtype:0 data1:0 data2:0];
+        Check([app.window.contentView isKindOfClass:SCWindowResizeView.class],@"Main content view provides custom edge resizing without enabling native resize cursors");
+        SCWindowResizeView *resizeRoot=(SCWindowResizeView *)app.window.contentView;
+        Check(([resizeRoot resizeEdgesAtPoint:NSMakePoint(NSMaxX(resizeRoot.bounds)-1,NSMidY(resizeRoot.bounds))]&SCWindowResizeEdgeRight)!=0,@"Right edge is a custom resize target");
+        Check(([resizeRoot resizeEdgesAtPoint:NSMakePoint(NSMidX(resizeRoot.bounds),1)]&SCWindowResizeEdgeBottom)!=0,@"Bottom edge is a custom resize target");
+        Check([resizeRoot resizeEdgesAtPoint:NSMakePoint(NSMidX(resizeRoot.bounds),NSMidY(resizeRoot.bounds))]==SCWindowResizeEdgeNone,@"The reading area is not swallowed by the custom edge target");
+        NSRect resizeFixture=NSMakeRect(100,100,900,600),visibleFixture=NSMakeRect(0,0,1200,900);
+        NSRect grown=[resizeRoot frameByResizingFrame:resizeFixture edges:SCWindowResizeEdgeRight|SCWindowResizeEdgeBottom delta:NSMakePoint(120,-90) visibleFrame:visibleFixture minimumSize:NSMakeSize(720,520)];
+        Check(fabs(NSWidth(grown)-1020)<0.1 && fabs(NSHeight(grown)-690)<0.1 && fabs(NSMaxY(grown)-NSMaxY(resizeFixture))<0.1,@"Dragging the lower-right edge grows the window and holds the opposite edges still");
+        NSRect clamped=[resizeRoot frameByResizingFrame:resizeFixture edges:SCWindowResizeEdgeLeft|SCWindowResizeEdgeTop delta:NSMakePoint(500,-500) visibleFrame:visibleFixture minimumSize:NSMakeSize(720,520)];
+        Check(NSWidth(clamped)>=720 && NSHeight(clamped)>=520 && NSContainsRect(visibleFixture,clamped),@"Custom resizing respects minimum size and visible-screen bounds");
+        [NSCursor.IBeamCursor set]; [resizeRoot cursorUpdate:cursorEvent];
+        Check(NSCursor.currentCursor==NSCursor.arrowCursor,@"Custom resize edges retain the normal arrow cursor");
         for(NSTextView *conversation in @[app.autoAnswerView,app.currentAnswerView]) {
             Check([conversation isKindOfClass:SCArrowTextView.class],@"Every visible conversation uses the arrow-only text view");
             [NSCursor.IBeamCursor set]; [(SCArrowTextView *)conversation cursorUpdate:cursorEvent];
@@ -239,6 +256,13 @@ int main(int argc,const char *argv[]) {
         Check(defaultWidthFits,@"Default window adapts to the visible MacBook screen width");
         Check(defaultHeightFits,@"Default window adapts to the visible MacBook screen height");
         Check(app.window.contentMinSize.width<=720 && app.window.contentMinSize.height<=520,@"The app can shrink to a compact MacBook-friendly size");
+        [app.window setContentSize:NSMakeSize(840,600)]; NSSize beforeShrink=app.window.frame.size;
+        NSMenuItem *shrink=[app secondaryMenuItem:@"Thu nhỏ" action:@selector(changeWindowSize:) tag:-1]; [app changeWindowSize:shrink];
+        Check(NSWidth(app.window.frame)<beforeShrink.width && NSHeight(app.window.frame)<beforeShrink.height,@"Overflow menu can shrink the window without a native resize cursor");
+        NSSize afterShrink=app.window.frame.size; NSMenuItem *grow=[app secondaryMenuItem:@"Mở rộng" action:@selector(changeWindowSize:) tag:1]; [app changeWindowSize:grow];
+        Check(NSWidth(app.window.frame)>afterShrink.width && NSHeight(app.window.frame)>afterShrink.height,@"Overflow menu can enlarge the window");
+        NSMenuItem *fit=[app secondaryMenuItem:@"Vừa màn hình" action:@selector(changeWindowSize:) tag:0]; [app changeWindowSize:fit];
+        Check(NSWidth(app.window.contentView.frame)>=720 && NSHeight(app.window.contentView.frame)>=520,@"Fit-to-screen restores an adaptive readable size");
         for(NSValue *sizeValue in @[[NSValue valueWithSize:NSMakeSize(720,520)],[NSValue valueWithSize:NSMakeSize(800,560)],[NSValue valueWithSize:NSMakeSize(900,600)],[NSValue valueWithSize:NSMakeSize(1080,700)]]) {
             [app.window setContentSize:sizeValue.sizeValue];
             for(NSNumber *size in @[@20,@26,@40]) {

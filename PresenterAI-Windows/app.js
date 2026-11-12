@@ -15,6 +15,7 @@ const stopWords = new Set('what when where which would could should please your 
 let qa = [];
 let vietnameseQuestionTranslations = new Map();
 let speechHints = [];
+let frenchSpeechHints = [];
 let answerPolicy = window.SACookB1.DEFAULT_POLICY;
 let studyChunks = [];
 let studyChunkIndex = new Map();
@@ -107,6 +108,23 @@ function cleanSpeech(text) {
     [/\b(?:ban marie|bane marie|ben marie)\b/gi, 'bain-marie'],
     [/\b(?:holland days|holland day sauce)\b/gi, 'hollandaise'],
     [/\b(?:bear nays|bernese sauce)\b/gi, 'béarnaise'],
+    [/\b(?:rotisseur|roti sir)\b/gi, 'rôtisseur'],
+    [/\bsauce yay\b/gi, 'saucier'], [/\bpoisson yay\b/gi, 'poissonnier'], [/\bgrill ar din\b/gi, 'grillardin'],
+    [/\bfree tour yay\b/gi, 'friturier'], [/\bon tremet yay\b/gi, 'entremetier'],
+    [/\b(?:patissier|patiss yay)\b/gi, 'pâtissier'], [/\bboo lon jay\b/gi, 'boulanger'], [/\bplon jur\b/gi, 'plongeur'], [/\bah boy eur\b/gi, 'aboyeur'],
+    [/\b(?:jardiniere|garden air)\b/gi, 'jardinière'], [/\bbaton nay\b/gi, 'batonnet'], [/\bpay zan\b/gi, 'paysanne'],
+    [/\bmacedoine\b/gi, 'macédoine'], [/\b(?:emince|a min say)\b/gi, 'émincé'],
+    [/\b(?:deglacer|de glaze)\b/gi, 'déglacer'], [/\b(?:en croute|on croat)\b/gi, 'en croûte'], [/\b(?:meuniere|moon yair)\b/gi, 'meunière'],
+    [/\b(?:a la minute|ah la minute)\b/gi, 'à la minute'], [/\bsay nyon\b/gi, 'saignant'], [/\b(?:a point|ah pwan)\b/gi, 'à point'], [/\bbyen kwee\b/gi, 'bien cuit'],
+    [/\bmon tay oh burr\b/gi, 'monter au beurre'], [/\bfoo may\b/gi, 'fumet'], [/\bcore bullion\b/gi, 'court bouillon'], [/\bespan yol\b/gi, 'espagnole'],
+    [/\bbear noisette\b/gi, 'beurre noisette'], [/\b(?:remoulade|ray moo lad)\b/gi, 'rémoulade'], [/\bpuree\b/gi, 'purée'],
+    [/\bpat bree zay\b/gi, 'pâte brisée'], [/\bpat sue cray\b/gi, 'pâte sucrée'], [/\bpat fwayetay\b/gi, 'pâte feuilletée'], [/\bpat a shoe\b/gi, 'pâte à choux'],
+    [/\bcreme chantilly\b/gi, 'crème chantilly'], [/\bcreme caramel\b/gi, 'crème caramel'], [/\bsouffle\b/gi, 'soufflé'], [/\bgenoise\b/gi, 'génoise'],
+    [/\beclair\b/gi, 'éclair'], [/\bcrepe\b/gi, 'crêpe'], [/\bcroc em boosh\b/gi, 'croquembouche'], [/\bmill foy\b/gi, 'mille-feuille'], [/\btart ta tan\b/gi, 'tarte Tatin'],
+    [/\bpre fix\b/gi, 'prix fixe'], [/\b(?:degustation|day goo station)\b/gi, 'dégustation'], [/\bplot do zhoor\b/gi, 'plat du jour'],
+    [/\boh cuisine\b/gi, 'haute cuisine'], [/\bnew vell cuisine\b/gi, 'nouvelle cuisine'], [/\b(?:maitre d|may truh dee)\b/gi, "maître d'"],
+    [/\b(?:aperitif|ah pear a teef)\b/gi, 'apéritif'], [/\b(?:crudites|crew dee tay)\b/gi, 'crudités'], [/\b(?:crouton|crew ton)\b/gi, 'croûton'],
+    [/\b(?:boeuf bourguignon|beef borg in yon)\b/gi, 'bœuf bourguignon'], [/\bshin wah\b/gi, 'chinois'], [/\bta mee\b/gi, 'tamis'],
     [/\b(?:sanitizing|sanitize|sanitizer)\b/gi, match => ({ sanitizing: 'sanitising', sanitize: 'sanitise', sanitizer: 'sanitiser' })[match.toLowerCase()]],
     [/\bpaltry\b/gi, 'poultry'],
     [/\bverseti\b/gi, 'versatility']
@@ -429,9 +447,13 @@ async function api(path, body, isForm = false, signal) {
   return data;
 }
 
+function frenchDocumentHints() {
+  return frenchSpeechHints;
+}
+
 function transcriptionPrompt(kind) {
   const priority = ['grill', 'grilled', 'grilling', 'stock', 'mise en place', 'à la carte', 'roux', 'béchamel', 'velouté', 'hollandaise', 'béarnaise', 'mirepoix', 'julienne', 'brunoise', 'sous-vide', 'bain-marie', 'HACCP', 'FIFO', 'sanitising', 'cross-contamination'];
-  const vocabulary = [...new Set([...priority, ...speechHints])].slice(0, 90).join(', ');
+  const vocabulary = [...new Set([...priority, ...frenchDocumentHints(), ...speechHints])].slice(0, 180).join(', ');
   const recent = lanes[kind].records.slice(-4).map(record => record.question).join(' | ');
   return `Bilingual Vietnamese or Australian English commercial cookery skills-assessment interview. Detect the spoken language and transcribe in that same language. Preserve the exact question, numbers, and culinary terminology, including French loanwords. Vocabulary: ${vocabulary}.${recent ? ` Recent questions: ${recent}.` : ''}`;
 }
@@ -451,7 +473,7 @@ async function transcribeBlob(blob, kind, fast = false) {
     form.append('prompt', transcriptionPrompt(kind));
     if (model === 'gpt-transcribe') {
       const priority = ['grill', 'grilled', 'stock', 'mise en place', 'à la carte', 'roux', 'béchamel', 'velouté', 'hollandaise', 'béarnaise', 'mirepoix', 'julienne', 'brunoise', 'sous-vide', 'bain-marie', 'HACCP', 'FIFO', 'sanitising', 'cross-contamination', "chef's knife"];
-      for (const term of [...new Set([...priority, ...speechHints])].slice(0, 100)) form.append('keywords[]', term);
+      for (const term of [...new Set([...priority, ...frenchDocumentHints(), ...speechHints])].slice(0, 100)) form.append('keywords[]', term);
     }
     try { return cleanSpeech((await api('audio/transcriptions', form, true)).text || ''); }
     catch (error) {
@@ -1458,7 +1480,7 @@ $('saveProfile').addEventListener('click', async () => {
   finally { clearTimeout(timeout); profileProcessingController = null; $('saveProfile').disabled = false; $('importProfile').disabled = false; $('profileSource').readOnly = false; }
 });
 
-window.saCook.loadResources().then(({ localQA, localQAVi, internetQA, hints, answerPolicy: sharedPolicy, knowledge, handbook, profileExtraction }) => {
+window.saCook.loadResources().then(({ localQA, localQAVi, internetQA, hints, frenchHints, answerPolicy: sharedPolicy, knowledge, handbook, profileExtraction }) => {
   profileExtractionTemplate = profileExtraction;
   const english = [...(Array.isArray(localQA) ? localQA : []), ...(Array.isArray(internetQA) ? internetQA : [])]
     .map(item => ({...item, targetLanguage: 'en'}));
@@ -1466,6 +1488,7 @@ window.saCook.loadResources().then(({ localQA, localQAVi, internetQA, hints, ans
   qa = [...english, ...vietnamese];
   buildVietnameseQuestionTranslations(vietnamese);
   speechHints = hints.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+  frenchSpeechHints = frenchHints.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   if (String(sharedPolicy || '').trim()) answerPolicy = String(sharedPolicy).replace(/\s+/g, ' ').trim();
   buildStudyChunks([['SA Cook Study', knowledge], ['SA Cook Handbook', handbook]]);
   answerEvidenceCache.clear();
