@@ -59,6 +59,22 @@ static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1
 }
 @end
 
+// A normal miniaturized NSWindow always receives a tile in the Dock, even
+// when the application itself is an LSUIElement/accessory app. Keep the
+// familiar yellow control, but make every AppKit minimize path hide this
+// presenter window instead. Reopening the running app restores it through
+// applicationShouldHandleReopen: without exposing a minimized-window tile.
+@interface SCPresenterWindow : NSWindow
+@end
+@implementation SCPresenterWindow
+- (void)hideWithoutDockTile:(id)sender {
+    if(self.isMiniaturized) [self deminiaturize:nil];
+    [self orderOut:sender];
+}
+- (void)miniaturize:(id)sender { [self hideWithoutDockTile:sender]; }
+- (void)performMiniaturize:(id)sender { [self hideWithoutDockTile:sender]; }
+@end
+
 typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
     SCWindowResizeEdgeNone   = 0,
     SCWindowResizeEdgeLeft   = 1 << 0,
@@ -356,7 +372,7 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)hasVisibleWindows {
     (void)sender;
-    if (!hasVisibleWindows) {
+    if (!hasVisibleWindows || !self.window.visible || self.window.miniaturized) {
       [self protectWindowFromCapture:self.window];
       [self.window deminiaturize:nil];
       [self.window makeKeyAndOrderFront:nil];
@@ -985,7 +1001,7 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
     NSRect visible=NSScreen.mainScreen.visibleFrame;
     NSSize initialSize=[self adaptiveWindowContentSizeForVisibleFrame:visible];
     CGFloat initialWidth=initialSize.width,initialHeight=initialSize.height;
-    self.window=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,initialWidth,initialHeight)
+    self.window=[[SCPresenterWindow alloc] initWithContentRect:NSMakeRect(0,0,initialWidth,initialHeight)
         styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskFullSizeContentView backing:NSBackingStoreBuffered defer:NO];
     self.window.title=@"SA Cook Assistant"; self.window.contentMinSize=NSMakeSize(720,520);
     [self protectWindowFromCapture:self.window];

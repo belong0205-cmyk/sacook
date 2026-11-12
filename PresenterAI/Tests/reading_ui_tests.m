@@ -3,6 +3,7 @@
 #define main PresenterApplicationMain
 #import "../Sources/main.m"
 #undef main
+#import <objc/runtime.h>
 
 @interface ReadingUITestApp : AppDelegate
 @end
@@ -208,6 +209,8 @@ int main(int argc,const char *argv[]) {
         Check(app.window.titlebarAppearsTransparent && app.window.titleVisibility==NSWindowTitleHidden,@"Floating shell has an integrated transparent titlebar");
         Check(app.window.movableByWindowBackground && app.window.level==NSFloatingWindowLevel,@"Compact assistant can be dragged and stays above presentation windows");
         Check((app.window.styleMask&NSWindowStyleMaskResizable)==0 && app.window.acceptsMouseMovedEvents,@"Main window has no native resize edge cursor and tracks arrow-cursor updates");
+        Check([app.window isKindOfClass:SCPresenterWindow.class],@"Main presenter window replaces Dock miniaturization with hidden-window behavior");
+        Check(method_getImplementation(class_getInstanceMethod(SCPresenterWindow.class,@selector(miniaturize:)))!=method_getImplementation(class_getInstanceMethod(NSWindow.class,@selector(miniaturize:))) && method_getImplementation(class_getInstanceMethod(SCPresenterWindow.class,@selector(performMiniaturize:)))!=method_getImplementation(class_getInstanceMethod(NSWindow.class,@selector(performMiniaturize:))),@"Both AppKit minimize entry points are overridden before the Dock can create a tile");
         NSEvent *cursorEvent=[NSEvent otherEventWithType:NSEventTypeApplicationDefined location:NSZeroPoint modifierFlags:0 timestamp:0 windowNumber:0 context:nil subtype:0 data1:0 data2:0];
         Check([app.window.contentView isKindOfClass:SCWindowResizeView.class],@"Main content view provides custom edge resizing without enabling native resize cursors");
         SCWindowResizeView *resizeRoot=(SCWindowResizeView *)app.window.contentView;
