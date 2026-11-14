@@ -10,6 +10,7 @@
 #import <NaturalLanguage/NaturalLanguage.h>
 #import <unistd.h>
 #import <CommonCrypto/CommonDigest.h>
+#import <Carbon/Carbon.h>
 #import "SCSpeechTimeline.h"
 #import "SCAutoQuestionDetector.h"
 #import "SCAnswerLane.h"
@@ -33,6 +34,8 @@ static const NSTimeInterval SCAutoStableEndpoint = 1.35;
 static NSString * const SCManualAnswerCacheKey = @"PresenterAI.answerCache.manual.v21";
 static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v21";
 static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1__";
+static const OSType SCVisibilityHotKeySignature = 'SACP';
+static const UInt32 SCVisibilityHotKeyIdentifier = 1;
 
 @interface SCArrowTextView : NSTextView
 @end
@@ -296,6 +299,9 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 @property NSButton *webProfileSyncButton;
 @property NSButton *webProfileLogoutButton;
 @property NSURLSessionDataTask *webProfileTask;
+@property EventHotKeyRef visibilityHotKey;
+@property EventHandlerRef visibilityHotKeyHandler;
+@property NSMenuItem *visibilityMenuItem;
 - (void)stageAutoQuestionTurnText:(NSString *)text;
 - (void)flushAutoQuestionTurnIfReadyAt:(NSTimeInterval)now force:(BOOL)force;
 - (NSArray<NSString *> *)questionPartsForSynthesis:(NSString *)question;
@@ -307,13 +313,27 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 - (void)setAudioLevelText:(NSString *)text color:(NSColor *)color toolTip:(NSString *)toolTip;
 - (void)protectWindowFromCapture:(NSWindow *)window;
 - (void)protectAllApplicationWindows;
+- (void)togglePresenterVisibility:(id)sender;
 @end
+
+static BOOL SCIsVisibilityHotKey(EventHotKeyID hotKeyID) {
+    return hotKeyID.signature==SCVisibilityHotKeySignature && hotKeyID.id==SCVisibilityHotKeyIdentifier;
+}
+static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventRef event,void *userData) {
+    (void)nextHandler;
+    EventHotKeyID hotKeyID={0};
+    OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(hotKeyID),NULL,&hotKeyID);
+    if(status!=noErr || !SCIsVisibilityHotKey(hotKeyID)) return eventNotHandledErr;
+    AppDelegate *delegate=(__bridge AppDelegate *)userData;
+    dispatch_async(dispatch_get_main_queue(),^{ [delegate togglePresenterVisibility:nil]; });
+    return noErr;
+}
 
 @implementation AppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)n {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-    [self buildMenu]; [self buildUI]; [self loadAudioDevices]; [self loadSavedAPIKey]; [self loadBundledKnowledge];
+    [self buildMenu]; [self buildUI]; [self loadAudioDevices]; [self loadSavedAPIKey]; [self loadBundledKnowledge]; [self registerVisibilityHotKey];
     NSNotificationCenter *notifications=NSNotificationCenter.defaultCenter;
     [notifications addObserver:self selector:@selector(applicationWindowBecameKey:) name:NSWindowDidBecomeKeyNotification object:nil];
     [notifications addObserver:self selector:@selector(applicationWindowUpdated:) name:NSWindowDidExposeNotification object:nil];
@@ -370,14 +390,40 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 - (void)applicationDidBecomeActive:(NSNotification *)notification { (void)notification; [self protectAllApplicationWindows]; }
 - (void)windowDidBecomeKey:(NSNotification *)notification { [self protectWindowFromCapture:notification.object]; }
 
+- (void)registerVisibilityHotKey {
+    if(self.visibilityHotKey || self.visibilityHotKeyHandler) return;
+    EventTypeSpec eventType={kEventClassKeyboard,kEventHotKeyPressed};
+    if(InstallApplicationEventHandler(&SCVisibilityHotKeyHandler,1,&eventType,(__bridge void *)self,&_visibilityHotKeyHandler)!=noErr) return;
+    EventHotKeyID hotKeyID={SCVisibilityHotKeySignature,SCVisibilityHotKeyIdentifier};
+    OSStatus registration=RegisterEventHotKey(kVK_ANSI_P,controlKey|optionKey,hotKeyID,GetApplicationEventTarget(),kEventHotKeyExclusive,&_visibilityHotKey);
+    if(registration!=noErr) {
+      registration=RegisterEventHotKey(kVK_ANSI_P,controlKey|optionKey|cmdKey,hotKeyID,GetApplicationEventTarget(),kEventHotKeyExclusive,&_visibilityHotKey);
+      if(registration==noErr) self.visibilityMenuItem.title=@"Ẩn / hiện cửa sổ · ⌃⌥⌘P";
+    }
+    if(registration!=noErr) {
+      self.visibilityMenuItem.title=@"Ẩn / hiện cửa sổ";
+      RemoveEventHandler(self.visibilityHotKeyHandler); self.visibilityHotKeyHandler=NULL;
+    }
+}
+- (void)unregisterVisibilityHotKey {
+    if(self.visibilityHotKey){UnregisterEventHotKey(self.visibilityHotKey);self.visibilityHotKey=NULL;}
+    if(self.visibilityHotKeyHandler){RemoveEventHandler(self.visibilityHotKeyHandler);self.visibilityHotKeyHandler=NULL;}
+}
+- (void)showPresenterWindow {
+    [self protectWindowFromCapture:self.window];
+    if(self.window.miniaturized) [self.window deminiaturize:nil];
+    [self.window makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+}
+- (void)togglePresenterVisibility:(id)sender {
+    (void)sender;
+    if(self.window.visible && !self.window.miniaturized) [self.window orderOut:nil];
+    else [self showPresenterWindow];
+}
+
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)hasVisibleWindows {
     (void)sender;
-    if (!hasVisibleWindows || !self.window.visible || self.window.miniaturized) {
-      [self protectWindowFromCapture:self.window];
-      [self.window deminiaturize:nil];
-      [self.window makeKeyAndOrderFront:nil];
-      [NSApp activateIgnoringOtherApps:YES];
-    }
+    if (!hasVisibleWindows || !self.window.visible || self.window.miniaturized) [self showPresenterWindow];
     return YES;
 }
 
@@ -1048,6 +1094,8 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
     NSMenuItem *about=[[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"SA Cook Assistant · v%@",version] action:nil keyEquivalent:@""]; about.enabled=NO; [secondary addItem:about];
     self.statusMenuItem=[[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Trạng thái: %@",self.status.stringValue] action:nil keyEquivalent:@""]; self.statusMenuItem.enabled=NO; [secondary addItem:self.statusMenuItem];
     self.levelMenuItem=[[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Âm thanh: %@",self.levelLabel.stringValue] action:nil keyEquivalent:@""]; self.levelMenuItem.enabled=NO; [secondary addItem:self.levelMenuItem];
+    [secondary addItem:[NSMenuItem separatorItem]];
+    self.visibilityMenuItem=[self secondaryMenuItem:@"Ẩn / hiện cửa sổ · ⌃⌥P" action:@selector(togglePresenterVisibility:) tag:0]; [secondary addItem:self.visibilityMenuItem];
     [secondary addItem:[NSMenuItem separatorItem]];
     NSMenuItem *sourceRoot=[[NSMenuItem alloc] initWithTitle:@"Nguồn âm thanh" action:nil keyEquivalent:@""];
     self.audioSourceMenu=[[NSMenu alloc] initWithTitle:@"Nguồn âm thanh"];
@@ -3189,7 +3237,7 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
     [editMenu addItemWithTitle:@"Chọn tất cả" action:@selector(selectAll:) keyEquivalent:@"a"];
     NSApp.mainMenu=bar;
 }
-- (void)applicationWillTerminate:(NSNotification *)n { if (self.spaceKeyMonitor) [NSEvent removeMonitor:self.spaceKeyMonitor]; if (self.listening) [self stopListening]; }
+- (void)applicationWillTerminate:(NSNotification *)n { [self unregisterVisibilityHotKey]; if (self.spaceKeyMonitor) [NSEvent removeMonitor:self.spaceKeyMonitor]; if (self.listening) [self stopListening]; }
 @end
 
 int main(int argc,const char *argv[]){ @autoreleasepool { NSApplication *a=NSApplication.sharedApplication; [a setActivationPolicy:NSApplicationActivationPolicyAccessory]; AppDelegate *d=[AppDelegate new]; a.delegate=d; [a run]; } return 0; }

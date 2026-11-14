@@ -140,7 +140,7 @@ int main(int argc,const char *argv[]) {
         Check(app.listenButton.superview==topBar && app.moreButton.superview==topBar && app.vHeaderLabel.superview==topBar && app.eHeaderLabel.superview==topBar,@"V, E, Start listening, and overflow share the top row");
         Check(app.deviceButton.superview==nil && app.commitButton.superview==nil && app.status.superview==nil && app.levelLabel.superview==nil && app.autoButton.superview==nil,@"Source, Space, status, level, and AUTO no longer consume visible chrome");
         Check(topBar.subviews.count==4 && [app.vHeaderLabel.stringValue isEqual:@"V"] && [app.eHeaderLabel.stringValue isEqual:@"E"],@"Top row contains only the two lane labels and two controls");
-        Check(app.audioSourceMenu!=nil && MenuHasAction(app.moreButton.menu,@selector(commitCurrentQuestionFromSpace)),@"Overflow contains the audio source submenu and Space action");
+        Check(app.audioSourceMenu!=nil && MenuHasAction(app.moreButton.menu,@selector(commitCurrentQuestionFromSpace)) && MenuHasAction(app.moreButton.menu,@selector(togglePresenterVisibility:)),@"Overflow contains audio source, Space, and global visibility actions");
         Check(app.statusMenuItem && !app.statusMenuItem.enabled && app.levelMenuItem && !app.levelMenuItem.enabled,@"Overflow keeps read-only listening status and audio level from the removed bottom bar");
         [app setStatus:@"● Test status" color:NSColor.systemGreenColor]; [app setAudioLevelText:@"● Test audio" color:NSColor.systemGreenColor toolTip:@"Test meter"];
         Check([app.statusMenuItem.title containsString:@"Test status"] && [app.levelMenuItem.title containsString:@"Test audio"],@"Hidden status and audio state update live inside overflow");
@@ -211,6 +211,7 @@ int main(int argc,const char *argv[]) {
         Check((app.window.styleMask&NSWindowStyleMaskResizable)==0 && app.window.acceptsMouseMovedEvents,@"Main window has no native resize edge cursor and tracks arrow-cursor updates");
         Check([app.window isKindOfClass:SCPresenterWindow.class],@"Main presenter window replaces Dock miniaturization with hidden-window behavior");
         Check(method_getImplementation(class_getInstanceMethod(SCPresenterWindow.class,@selector(miniaturize:)))!=method_getImplementation(class_getInstanceMethod(NSWindow.class,@selector(miniaturize:))) && method_getImplementation(class_getInstanceMethod(SCPresenterWindow.class,@selector(performMiniaturize:)))!=method_getImplementation(class_getInstanceMethod(NSWindow.class,@selector(performMiniaturize:))),@"Both AppKit minimize entry points are overridden before the Dock can create a tile");
+        Check(SCIsVisibilityHotKey((EventHotKeyID){SCVisibilityHotKeySignature,SCVisibilityHotKeyIdentifier}) && !SCIsVisibilityHotKey((EventHotKeyID){'NOPE',99}),@"Global visibility handler accepts only its own registered Carbon hotkey");
         NSEvent *cursorEvent=[NSEvent otherEventWithType:NSEventTypeApplicationDefined location:NSZeroPoint modifierFlags:0 timestamp:0 windowNumber:0 context:nil subtype:0 data1:0 data2:0];
         Check([app.window.contentView isKindOfClass:SCWindowResizeView.class],@"Main content view provides custom edge resizing without enabling native resize cursors");
         SCWindowResizeView *resizeRoot=(SCWindowResizeView *)app.window.contentView;

@@ -6,7 +6,7 @@ APP="$STAGING_ROOT/Presenter AI.app"
 FINAL_APP="$ROOT/dist/Presenter AI.app"
 SOURCE_DATA="/Users/trunghuy/sa-cook-study/data"
 mkdir -p "$ROOT/build" "$APP/Contents/MacOS" "$APP/Contents/Resources"
-clang -fobjc-arc -framework Cocoa -framework AVFoundation -framework Speech -framework PDFKit -framework Security -framework CoreAudio -framework AudioToolbox -framework NaturalLanguage \
+clang -fobjc-arc -framework Cocoa -framework AVFoundation -framework Speech -framework PDFKit -framework Security -framework CoreAudio -framework AudioToolbox -framework NaturalLanguage -framework Carbon \
   -mmacosx-version-min=13.0 "$ROOT/Sources/main.m" "$ROOT/Sources/SCProfileDocument.m" "$ROOT/Sources/SCSpeechTimeline.m" "$ROOT/Sources/SCAutoQuestionDetector.m" "$ROOT/Sources/SCAnswerLane.m" "$ROOT/Sources/SCUntimedTranscriptBuffer.m" "$ROOT/Sources/SCAudioUtteranceBuffer.m" -o "$ROOT/build/PresenterAI"
 cp "$ROOT/build/PresenterAI" "$APP/Contents/MacOS/PresenterAI"
 cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
