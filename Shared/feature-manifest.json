@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "featureVersion": "5.75.0",
+  "featureVersion": "5.76.0",
   "platforms": ["macOS", "Windows"],
   "answerPolicy": {
     "resource": "answer-policy.txt",
@@ -35,6 +35,7 @@
     "shortAnswerFastTier": true,
     "adaptiveSpaceAudioTail": true,
     "macOSDirectSystemAudio": true,
+    "macOSCoreAudioSystemTap": true,
     "fullContainsOnlyAdditionalDetails": true,
     "dualAnswerVariants": true,
     "keywordHighlighting": true

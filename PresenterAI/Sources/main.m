@@ -4,6 +4,8 @@
 #import <PDFKit/PDFKit.h>
 #import <Security/Security.h>
 #import <CoreAudio/CoreAudio.h>
+#import <CoreAudio/AudioHardwareTapping.h>
+#import <CoreAudio/CATapDescription.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <math.h>
 #import <float.h>
@@ -311,6 +313,11 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 @property BOOL usingSystemAudio;
 @property NSUInteger systemAudioRawBufferCount;
 @property NSUInteger systemAudioPCMBufferCount;
+@property AudioObjectID coreAudioTapID;
+@property AudioObjectID coreAudioAggregateDeviceID;
+@property AudioDeviceIOProcID coreAudioIOProcID;
+@property AVAudioFormat *coreAudioTapFormat;
+@property BOOL usingCoreAudioTap;
 - (void)stageAutoQuestionTurnText:(NSString *)text;
 - (void)flushAutoQuestionTurnIfReadyAt:(NSTimeInterval)now force:(BOOL)force;
 - (NSArray<NSString *> *)questionPartsForSynthesis:(NSString *)question;
@@ -325,6 +332,8 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 - (void)togglePresenterVisibility:(id)sender;
 - (BOOL)isSystemAudioSelected;
 - (void)consumeCapturedAudioBuffer:(AVAudioPCMBuffer *)buffer;
+- (BOOL)startCoreAudioSystemTapForGeneration:(NSUInteger)generation error:(NSError **)error;
+- (void)stopCoreAudioSystemTap;
 - (void)startSystemAudioCaptureForGeneration:(NSUInteger)generation;
 @end
 
@@ -1282,6 +1291,14 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
 - (void)requestAndStart {
     if([self isSystemAudioSelected]) {
       [self setStatus:@"Đang kiểm tra quyền âm thanh hệ thống…" color:NSColor.systemOrangeColor];
+      // macOS 14.2 introduced Core Audio process taps. They request the
+      // dedicated System Audio Recording permission and do not require the
+      // app to capture a display. Requiring Screen Recording here prevented
+      // otherwise valid audio-only capture on recent macOS releases.
+      if(@available(macOS 14.2, *)) {
+        [self requestSpeechAuthorizationAndStart];
+        return;
+      }
       if(!CGPreflightScreenCaptureAccess()) {
         BOOL granted=CGRequestScreenCaptureAccess();
         NSString *detail=granted?@"macOS đã nhận lựa chọn của bạn. Hãy đóng hẳn rồi mở lại SA Cook Assistant một lần để quyền âm thanh hệ thống có hiệu lực.":@"Mở System Settings → Privacy & Security → Screen & System Audio Recording (hoặc Screen Recording), bật SA Cook Assistant rồi mở lại ứng dụng.";
@@ -1340,6 +1357,162 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
       if(!weak.listening || weak.recognitionGeneration!=generation) return;
       [weak setAudioLevelText:bars?@"● Có âm thanh":@"○ Im lặng" color:bars?NSColor.systemGreenColor:NSColor.systemOrangeColor toolTip:detail];
     });
+}
+- (BOOL)startCoreAudioSystemTapForGeneration:(NSUInteger)generation error:(NSError **)error {
+    if(@available(macOS 14.2, *)) {
+      [self stopCoreAudioSystemTap];
+      if(!self.systemAudioQueue) self.systemAudioQueue=dispatch_queue_create("local.codex.PresenterAI.system-audio",DISPATCH_QUEUE_SERIAL);
+      NSError *(^captureError)(NSString *,OSStatus)=^NSError *(NSString *stage,OSStatus status) {
+        NSString *detail=[NSString stringWithFormat:@"%@ (Core Audio, mã %d).",stage,(int)status];
+        return [NSError errorWithDomain:@"local.codex.PresenterAI.SystemAudio" code:status userInfo:@{NSLocalizedDescriptionKey:detail}];
+      };
+
+      CATapDescription *description=[[CATapDescription alloc] initStereoGlobalTapButExcludeProcesses:@[]];
+      description.name=@"SA Cook Assistant System Audio";
+      description.UUID=NSUUID.UUID;
+      description.privateTap=YES;
+      description.muteBehavior=CATapUnmuted;
+
+      AudioObjectID tapID=kAudioObjectUnknown;
+      OSStatus status=AudioHardwareCreateProcessTap(description,&tapID);
+      if(status!=noErr || tapID==kAudioObjectUnknown) {
+        if(error) *error=captureError(@"macOS không thể tạo System Audio tap",status);
+        return NO;
+      }
+      self.coreAudioTapID=tapID;
+
+      AudioStreamBasicDescription streamDescription={0};
+      UInt32 descriptionSize=sizeof(streamDescription);
+      AudioObjectPropertyAddress formatAddress={kAudioTapPropertyFormat,kAudioObjectPropertyScopeGlobal,kAudioObjectPropertyElementMain};
+      status=AudioObjectGetPropertyData(tapID,&formatAddress,0,NULL,&descriptionSize,&streamDescription);
+      AVAudioFormat *format=status==noErr?[[AVAudioFormat alloc] initWithStreamDescription:&streamDescription]:nil;
+      if(status!=noErr || !format || format.sampleRate<=0 || format.channelCount==0 || streamDescription.mBytesPerFrame==0) {
+        if(error) *error=captureError(@"Không đọc được định dạng System Audio tap",status);
+        [self stopCoreAudioSystemTap];
+        return NO;
+      }
+      self.coreAudioTapFormat=format;
+
+      CFStringRef tapUIDRef=NULL;
+      UInt32 tapUIDSize=sizeof(tapUIDRef);
+      AudioObjectPropertyAddress uidAddress={kAudioTapPropertyUID,kAudioObjectPropertyScopeGlobal,kAudioObjectPropertyElementMain};
+      status=AudioObjectGetPropertyData(tapID,&uidAddress,0,NULL,&tapUIDSize,&tapUIDRef);
+      NSString *tapUID=nil;
+      if(status==noErr && tapUIDRef) { tapUID=CFBridgingRelease(tapUIDRef); tapUIDRef=NULL; }
+      if(status!=noErr || !tapUID.length) {
+        if(tapUIDRef) CFRelease(tapUIDRef);
+        if(error) *error=captureError(@"Không đọc được UID của System Audio tap",status);
+        [self stopCoreAudioSystemTap];
+        return NO;
+      }
+
+      NSString *aggregateUID=[NSString stringWithFormat:@"local.codex.PresenterAI.system-audio.%@",description.UUID.UUIDString];
+      NSDictionary *tapEntry=@{
+        [NSString stringWithUTF8String:kAudioSubTapUIDKey]:tapUID,
+        [NSString stringWithUTF8String:kAudioSubTapDriftCompensationKey]:@YES
+      };
+      NSDictionary *aggregateDescription=@{
+        [NSString stringWithUTF8String:kAudioAggregateDeviceUIDKey]:aggregateUID,
+        [NSString stringWithUTF8String:kAudioAggregateDeviceNameKey]:@"SA Cook Assistant System Audio",
+        [NSString stringWithUTF8String:kAudioAggregateDeviceIsPrivateKey]:@YES,
+        [NSString stringWithUTF8String:kAudioAggregateDeviceTapListKey]:@[tapEntry],
+        [NSString stringWithUTF8String:kAudioAggregateDeviceTapAutoStartKey]:@YES
+      };
+      AudioObjectID aggregateID=kAudioObjectUnknown;
+      status=AudioHardwareCreateAggregateDevice((__bridge CFDictionaryRef)aggregateDescription,&aggregateID);
+      if(status!=noErr || aggregateID==kAudioObjectUnknown) {
+        if(error) *error=captureError(@"macOS không thể tạo thiết bị thu System Audio",status);
+        [self stopCoreAudioSystemTap];
+        return NO;
+      }
+      self.coreAudioAggregateDeviceID=aggregateID;
+
+      __weak typeof(self) weak=self;
+      AudioDeviceIOProcID ioProcID=NULL;
+      status=AudioDeviceCreateIOProcIDWithBlock(&ioProcID,aggregateID,self.systemAudioQueue,^(const AudioTimeStamp *now,const AudioBufferList *input,const AudioTimeStamp *inputTime,AudioBufferList *output,const AudioTimeStamp *outputTime) {
+        (void)now; (void)inputTime; (void)output; (void)outputTime;
+        AppDelegate *strong=weak;
+        if(!strong || !strong.listening || !strong.usingSystemAudio || !strong.usingCoreAudioTap || generation!=strong.recognitionGeneration || aggregateID!=strong.coreAudioAggregateDeviceID) return;
+        if(!input || !input->mNumberBuffers || !input->mBuffers[0].mData || !input->mBuffers[0].mDataByteSize) return;
+        strong.systemAudioRawBufferCount++;
+        AVAudioFormat *captureFormat=strong.coreAudioTapFormat;
+        const AudioStreamBasicDescription *asbd=captureFormat.streamDescription;
+        UInt32 bytesPerFrame=asbd?asbd->mBytesPerFrame:0;
+        if(!captureFormat || !bytesPerFrame) return;
+        AVAudioFrameCount frameCount=(AVAudioFrameCount)(input->mBuffers[0].mDataByteSize/bytesPerFrame);
+        if(!frameCount) return;
+        AVAudioPCMBuffer *pcm=[[AVAudioPCMBuffer alloc] initWithPCMFormat:captureFormat frameCapacity:frameCount];
+        AudioBufferList *destination=pcm.mutableAudioBufferList;
+        if(!pcm || !destination) return;
+        UInt32 bufferCount=MIN(input->mNumberBuffers,destination->mNumberBuffers);
+        for(UInt32 index=0;index<bufferCount;index++) {
+          const AudioBuffer source=input->mBuffers[index];
+          AudioBuffer *target=&destination->mBuffers[index];
+          if(!source.mData || !target->mData) return;
+          UInt32 copySize=MIN(source.mDataByteSize,target->mDataByteSize);
+          if(!copySize) return;
+          memcpy(target->mData,source.mData,copySize);
+          target->mDataByteSize=copySize;
+        }
+        pcm.frameLength=frameCount;
+        strong.systemAudioPCMBufferCount++;
+        if(strong.systemAudioPCMBufferCount==1) {
+          dispatch_async(dispatch_get_main_queue(),^{
+            if(!weak || !weak.listening || !weak.usingCoreAudioTap || generation!=weak.recognitionGeneration || aggregateID!=weak.coreAudioAggregateDeviceID) return;
+            weak.listenButton.title=@"Dừng nghe";
+            [weak setAudioLevelText:@"○ Đã kết nối • nguồn đang im lặng" color:NSColor.systemOrangeColor toolTip:@"Đã nhận dữ liệu từ Core Audio System Tap"];
+          });
+        }
+        [strong consumeCapturedAudioBuffer:pcm];
+      });
+      if(status!=noErr || !ioProcID) {
+        if(error) *error=captureError(@"Không thể tạo luồng đọc System Audio",status);
+        [self stopCoreAudioSystemTap];
+        return NO;
+      }
+      self.coreAudioIOProcID=ioProcID;
+      self.usingCoreAudioTap=YES;
+      status=AudioDeviceStart(aggregateID,ioProcID);
+      if(status!=noErr) {
+        if(error) *error=captureError(@"Không thể khởi động System Audio",status);
+        [self stopCoreAudioSystemTap];
+        return NO;
+      }
+      [self setAudioLevelText:@"○ Đã kết nối • chờ âm thanh" color:NSColor.systemOrangeColor toolTip:@"Core Audio đang chờ video hoặc cuộc họp phát âm thanh"];
+      __weak typeof(self) diagnosticWeak=self;
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW,4*NSEC_PER_SEC),dispatch_get_main_queue(),^{
+        if(!diagnosticWeak || !diagnosticWeak.listening || !diagnosticWeak.usingCoreAudioTap || generation!=diagnosticWeak.recognitionGeneration || aggregateID!=diagnosticWeak.coreAudioAggregateDeviceID || diagnosticWeak.systemAudioPCMBufferCount) return;
+        if(diagnosticWeak.systemAudioRawBufferCount) {
+          [diagnosticWeak setAudioLevelText:@"○ Không đọc được định dạng âm thanh" color:NSColor.systemRedColor toolTip:@"Core Audio có dữ liệu nhưng chưa chuyển được PCM"];
+          [diagnosticWeak setStatus:@"Không đọc được âm thanh hệ thống • thử lại" color:NSColor.systemRedColor];
+        } else {
+          [diagnosticWeak setAudioLevelText:@"○ Chưa nhận System Audio" color:NSColor.systemRedColor toolTip:@"Bật quyền System Audio Recording cho SA Cook Assistant"];
+          [diagnosticWeak setStatus:@"Chưa nhận âm thanh • kiểm tra quyền System Audio Recording" color:NSColor.systemRedColor];
+        }
+        diagnosticWeak.listenButton.title=@"Dừng • Chưa có âm thanh";
+      });
+      return YES;
+    }
+    if(error) *error=[NSError errorWithDomain:@"local.codex.PresenterAI.SystemAudio" code:-1 userInfo:@{NSLocalizedDescriptionKey:@"Core Audio System Tap cần macOS 14.2 trở lên."}];
+    return NO;
+}
+- (void)stopCoreAudioSystemTap {
+    AudioObjectID aggregateID=self.coreAudioAggregateDeviceID;
+    AudioDeviceIOProcID ioProcID=self.coreAudioIOProcID;
+    AudioObjectID tapID=self.coreAudioTapID;
+    self.usingCoreAudioTap=NO;
+    self.coreAudioIOProcID=NULL;
+    self.coreAudioAggregateDeviceID=kAudioObjectUnknown;
+    self.coreAudioTapID=kAudioObjectUnknown;
+    self.coreAudioTapFormat=nil;
+    if(aggregateID!=kAudioObjectUnknown && ioProcID) {
+      AudioDeviceStop(aggregateID,ioProcID);
+      AudioDeviceDestroyIOProcID(aggregateID,ioProcID);
+    }
+    if(aggregateID!=kAudioObjectUnknown) AudioHardwareDestroyAggregateDevice(aggregateID);
+    if(tapID!=kAudioObjectUnknown) {
+      if(@available(macOS 14.2, *)) AudioHardwareDestroyProcessTap(tapID);
+    }
 }
 - (void)startSystemAudioCaptureForGeneration:(NSUInteger)generation {
     NSScreen *targetScreen=self.window.screen ?: NSScreen.mainScreen;
@@ -1493,7 +1666,16 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     [[NSRunLoop mainRunLoop] addTimer:self.autoTimer forMode:NSRunLoopCommonModes];
     CFAbsoluteTime started=CFAbsoluteTimeGetCurrent(); self.lastLevelUpdate=started;
     if(systemAudio) {
-      [self startSystemAudioCaptureForGeneration:self.recognitionGeneration];
+      if(@available(macOS 14.2, *)) {
+        NSError *tapError=nil;
+        if(![self startCoreAudioSystemTapForGeneration:self.recognitionGeneration error:&tapError]) {
+          [self stopListening];
+          [self showErrorTitle:@"Không thể nghe âm thanh hệ thống" detail:[NSString stringWithFormat:@"%@\n\nMở System Settings → Privacy & Security → Screen & System Audio Recording, bật SA Cook Assistant rồi mở lại app.",tapError.localizedDescription ?: @"Core Audio System Tap không khởi động được."]];
+          return;
+        }
+      } else {
+        [self startSystemAudioCaptureForGeneration:self.recognitionGeneration];
+      }
     } else {
       NSError *error=nil; [self.audioEngine prepare];
       if (![self.audioEngine startAndReturnError:&error]) {
@@ -1659,6 +1841,7 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     self.systemAudioStream=nil;
     self.usingSystemAudio=NO;
     self.systemAudioRawBufferCount=0; self.systemAudioPCMBufferCount=0;
+    [self stopCoreAudioSystemTap];
     if(systemStream) {
       [systemStream stopCaptureWithCompletionHandler:^(NSError *error) {
         (void)error;

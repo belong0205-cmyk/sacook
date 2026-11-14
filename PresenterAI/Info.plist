@@ -11,9 +11,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>5.75</string>
+	<string>5.76</string>
 	<key>CFBundleVersion</key>
-	<string>122</string>
+	<string>123</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>LSMinimumSystemVersion</key>
