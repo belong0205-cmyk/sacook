@@ -43,9 +43,11 @@ static void SCAppendLE32(NSMutableData *data, uint32_t value) {
     int16_t *output=data.mutableBytes;
     float *const *floats=buffer.floatChannelData;
     if(floats) {
+      BOOL interleaved=buffer.format.isInterleaved;
       for(AVAudioFrameCount frame=0;frame<frames;frame++) {
         double sum=0;
-        for(AVAudioChannelCount channel=0;channel<channels;channel++) sum+=floats[channel][frame];
+        for(AVAudioChannelCount channel=0;channel<channels;channel++)
+          sum+=interleaved?floats[0][(NSUInteger)frame*channels+channel]:floats[channel][frame];
         double sample=MAX(-1.0,MIN(1.0,sum/channels));
         output[frame]=(int16_t)lrint(sample*32767.0);
       }
@@ -53,9 +55,11 @@ static void SCAppendLE32(NSMutableData *data, uint32_t value) {
     }
     int16_t *const *signed16=buffer.int16ChannelData;
     if(signed16) {
+      BOOL interleaved=buffer.format.isInterleaved;
       for(AVAudioFrameCount frame=0;frame<frames;frame++) {
         long sum=0;
-        for(AVAudioChannelCount channel=0;channel<channels;channel++) sum+=signed16[channel][frame];
+        for(AVAudioChannelCount channel=0;channel<channels;channel++)
+          sum+=interleaved?signed16[0][(NSUInteger)frame*channels+channel]:signed16[channel][frame];
         output[frame]=(int16_t)(sum/(long)channels);
       }
       return data;

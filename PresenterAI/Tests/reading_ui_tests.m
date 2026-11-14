@@ -154,11 +154,13 @@ int main(int argc,const char *argv[]) {
         latePopup.sharingType=NSWindowSharingReadOnly;
         [app applicationWindowUpdated:[NSNotification notificationWithName:NSWindowDidExposeNotification object:latePopup]];
         Check(latePopup.sharingType==NSWindowSharingNone,@"A menu-like window created after launch is protected as soon as it is exposed"); [latePopup close];
-        app.inputDeviceIDs=@[@(101),@(202)]; [app.deviceButton addItemsWithTitles:@[@"Nguồn: A",@"Nguồn: B"]];
-        NSMenuItem *sourceA=[app secondaryMenuItem:@"A" action:@selector(selectAudioSourceFromMenu:) tag:0],*sourceB=[app secondaryMenuItem:@"B" action:@selector(selectAudioSourceFromMenu:) tag:1];
-        [app.audioSourceMenu addItem:sourceA]; [app.audioSourceMenu addItem:sourceB]; app.audioSourceMenuItems=@[sourceA,sourceB];
+        app.inputDeviceIDs=@[@(SCSystemAudioSource),@(101),@(202)]; [app.deviceButton addItemsWithTitles:@[@"Nguồn: Âm thanh hệ thống (không dùng mic)",@"Nguồn: A",@"Nguồn: B"]];
+        [app.deviceButton selectItemAtIndex:0];
+        Check([app isSystemAudioSelected],@"Direct macOS system audio is a distinct selectable source that does not require a microphone device");
+        NSMenuItem *systemSource=[app secondaryMenuItem:@"Âm thanh hệ thống (không dùng mic)" action:@selector(selectAudioSourceFromMenu:) tag:0],*sourceA=[app secondaryMenuItem:@"A" action:@selector(selectAudioSourceFromMenu:) tag:1],*sourceB=[app secondaryMenuItem:@"B" action:@selector(selectAudioSourceFromMenu:) tag:2];
+        [app.audioSourceMenu addItem:systemSource]; [app.audioSourceMenu addItem:sourceA]; [app.audioSourceMenu addItem:sourceB]; app.audioSourceMenuItems=@[systemSource,sourceA,sourceB];
         [app selectAudioSourceFromMenu:sourceB];
-        Check(app.deviceButton.indexOfSelectedItem==1 && sourceB.state==NSControlStateValueOn && sourceA.state==NSControlStateValueOff,@"Choosing a source in overflow updates the hidden audio-device state");
+        Check(app.deviceButton.indexOfSelectedItem==2 && sourceB.state==NSControlStateValueOn && sourceA.state==NSControlStateValueOff && systemSource.state==NSControlStateValueOff && ![app isSystemAudioSelected],@"Choosing a source in overflow updates the hidden audio-device state");
         for(NSString *selectorName in @[@"retryAutoAnswer:",@"retryManualAnswer:",@"clearAutoHistory:",@"clearManualHistory:",@"checkForUpdates:",@"configureAI:",@"changeReadingFont:",@"changeWindowSize:",@"changeBackdropStrength:"])
             Check(MenuHasAction(app.moreButton.menu,NSSelectorFromString(selectorName)),[NSString stringWithFormat:@"Secondary menu exposes %@",selectorName]);
         Check(app.backdropMenuItems.count==3 && app.backdropStrength==1,@"Background menu offers three levels and starts at the balanced level");

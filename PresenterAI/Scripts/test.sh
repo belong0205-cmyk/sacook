@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="${0:A:h:h}"
 RESOURCES="${1:-$ROOT/dist/Presenter AI.app/Contents/Resources}"
 TEST_BUILD="$(mktemp -d /private/tmp/sa-cook-tests.XXXXXX)"
-FRAMEWORKS=(-framework Cocoa -framework AVFoundation -framework Speech -framework PDFKit -framework Security -framework CoreAudio -framework AudioToolbox -framework NaturalLanguage -framework Carbon)
+FRAMEWORKS=(-framework Cocoa -framework AVFoundation -framework Speech -framework PDFKit -framework Security -framework CoreAudio -framework AudioToolbox -framework NaturalLanguage -framework Carbon -framework ScreenCaptureKit -framework CoreMedia)
 SUPPORT=("$ROOT/Sources/SCProfileDocument.m" "$ROOT/Sources/SCSpeechTimeline.m" "$ROOT/Sources/SCAutoQuestionDetector.m" "$ROOT/Sources/SCAnswerLane.m" "$ROOT/Sources/SCUntimedTranscriptBuffer.m" "$ROOT/Sources/SCAudioUtteranceBuffer.m")
 for shared_resource in answer-policy.txt feature-manifest.json ui-tokens.json; do
   test -s "$RESOURCES/$shared_resource"

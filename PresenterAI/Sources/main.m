@@ -11,6 +11,8 @@
 #import <unistd.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <Carbon/Carbon.h>
+#import <ScreenCaptureKit/ScreenCaptureKit.h>
+#import <CoreMedia/CoreMedia.h>
 #import "SCSpeechTimeline.h"
 #import "SCAutoQuestionDetector.h"
 #import "SCAnswerLane.h"
@@ -36,6 +38,7 @@ static NSString * const SCAutoAnswerCacheKey = @"PresenterAI.answerCache.auto.v2
 static NSString * const SCPairedBilingualAnswerPrefix = @"__SA_COOK_BILINGUAL_V1__";
 static const OSType SCVisibilityHotKeySignature = 'SACP';
 static const UInt32 SCVisibilityHotKeyIdentifier = 1;
+static const AudioDeviceID SCSystemAudioSource = kAudioObjectUnknown;
 
 @interface SCArrowTextView : NSTextView
 @end
@@ -163,7 +166,7 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 - (void)mouseUp:(NSEvent *)event { (void)event; self.dragEdges=SCWindowResizeEdgeNone; [NSCursor.arrowCursor set]; }
 @end
 
-@interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate, SCStreamOutput, SCStreamDelegate>
 @property NSWindow *window;
 @property NSSecureTextField *keyField;
 @property NSTextField *topicField;
@@ -302,6 +305,10 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 @property EventHotKeyRef visibilityHotKey;
 @property EventHandlerRef visibilityHotKeyHandler;
 @property NSMenuItem *visibilityMenuItem;
+@property CFAbsoluteTime lastVisibilityHotKeyAt;
+@property SCStream *systemAudioStream;
+@property (strong) dispatch_queue_t systemAudioQueue;
+@property BOOL usingSystemAudio;
 - (void)stageAutoQuestionTurnText:(NSString *)text;
 - (void)flushAutoQuestionTurnIfReadyAt:(NSTimeInterval)now force:(BOOL)force;
 - (NSArray<NSString *> *)questionPartsForSynthesis:(NSString *)question;
@@ -314,6 +321,9 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 - (void)protectWindowFromCapture:(NSWindow *)window;
 - (void)protectAllApplicationWindows;
 - (void)togglePresenterVisibility:(id)sender;
+- (BOOL)isSystemAudioSelected;
+- (void)consumeCapturedAudioBuffer:(AVAudioPCMBuffer *)buffer;
+- (void)startSystemAudioCaptureForGeneration:(NSUInteger)generation;
 @end
 
 static BOOL SCIsVisibilityHotKey(EventHotKeyID hotKeyID) {
@@ -325,7 +335,13 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(hotKeyID),NULL,&hotKeyID);
     if(status!=noErr || !SCIsVisibilityHotKey(hotKeyID)) return eventNotHandledErr;
     AppDelegate *delegate=(__bridge AppDelegate *)userData;
-    dispatch_async(dispatch_get_main_queue(),^{ [delegate togglePresenterVisibility:nil]; });
+    void (^toggle)(void)=^{
+      CFAbsoluteTime now=CFAbsoluteTimeGetCurrent();
+      if(now-delegate.lastVisibilityHotKeyAt<0.30) return;
+      delegate.lastVisibilityHotKeyAt=now;
+      [delegate togglePresenterVisibility:nil];
+    };
+    if(NSThread.isMainThread) toggle(); else dispatch_async(dispatch_get_main_queue(),toggle);
     return noErr;
 }
 
@@ -412,8 +428,16 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
 - (void)showPresenterWindow {
     [self protectWindowFromCapture:self.window];
     if(self.window.miniaturized) [self.window deminiaturize:nil];
-    [self.window makeKeyAndOrderFront:nil];
+    [NSApp unhide:nil];
     [NSApp activateIgnoringOtherApps:YES];
+    [self.window orderFrontRegardless];
+    [self.window makeKeyWindow];
+    dispatch_async(dispatch_get_main_queue(),^{
+      [self protectWindowFromCapture:self.window];
+      [NSApp activateIgnoringOtherApps:YES];
+      [self.window orderFrontRegardless];
+      [self.window makeKeyWindow];
+    });
 }
 - (void)togglePresenterVisibility:(id)sender {
     (void)sender;
@@ -900,6 +924,11 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     if(sender.tag<0 || sender.tag>=(NSInteger)self.inputDeviceIDs.count) return;
     [self.deviceButton selectItemAtIndex:sender.tag];
     for(NSMenuItem *item in self.audioSourceMenuItems) item.state=item.tag==sender.tag?NSControlStateValueOn:NSControlStateValueOff;
+    [[NSUserDefaults standardUserDefaults] setObject:sender.title ?: @"" forKey:@"PresenterAI.audioSourceName.v1"];
+}
+- (BOOL)isSystemAudioSelected {
+    NSInteger selected=self.deviceButton.indexOfSelectedItem;
+    return selected>=0 && selected<(NSInteger)self.inputDeviceIDs.count && self.inputDeviceIDs[selected].unsignedIntValue==SCSystemAudioSource;
 }
 - (NSScrollView *)textBox:(NSTextView **)out editable:(BOOL)editable {
     NSScrollView *scroll=[NSScrollView new]; scroll.translatesAutoresizingMaskIntoConstraints=NO;
@@ -1159,7 +1188,11 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     UInt32 count = size / sizeof(AudioDeviceID); AudioDeviceID *devices = calloc(count, sizeof(AudioDeviceID));
     AudioObjectGetPropertyData(kAudioObjectSystemObject, &listAddress, 0, NULL, &size, devices);
     [self.deviceButton removeAllItems]; [self.audioSourceMenu removeAllItems];
-    NSMutableArray *ids=[NSMutableArray array]; NSMutableArray<NSMenuItem *> *sourceItems=[NSMutableArray array]; NSInteger blackHoleIndex=-1;
+    NSMutableArray *ids=[NSMutableArray array]; NSMutableArray<NSMenuItem *> *sourceItems=[NSMutableArray array];
+    NSString *systemTitle=@"Âm thanh hệ thống (không dùng mic)";
+    [self.deviceButton addItemWithTitle:[NSString stringWithFormat:@"Nguồn: %@",systemTitle]]; [ids addObject:@(SCSystemAudioSource)];
+    NSMenuItem *systemItem=[self secondaryMenuItem:systemTitle action:@selector(selectAudioSourceFromMenu:) tag:0];
+    [self.audioSourceMenu addItem:systemItem]; [sourceItems addObject:systemItem];
     for (UInt32 i=0; i<count; i++) {
       AudioObjectPropertyAddress streamAddress = { kAudioDevicePropertyStreamConfiguration, kAudioDevicePropertyScopeInput, kAudioObjectPropertyElementMain };
       UInt32 configSize=0; if (AudioObjectGetPropertyDataSize(devices[i], &streamAddress, 0, NULL, &configSize) != noErr) continue;
@@ -1171,10 +1204,19 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
       [self.deviceButton addItemWithTitle:[NSString stringWithFormat:@"Nguồn: %@",deviceName]]; [ids addObject:@(devices[i])];
       NSMenuItem *sourceItem=[self secondaryMenuItem:deviceName action:@selector(selectAudioSourceFromMenu:) tag:(NSInteger)ids.count-1];
       [self.audioSourceMenu addItem:sourceItem]; [sourceItems addObject:sourceItem];
-      if ([deviceName rangeOfString:@"BlackHole" options:NSCaseInsensitiveSearch].location != NSNotFound) blackHoleIndex=ids.count-1;
     }
     free(devices); self.inputDeviceIDs=ids; self.audioSourceMenuItems=sourceItems;
-    NSInteger selected=blackHoleIndex>=0?blackHoleIndex:(ids.count?0:-1);
+    NSUserDefaults *defaults=NSUserDefaults.standardUserDefaults;
+    NSString *saved=[defaults stringForKey:@"PresenterAI.audioSourceName.v1"];
+    NSInteger selected=0;
+    // v5.74 moves new and existing installations to direct macOS system audio
+    // once. Any source the user chooses afterwards continues to persist.
+    if(![defaults boolForKey:@"PresenterAI.systemAudioDefaultApplied.v1"]) {
+      [defaults setBool:YES forKey:@"PresenterAI.systemAudioDefaultApplied.v1"];
+      [defaults setObject:systemTitle forKey:@"PresenterAI.audioSourceName.v1"];
+    } else if(saved.length) {
+      for(NSUInteger i=0;i<sourceItems.count;i++) if([sourceItems[i].title isEqualToString:saved]) { selected=(NSInteger)i; break; }
+    }
     if(selected>=0) {
       [self.deviceButton selectItemAtIndex:selected];
       for(NSMenuItem *item in self.audioSourceMenuItems) item.state=item.tag==selected?NSControlStateValueOn:NSControlStateValueOff;
@@ -1227,36 +1269,172 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
 }
 
 - (void)toggleListening:(id)sender { self.listening ? [self stopListening] : [self requestAndStart]; }
+- (void)requestSpeechAuthorizationAndStart {
+    [SFSpeechRecognizer requestAuthorization:^(SFSpeechRecognizerAuthorizationStatus status) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        if (status == SFSpeechRecognizerAuthorizationStatusAuthorized) [self startListening];
+        else [self showErrorTitle:@"Speech Recognition bị từ chối" detail:@"Mở System Settings → Privacy & Security → Speech Recognition và bật quyền cho Presenter AI."];
+      });
+    }];
+}
 - (void)requestAndStart {
+    if([self isSystemAudioSelected]) {
+      [self setStatus:@"Đang kiểm tra quyền âm thanh hệ thống…" color:NSColor.systemOrangeColor];
+      if(!CGPreflightScreenCaptureAccess() && !CGRequestScreenCaptureAccess()) {
+        [self showErrorTitle:@"Chưa có quyền âm thanh hệ thống" detail:@"Mở System Settings → Privacy & Security → Screen & System Audio Recording (hoặc Screen Recording), bật SA Cook Assistant rồi mở lại ứng dụng một lần."];
+        return;
+      }
+      [self requestSpeechAuthorizationAndStart];
+      return;
+    }
     [self setStatus:@"Đang kiểm tra quyền Microphone…" color:NSColor.systemOrangeColor];
     [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL micGranted) {
       if (!micGranted) { dispatch_async(dispatch_get_main_queue(), ^{ [self showErrorTitle:@"Microphone bị từ chối" detail:@"Mở System Settings → Privacy & Security → Microphone và bật quyền cho Presenter AI."]; }); return; }
-      [SFSpeechRecognizer requestAuthorization:^(SFSpeechRecognizerAuthorizationStatus status) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-          if (status == SFSpeechRecognizerAuthorizationStatusAuthorized) [self startListening];
-          else [self showErrorTitle:@"Speech Recognition bị từ chối" detail:@"Mở System Settings → Privacy & Security → Speech Recognition và bật quyền cho Presenter AI."];
-        });
-      }];
+      dispatch_async(dispatch_get_main_queue(), ^{ [self requestSpeechAuthorizationAndStart]; });
     }];
 }
+- (void)consumeCapturedAudioBuffer:(AVAudioPCMBuffer *)buffer {
+    if(!self.listening || !buffer || !buffer.frameLength || buffer.format.sampleRate<=0) return;
+    @synchronized(self) {
+      if(self.speechRequest) {
+        [self.speechRequest appendAudioPCMBuffer:buffer];
+        self.audioTime+=(double)buffer.frameLength/buffer.format.sampleRate;
+      }
+    }
+    double sum=0; NSUInteger samples=(NSUInteger)buffer.frameLength*buffer.format.channelCount;
+    BOOL interleaved=buffer.format.isInterleaved;
+    float *const *floats=buffer.floatChannelData;
+    if(floats) {
+      if(interleaved) {
+        for(NSUInteger sample=0;sample<samples;sample++) sum+=floats[0][sample]*floats[0][sample];
+      } else {
+        for(AVAudioChannelCount channel=0;channel<buffer.format.channelCount;channel++)
+          for(AVAudioFrameCount frame=0;frame<buffer.frameLength;frame++) sum+=floats[channel][frame]*floats[channel][frame];
+      }
+    } else {
+      int16_t *const *signed16=buffer.int16ChannelData;
+      if(signed16) {
+        if(interleaved) {
+          for(NSUInteger sample=0;sample<samples;sample++) { double value=(double)signed16[0][sample]/32768.0; sum+=value*value; }
+        } else {
+          for(AVAudioChannelCount channel=0;channel<buffer.format.channelCount;channel++)
+            for(AVAudioFrameCount frame=0;frame<buffer.frameLength;frame++) { double value=(double)signed16[channel][frame]/32768.0; sum+=value*value; }
+        }
+      } else samples=0;
+    }
+    float rms=samples?(float)sqrt(sum/samples):0;
+    BOOL voiced=rms>0.003;
+    if(voiced) self.lastVoiceAudioTime=self.audioTime;
+    [self.autoAudioBuffer appendBuffer:buffer voiced:voiced];
+    CFAbsoluteTime now=CFAbsoluteTimeGetCurrent(); if(now-self.lastLevelUpdate<0.18) return; self.lastLevelUpdate=now;
+    float db=rms>0?20.0f*log10f(rms):-100.0f; NSInteger bars=(NSInteger)((db+60.0f)/5.0f); bars=MAX(0,MIN(10,bars));
+    NSMutableString *meter=[NSMutableString string]; for(NSInteger index=0;index<10;index++) [meter appendString:index<bars?@"▮":@"▯"];
+    NSString *detail=bars?[NSString stringWithFormat:@"%@  %.0f dB",meter,db]:@"Không có tín hiệu âm thanh";
+    __weak typeof(self) weak=self;
+    NSUInteger generation=self.recognitionGeneration;
+    dispatch_async(dispatch_get_main_queue(),^{
+      if(!weak.listening || weak.recognitionGeneration!=generation) return;
+      [weak setAudioLevelText:bars?@"● Có âm thanh":@"○ Im lặng" color:bars?NSColor.systemGreenColor:NSColor.systemOrangeColor toolTip:detail];
+    });
+}
+- (void)startSystemAudioCaptureForGeneration:(NSUInteger)generation {
+    NSScreen *targetScreen=self.window.screen ?: NSScreen.mainScreen;
+    CGDirectDisplayID targetDisplayID=[targetScreen.deviceDescription[@"NSScreenNumber"] unsignedIntValue];
+    if(!self.systemAudioQueue) self.systemAudioQueue=dispatch_queue_create("local.codex.PresenterAI.system-audio",DISPATCH_QUEUE_SERIAL);
+    __weak typeof(self) weak=self;
+    [SCShareableContent getShareableContentExcludingDesktopWindows:YES onScreenWindowsOnly:NO completionHandler:^(SCShareableContent *content,NSError *contentError) {
+      dispatch_async(dispatch_get_main_queue(),^{
+        if(!weak || !weak.listening || !weak.usingSystemAudio || generation!=weak.recognitionGeneration) return;
+        if(contentError || !content.displays.count) {
+          NSString *detail=contentError.localizedDescription ?: @"macOS không trả về màn hình có thể thu âm thanh.";
+          [weak stopListening];
+          [weak showErrorTitle:@"Không thể mở âm thanh hệ thống" detail:[NSString stringWithFormat:@"%@\n\nKiểm tra System Settings → Privacy & Security → Screen & System Audio Recording, rồi mở lại ứng dụng.",detail]];
+          return;
+        }
+        SCDisplay *display=nil;
+        for(SCDisplay *candidate in content.displays) if(candidate.displayID==targetDisplayID) { display=candidate; break; }
+        if(!display) display=content.displays.firstObject;
+        NSMutableArray<SCRunningApplication *> *excluded=[NSMutableArray array];
+        for(SCRunningApplication *application in content.applications)
+          if(application.processID==NSProcessInfo.processInfo.processIdentifier) [excluded addObject:application];
+        SCContentFilter *filter=[[SCContentFilter alloc] initWithDisplay:display excludingApplications:excluded exceptingWindows:@[]];
+        SCStreamConfiguration *configuration=[SCStreamConfiguration new];
+        configuration.width=2; configuration.height=2; configuration.queueDepth=3;
+        configuration.minimumFrameInterval=CMTimeMake(1,1);
+        configuration.showsCursor=NO;
+        configuration.capturesAudio=YES;
+        configuration.sampleRate=48000;
+        // Speech recognition is mono. Requesting one channel also avoids doing
+        // unnecessary stereo work while the presenter app runs in the background.
+        configuration.channelCount=1;
+        configuration.excludesCurrentProcessAudio=YES;
+        SCStream *stream=[[SCStream alloc] initWithFilter:filter configuration:configuration delegate:weak];
+        NSError *outputError=nil;
+        if(![stream addStreamOutput:weak type:SCStreamOutputTypeAudio sampleHandlerQueue:weak.systemAudioQueue error:&outputError]) {
+          [weak stopListening];
+          [weak showErrorTitle:@"Không thể nhận âm thanh hệ thống" detail:outputError.localizedDescription ?: @"ScreenCaptureKit không thể tạo audio output."];
+          return;
+        }
+        weak.systemAudioStream=stream;
+        [stream startCaptureWithCompletionHandler:^(NSError *startError) {
+          dispatch_async(dispatch_get_main_queue(),^{
+            if(!weak || generation!=weak.recognitionGeneration || stream!=weak.systemAudioStream) return;
+            if(startError) {
+              [weak stopListening];
+              [weak showErrorTitle:@"Không thể nghe âm thanh hệ thống" detail:[NSString stringWithFormat:@"%@\n\nBật quyền Screen & System Audio Recording cho SA Cook Assistant rồi mở lại app.",startError.localizedDescription]];
+              return;
+            }
+            [weak setAudioLevelText:@"○ Đang chờ âm thanh hệ thống" color:NSColor.systemOrangeColor toolTip:@"Mở video hoặc cuộc họp trên Mac để kiểm tra"];
+          });
+        }];
+      });
+    }];
+}
+- (void)stream:(SCStream *)stream didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer ofType:(SCStreamOutputType)type {
+    if(type!=SCStreamOutputTypeAudio || stream!=self.systemAudioStream || !self.listening || !self.usingSystemAudio || !CMSampleBufferDataIsReady(sampleBuffer)) return;
+    CMItemCount sampleCount=CMSampleBufferGetNumSamples(sampleBuffer);
+    CMAudioFormatDescriptionRef description=(CMAudioFormatDescriptionRef)CMSampleBufferGetFormatDescription(sampleBuffer);
+    if(sampleCount<=0 || sampleCount>INT32_MAX || !description) return;
+    AVAudioFormat *format=[[AVAudioFormat alloc] initWithCMAudioFormatDescription:description];
+    if(!format || !format.sampleRate || !format.channelCount) return;
+    AVAudioPCMBuffer *pcm=[[AVAudioPCMBuffer alloc] initWithPCMFormat:format frameCapacity:(AVAudioFrameCount)sampleCount];
+    if(!pcm) return;
+    OSStatus status=CMSampleBufferCopyPCMDataIntoAudioBufferList(sampleBuffer,0,(int32_t)sampleCount,pcm.mutableAudioBufferList);
+    if(status!=noErr) return;
+    pcm.frameLength=(AVAudioFrameCount)sampleCount;
+    [self consumeCapturedAudioBuffer:pcm];
+}
+- (void)stream:(SCStream *)stream didStopWithError:(NSError *)error {
+    dispatch_async(dispatch_get_main_queue(),^{
+      if(stream!=self.systemAudioStream || !self.listening || !self.usingSystemAudio) return;
+      self.systemAudioStream=nil;
+      [self stopListening];
+      [self showErrorTitle:@"Âm thanh hệ thống đã dừng" detail:error.localizedDescription ?: @"macOS đã dừng phiên thu âm thanh hệ thống."];
+    });
+}
 - (void)startListening {
+    BOOL systemAudio=[self isSystemAudioSelected];
     NSInteger selected=self.deviceButton.indexOfSelectedItem;
     AudioDeviceID device = selected >= 0 && selected < self.inputDeviceIDs.count ? self.inputDeviceIDs[selected].unsignedIntValue : kAudioObjectUnknown;
-    if (device == kAudioObjectUnknown) { [self showErrorTitle:@"Không có nguồn âm thanh" detail:@"Không tìm thấy thiết bị đầu vào. Kiểm tra BlackHole 2ch trong Audio MIDI Setup rồi mở lại ứng dụng."]; return; }
+    if (!systemAudio && device == kAudioObjectUnknown) { [self showErrorTitle:@"Không có nguồn âm thanh" detail:@"Không tìm thấy thiết bị đầu vào. Chọn Âm thanh hệ thống hoặc kiểm tra thiết bị mic/BlackHole rồi thử lại."]; return; }
 
-    UInt32 oldSize=sizeof(self.originalInputDevice);
-    AudioObjectPropertyAddress defaultAddress={kAudioHardwarePropertyDefaultInputDevice,kAudioObjectPropertyScopeGlobal,kAudioObjectPropertyElementMain};
-    AudioObjectGetPropertyData(kAudioObjectSystemObject,&defaultAddress,0,NULL,&oldSize,&_originalInputDevice);
-    OSStatus selectStatus=AudioObjectSetPropertyData(kAudioObjectSystemObject,&defaultAddress,0,NULL,sizeof(device),&device);
-    if (selectStatus != noErr) { [self showErrorTitle:@"Không thể chọn BlackHole" detail:[NSString stringWithFormat:@"Core Audio từ chối đổi input (mã %d). Chọn BlackHole 2ch tại System Settings → Sound → Input rồi thử lại.",(int)selectStatus]]; return; }
+    self.originalInputDevice=kAudioObjectUnknown;
+    if(!systemAudio) {
+      UInt32 oldSize=sizeof(self.originalInputDevice);
+      AudioObjectPropertyAddress defaultAddress={kAudioHardwarePropertyDefaultInputDevice,kAudioObjectPropertyScopeGlobal,kAudioObjectPropertyElementMain};
+      AudioObjectGetPropertyData(kAudioObjectSystemObject,&defaultAddress,0,NULL,&oldSize,&_originalInputDevice);
+      OSStatus selectStatus=AudioObjectSetPropertyData(kAudioObjectSystemObject,&defaultAddress,0,NULL,sizeof(device),&device);
+      if (selectStatus != noErr) { [self showErrorTitle:@"Không thể chọn nguồn âm thanh" detail:[NSString stringWithFormat:@"Core Audio từ chối đổi input (mã %d). Chọn lại thiết bị tại System Settings → Sound → Input rồi thử lại.",(int)selectStatus]]; return; }
+    }
 
-    self.audioEngine = [AVAudioEngine new];
+    self.usingSystemAudio=systemAudio;
+    self.audioEngine = systemAudio?nil:[AVAudioEngine new];
     NSString *locale = self.languageButton.indexOfSelectedItem == 0 ? @"en-AU" : @"vi-VN";
     self.recognizer = [[SFSpeechRecognizer alloc] initWithLocale:[[NSLocale alloc] initWithLocaleIdentifier:locale]];
     if (!self.recognizer || !self.recognizer.available) { [self showErrorTitle:@"Nhận diện giọng nói chưa sẵn sàng" detail:@"Kiểm tra Internet, ngôn ngữ đã chọn và thử lại sau vài giây."]; return; }
-    AVAudioInputNode *input = self.audioEngine.inputNode;
-    AVAudioFormat *format = [input outputFormatForBus:0];
-    if (format.sampleRate <= 0 || format.channelCount == 0) { [self showErrorTitle:@"Không tìm thấy tín hiệu micro" detail:@"Chọn một micro trong System Settings → Sound → Input, sau đó mở lại ứng dụng."]; return; }
+    AVAudioInputNode *input = systemAudio?nil:self.audioEngine.inputNode;
+    AVAudioFormat *format = systemAudio?nil:[input outputFormatForBus:0];
+    if (!systemAudio && (format.sampleRate <= 0 || format.channelCount == 0)) { [self showErrorTitle:@"Không tìm thấy tín hiệu đầu vào" detail:@"Chọn một mic hoặc BlackHole trong System Settings → Sound → Input, sau đó mở lại ứng dụng."]; return; }
     self.timeline=[SCSpeechTimeline new];
     self.autoDetector=[SCAutoQuestionDetector new];
     self.manualUntimedBuffer=[SCUntimedTranscriptBuffer new];
@@ -1276,36 +1454,28 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     self.autoLiveLabel.stringValue=@"V • Đang nghe cùng câu hỏi";
     self.transcriptView.textColor=[NSColor colorWithWhite:0.82 alpha:1];
     __weak typeof(self) weak = self;
-    [input installTapOnBus:0 bufferSize:1024 format:format block:^(AVAudioPCMBuffer *b, AVAudioTime *t) {
-      // The timestamp counts exactly the PCM submitted to the current speech request.
-      @synchronized(weak) {
-        if (weak.speechRequest) {
-          [weak.speechRequest appendAudioPCMBuffer:b];
-          weak.audioTime += (double)b.frameLength/b.format.sampleRate;
-        }
-      }
-      float *const *channels=b.floatChannelData; float rms=0; if (channels && b.frameLength) { double sum=0; for(AVAudioChannelCount c=0;c<b.format.channelCount;c++) for (AVAudioFrameCount i=0;i<b.frameLength;i++) sum += channels[c][i]*channels[c][i]; rms=(float)sqrt(sum/(b.frameLength*b.format.channelCount)); }
-      BOOL voiced=rms>0.003;
-      if(voiced) weak.lastVoiceAudioTime=weak.audioTime;
-      [weak.autoAudioBuffer appendBuffer:b voiced:voiced];
-      CFAbsoluteTime now=CFAbsoluteTimeGetCurrent(); if (now-weak.lastLevelUpdate < 0.18) return; weak.lastLevelUpdate=now;
-      float db=rms>0?20.0f*log10f(rms):-100.0f; NSInteger bars=(NSInteger)((db+60.0f)/5.0f); bars=MAX(0,MIN(10,bars));
-      NSMutableString *meter=[NSMutableString string]; for(NSInteger i=0;i<10;i++) [meter appendString:i<bars?@"▮":@"▯"];
-      NSString *detail=bars?[NSString stringWithFormat:@"%@  %.0f dB",meter,db]:@"Không có tín hiệu âm thanh";
-      dispatch_async(dispatch_get_main_queue(), ^{ [weak setAudioLevelText:bars?@"● Có âm thanh":@"○ Im lặng" color:bars?NSColor.systemGreenColor:NSColor.systemOrangeColor toolTip:detail]; });
-    }];
-    self.inputTapInstalled=YES;
+    if(!systemAudio) {
+      [input installTapOnBus:0 bufferSize:1024 format:format block:^(AVAudioPCMBuffer *b, AVAudioTime *t) {
+        (void)t;
+        [weak consumeCapturedAudioBuffer:b];
+      }];
+      self.inputTapInstalled=YES;
+    } else self.inputTapInstalled=NO;
     self.listening=YES;
     [self beginSpeechTask];
     [self.autoTimer invalidate];
     self.autoTimer=[NSTimer timerWithTimeInterval:0.10 target:self selector:@selector(tickAutoRecognition:) userInfo:nil repeats:YES];
     [[NSRunLoop mainRunLoop] addTimer:self.autoTimer forMode:NSRunLoopCommonModes];
     CFAbsoluteTime started=CFAbsoluteTimeGetCurrent(); self.lastLevelUpdate=started;
-    NSError *error; [self.audioEngine prepare];
-    if (![self.audioEngine startAndReturnError:&error]) {
-      NSString *help = error.code == 560227702 ? @"Mã !dev: thiết bị thu âm hiện tại không khả dụng. Vào System Settings → Sound → Input, chọn MacBook Microphone (không chọn thiết bị Bluetooth/Continuity đã ngắt), đóng các app độc quyền âm thanh rồi mở lại Presenter AI." : @"Kiểm tra micro trong System Settings → Sound → Input.";
-      [self stopListening];
-      [self showErrorTitle:@"Không thể khởi động micro" detail:[NSString stringWithFormat:@"%@\n\n%@ (%@, mã %ld)", help, error.localizedDescription, error.domain, (long)error.code]]; return;
+    if(systemAudio) {
+      [self startSystemAudioCaptureForGeneration:self.recognitionGeneration];
+    } else {
+      NSError *error=nil; [self.audioEngine prepare];
+      if (![self.audioEngine startAndReturnError:&error]) {
+        NSString *help = error.code == 560227702 ? @"Mã !dev: thiết bị thu âm hiện tại không khả dụng. Vào System Settings → Sound → Input, chọn MacBook Microphone (không chọn thiết bị Bluetooth/Continuity đã ngắt), đóng các app độc quyền âm thanh rồi mở lại Presenter AI." : @"Kiểm tra micro trong System Settings → Sound → Input.";
+        [self stopListening];
+        [self showErrorTitle:@"Không thể khởi động micro" detail:[NSString stringWithFormat:@"%@\n\n%@ (%@, mã %ld)", help, error.localizedDescription, error.domain, (long)error.code]]; return;
+      }
     }
     self.listening = YES; self.listenButton.title = @"Dừng nghe";
     self.listenButton.layer.backgroundColor=[NSColor colorWithRed:0.96 green:0.33 blue:0.40 alpha:0.20].CGColor;
@@ -1313,7 +1483,7 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     [self setAudioLevelText:@"○ Đang chờ âm thanh" color:NSColor.systemOrangeColor toolTip:@"Đang chờ tín hiệu từ nguồn đã chọn"];
     [self setStatus:@"● Đang nghe • Space để lấy gợi ý" color:NSColor.systemRedColor];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2*NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-      if (self.listening && self.lastLevelUpdate <= started) [self setAudioLevelText:@"○ Không có âm thanh" color:NSColor.systemRedColor toolTip:@"Không nhận được buffer từ BlackHole"];
+      if (self.listening && self.lastLevelUpdate <= started) [self setAudioLevelText:@"○ Không có âm thanh" color:NSColor.systemRedColor toolTip:systemAudio?@"Không nhận được âm thanh hệ thống":@"Không nhận được buffer từ thiết bị đầu vào"];
     });
 }
 - (NSArray<NSString *> *)recognitionContextualStrings {
@@ -1460,11 +1630,21 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
 - (void)stopListening {
     self.listening=NO;
     self.recognitionGeneration++;
+    SCStream *systemStream=self.systemAudioStream;
+    self.systemAudioStream=nil;
+    self.usingSystemAudio=NO;
+    if(systemStream) {
+      [systemStream stopCaptureWithCompletionHandler:^(NSError *error) {
+        (void)error;
+        NSError *removeError=nil;
+        [systemStream removeStreamOutput:self type:SCStreamOutputTypeAudio error:&removeError];
+      }];
+    }
     [self.silenceTimer invalidate]; [self.autoTimer invalidate];
     [self.spaceSettleTimer invalidate]; [self.spaceDeadlineTimer invalidate];
     if(self.spaceCommitPending) [self finishSpaceCommit];
-    if(self.inputTapInstalled) { [self.audioEngine.inputNode removeTapOnBus:0]; self.inputTapInstalled=NO; }
-    [self.audioEngine stop];
+    if(self.inputTapInstalled && self.audioEngine) { [self.audioEngine.inputNode removeTapOnBus:0]; self.inputTapInstalled=NO; }
+    [self.audioEngine stop]; self.audioEngine=nil;
     @synchronized(self) {
       [self.speechRequest endAudio]; self.speechRequest=nil;
     }

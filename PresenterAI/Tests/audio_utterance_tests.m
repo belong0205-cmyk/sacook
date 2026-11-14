@@ -17,8 +17,36 @@ static AVAudioPCMBuffer *Buffer(AVAudioFrameCount frames,float value) {
     return buffer;
 }
 
+static AVAudioPCMBuffer *InterleavedFloatBuffer(AVAudioFrameCount frames,float left,float right) {
+    AVAudioFormat *format=[[AVAudioFormat alloc] initWithCommonFormat:AVAudioPCMFormatFloat32 sampleRate:48000 channels:2 interleaved:YES];
+    AVAudioPCMBuffer *buffer=[[AVAudioPCMBuffer alloc] initWithPCMFormat:format frameCapacity:frames];
+    buffer.frameLength=frames;
+    float *samples=buffer.floatChannelData[0];
+    for(AVAudioFrameCount frame=0;frame<frames;frame++) {
+      samples[(NSUInteger)frame*2]=left;
+      samples[(NSUInteger)frame*2+1]=right;
+    }
+    return buffer;
+}
+
+static AVAudioPCMBuffer *InterleavedInt16Buffer(AVAudioFrameCount frames,int16_t left,int16_t right) {
+    AVAudioFormat *format=[[AVAudioFormat alloc] initWithCommonFormat:AVAudioPCMFormatInt16 sampleRate:48000 channels:2 interleaved:YES];
+    AVAudioPCMBuffer *buffer=[[AVAudioPCMBuffer alloc] initWithPCMFormat:format frameCapacity:frames];
+    buffer.frameLength=frames;
+    int16_t *samples=buffer.int16ChannelData[0];
+    for(AVAudioFrameCount frame=0;frame<frames;frame++) {
+      samples[(NSUInteger)frame*2]=left;
+      samples[(NSUInteger)frame*2+1]=right;
+    }
+    return buffer;
+}
+
 static uint32_t LE32(const uint8_t *bytes) {
     return (uint32_t)bytes[0]|((uint32_t)bytes[1]<<8)|((uint32_t)bytes[2]<<16)|((uint32_t)bytes[3]<<24);
+}
+
+static int16_t LE16S(const uint8_t *bytes) {
+    return (int16_t)((uint16_t)bytes[0]|((uint16_t)bytes[1]<<8));
 }
 
 int main(void) { @autoreleasepool {
@@ -41,5 +69,18 @@ int main(void) { @autoreleasepool {
     Assert([capture finishUtteranceWithMinimumDuration:1.0]==nil,@"very short noise turn must be discarded");
     [capture reset];
     Assert(!capture.hasActiveUtterance && capture.activeDuration==0,@"reset must clear all audio");
+
+    [capture appendBuffer:InterleavedFloatBuffer(4,0.5f,-0.25f) voiced:YES];
+    wav=[capture finishUtteranceWithMinimumDuration:0];
+    Assert(wav.length==44+8,@"interleaved Float32 stereo must produce one mono sample per frame");
+    bytes=wav.bytes;
+    Assert(LE16S(bytes+44)>=4094 && LE16S(bytes+44)<=4096,@"interleaved Float32 channels must be averaged without reading past channel zero");
+
+    [capture reset];
+    [capture appendBuffer:InterleavedInt16Buffer(4,12000,-4000) voiced:YES];
+    wav=[capture finishUtteranceWithMinimumDuration:0];
+    Assert(wav.length==44+8,@"interleaved Int16 stereo must produce one mono sample per frame");
+    bytes=wav.bytes;
+    Assert(LE16S(bytes+44)==4000,@"interleaved Int16 channels must be averaged without reading past channel zero");
     NSLog(@"Audio utterance buffer tests passed (%lu checks)",(unsigned long)checks);
 } return 0; }

@@ -31,6 +31,7 @@ rg -q 'gpt-transcribe' "$ROOT/PresenterAI-Windows/app.js"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$ROOT/PresenterAI/Info.plist")" == "true" ]]
 rg -q 'NSApplicationActivationPolicyAccessory' "$ROOT/PresenterAI/Sources/main.m"
 rg -q 'RegisterEventHotKey' "$ROOT/PresenterAI/Sources/main.m"
+rg -q 'SCStreamOutputTypeAudio' "$ROOT/PresenterAI/Sources/main.m"
 rg -q 'skipTaskbar: true' "$ROOT/PresenterAI-Windows/main.js"
 node "$ROOT/PresenterAI-Windows/tests/update-source.test.js"
 
