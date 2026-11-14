@@ -309,6 +309,8 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 @property SCStream *systemAudioStream;
 @property (strong) dispatch_queue_t systemAudioQueue;
 @property BOOL usingSystemAudio;
+@property NSUInteger systemAudioRawBufferCount;
+@property NSUInteger systemAudioPCMBufferCount;
 - (void)stageAutoQuestionTurnText:(NSString *)text;
 - (void)flushAutoQuestionTurnIfReadyAt:(NSTimeInterval)now force:(BOOL)force;
 - (NSArray<NSString *> *)questionPartsForSynthesis:(NSString *)question;
@@ -1280,8 +1282,10 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
 - (void)requestAndStart {
     if([self isSystemAudioSelected]) {
       [self setStatus:@"Đang kiểm tra quyền âm thanh hệ thống…" color:NSColor.systemOrangeColor];
-      if(!CGPreflightScreenCaptureAccess() && !CGRequestScreenCaptureAccess()) {
-        [self showErrorTitle:@"Chưa có quyền âm thanh hệ thống" detail:@"Mở System Settings → Privacy & Security → Screen & System Audio Recording (hoặc Screen Recording), bật SA Cook Assistant rồi mở lại ứng dụng một lần."];
+      if(!CGPreflightScreenCaptureAccess()) {
+        BOOL granted=CGRequestScreenCaptureAccess();
+        NSString *detail=granted?@"macOS đã nhận lựa chọn của bạn. Hãy đóng hẳn rồi mở lại SA Cook Assistant một lần để quyền âm thanh hệ thống có hiệu lực.":@"Mở System Settings → Privacy & Security → Screen & System Audio Recording (hoặc Screen Recording), bật SA Cook Assistant rồi mở lại ứng dụng.";
+        [self showErrorTitle:granted?@"Mở lại ứng dụng để hoàn tất":@"Chưa có quyền âm thanh hệ thống" detail:detail];
         return;
       }
       [self requestSpeechAuthorizationAndStart];
@@ -1359,14 +1363,12 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
           if(application.processID==NSProcessInfo.processInfo.processIdentifier) [excluded addObject:application];
         SCContentFilter *filter=[[SCContentFilter alloc] initWithDisplay:display excludingApplications:excluded exceptingWindows:@[]];
         SCStreamConfiguration *configuration=[SCStreamConfiguration new];
-        configuration.width=2; configuration.height=2; configuration.queueDepth=3;
-        configuration.minimumFrameInterval=CMTimeMake(1,1);
         configuration.showsCursor=NO;
         configuration.capturesAudio=YES;
         configuration.sampleRate=48000;
-        // Speech recognition is mono. Requesting one channel also avoids doing
-        // unnecessary stereo work while the presenter app runs in the background.
-        configuration.channelCount=1;
+        // Match Apple's documented ScreenCaptureKit capture configuration.
+        // The downstream buffer normalises stereo to mono only when required.
+        configuration.channelCount=2;
         configuration.excludesCurrentProcessAudio=YES;
         SCStream *stream=[[SCStream alloc] initWithFilter:filter configuration:configuration delegate:weak];
         NSError *outputError=nil;
@@ -1384,7 +1386,19 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
               [weak showErrorTitle:@"Không thể nghe âm thanh hệ thống" detail:[NSString stringWithFormat:@"%@\n\nBật quyền Screen & System Audio Recording cho SA Cook Assistant rồi mở lại app.",startError.localizedDescription]];
               return;
             }
-            [weak setAudioLevelText:@"○ Đang chờ âm thanh hệ thống" color:NSColor.systemOrangeColor toolTip:@"Mở video hoặc cuộc họp trên Mac để kiểm tra"];
+            if(!weak.systemAudioPCMBufferCount)
+              [weak setAudioLevelText:@"○ Đã kết nối • chờ âm thanh" color:NSColor.systemOrangeColor toolTip:@"Mở video hoặc cuộc họp trên Mac để kiểm tra"];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW,4*NSEC_PER_SEC),dispatch_get_main_queue(),^{
+              if(!weak || !weak.listening || !weak.usingSystemAudio || generation!=weak.recognitionGeneration || stream!=weak.systemAudioStream || weak.systemAudioPCMBufferCount) return;
+              if(weak.systemAudioRawBufferCount) {
+                [weak setAudioLevelText:@"○ Không đọc được định dạng âm thanh" color:NSColor.systemRedColor toolTip:@"ScreenCaptureKit có dữ liệu nhưng chưa chuyển được PCM"];
+                [weak setStatus:@"Không đọc được âm thanh hệ thống • thử lại sau khi mở app" color:NSColor.systemRedColor];
+              } else {
+                [weak setAudioLevelText:@"○ Chưa nhận dữ liệu hệ thống" color:NSColor.systemRedColor toolTip:@"Kiểm tra quyền Screen & System Audio Recording"];
+                [weak setStatus:@"Chưa nhận âm thanh • kiểm tra quyền rồi mở lại app" color:NSColor.systemRedColor];
+              }
+              weak.listenButton.title=@"Dừng • Chưa có âm thanh";
+            });
           });
         }];
       });
@@ -1392,6 +1406,7 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
 }
 - (void)stream:(SCStream *)stream didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer ofType:(SCStreamOutputType)type {
     if(type!=SCStreamOutputTypeAudio || stream!=self.systemAudioStream || !self.listening || !self.usingSystemAudio || !CMSampleBufferDataIsReady(sampleBuffer)) return;
+    self.systemAudioRawBufferCount++;
     CMItemCount sampleCount=CMSampleBufferGetNumSamples(sampleBuffer);
     CMAudioFormatDescriptionRef description=(CMAudioFormatDescriptionRef)CMSampleBufferGetFormatDescription(sampleBuffer);
     if(sampleCount<=0 || sampleCount>INT32_MAX || !description) return;
@@ -1402,6 +1417,15 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     OSStatus status=CMSampleBufferCopyPCMDataIntoAudioBufferList(sampleBuffer,0,(int32_t)sampleCount,pcm.mutableAudioBufferList);
     if(status!=noErr) return;
     pcm.frameLength=(AVAudioFrameCount)sampleCount;
+    self.systemAudioPCMBufferCount++;
+    if(self.systemAudioPCMBufferCount==1) {
+      NSUInteger generation=self.recognitionGeneration;
+      dispatch_async(dispatch_get_main_queue(),^{
+        if(stream!=self.systemAudioStream || !self.listening || !self.usingSystemAudio || generation!=self.recognitionGeneration) return;
+        self.listenButton.title=@"Dừng nghe";
+        [self setAudioLevelText:@"○ Đã kết nối • nguồn đang im lặng" color:NSColor.systemOrangeColor toolTip:@"Đã nhận được dữ liệu âm thanh hệ thống"];
+      });
+    }
     [self consumeCapturedAudioBuffer:pcm];
 }
 - (void)stream:(SCStream *)stream didStopWithError:(NSError *)error {
@@ -1448,6 +1472,7 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     self.audioTime=0; self.lastVoiceAudioTime=0; self.taskAudioStart=0; self.lastAutoAsked=nil; self.autoCommittedAudioTime=0;
     self.latestTranscript=@""; self.autoTranscript=@""; self.autoPendingSnapshot=@"";
     self.autoPendingChangedAt=NSProcessInfo.processInfo.systemUptime; self.spaceCommitPending=NO;
+    self.systemAudioRawBufferCount=0; self.systemAudioPCMBufferCount=0;
     self.transcriptView.string=@"";
     self.autoTranscriptView.string=@"";
     self.manualLiveLabel.stringValue=@"E • Đang nghe cùng câu hỏi";
@@ -1482,8 +1507,8 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     self.listenButton.layer.borderColor=[NSColor colorWithRed:1 green:0.42 blue:0.48 alpha:0.42].CGColor;
     [self setAudioLevelText:@"○ Đang chờ âm thanh" color:NSColor.systemOrangeColor toolTip:@"Đang chờ tín hiệu từ nguồn đã chọn"];
     [self setStatus:@"● Đang nghe • Space để lấy gợi ý" color:NSColor.systemRedColor];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2*NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-      if (self.listening && self.lastLevelUpdate <= started) [self setAudioLevelText:@"○ Không có âm thanh" color:NSColor.systemRedColor toolTip:systemAudio?@"Không nhận được âm thanh hệ thống":@"Không nhận được buffer từ thiết bị đầu vào"];
+    if(!systemAudio) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2*NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+      if (self.listening && self.lastLevelUpdate <= started) [self setAudioLevelText:@"○ Không có âm thanh" color:NSColor.systemRedColor toolTip:@"Không nhận được buffer từ thiết bị đầu vào"];
     });
 }
 - (NSArray<NSString *> *)recognitionContextualStrings {
@@ -1633,6 +1658,7 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     SCStream *systemStream=self.systemAudioStream;
     self.systemAudioStream=nil;
     self.usingSystemAudio=NO;
+    self.systemAudioRawBufferCount=0; self.systemAudioPCMBufferCount=0;
     if(systemStream) {
       [systemStream stopCaptureWithCompletionHandler:^(NSError *error) {
         (void)error;
