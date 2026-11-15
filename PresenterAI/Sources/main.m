@@ -42,6 +42,35 @@ static const OSType SCVisibilityHotKeySignature = 'SACP';
 static const UInt32 SCVisibilityHotKeyIdentifier = 1;
 static const AudioDeviceID SCSystemAudioSource = kAudioObjectUnknown;
 
+static AVAudioPCMBuffer *SCPCMBufferFromAudioBufferList(const AudioBufferList *input,AVAudioFormat *format) {
+    if(!input || !input->mNumberBuffers || !input->mBuffers[0].mData || !input->mBuffers[0].mDataByteSize || !format) return nil;
+    const AudioStreamBasicDescription *asbd=format.streamDescription;
+    UInt32 bytesPerFrame=asbd?asbd->mBytesPerFrame:0;
+    if(!bytesPerFrame) return nil;
+    AVAudioFrameCount frameCount=(AVAudioFrameCount)(input->mBuffers[0].mDataByteSize/bytesPerFrame);
+    if(!frameCount) return nil;
+    AVAudioPCMBuffer *pcm=[[AVAudioPCMBuffer alloc] initWithPCMFormat:format frameCapacity:frameCount];
+    if(!pcm) return nil;
+    // AVAudioPCMBuffer advertises zero writable bytes while frameLength is 0.
+    // Set it before reading mutableAudioBufferList or every input packet gets
+    // rejected even though Core Audio is delivering valid system audio.
+    pcm.frameLength=frameCount;
+    AudioBufferList *destination=pcm.mutableAudioBufferList;
+    if(!destination) return nil;
+    UInt32 bufferCount=MIN(input->mNumberBuffers,destination->mNumberBuffers);
+    if(!bufferCount) return nil;
+    for(UInt32 index=0;index<bufferCount;index++) {
+      const AudioBuffer source=input->mBuffers[index];
+      AudioBuffer *target=&destination->mBuffers[index];
+      if(!source.mData || !target->mData) return nil;
+      UInt32 copySize=MIN(source.mDataByteSize,target->mDataByteSize);
+      if(!copySize) return nil;
+      memcpy(target->mData,source.mData,copySize);
+      target->mDataByteSize=copySize;
+    }
+    return pcm;
+}
+
 @interface SCArrowTextView : NSTextView
 @end
 @implementation SCArrowTextView
@@ -313,6 +342,9 @@ typedef NS_OPTIONS(NSUInteger, SCWindowResizeEdges) {
 @property BOOL usingSystemAudio;
 @property NSUInteger systemAudioRawBufferCount;
 @property NSUInteger systemAudioPCMBufferCount;
+@property NSUInteger coreAudioIOCallbackCount;
+@property NSUInteger coreAudioAttachedTapCount;
+@property NSUInteger coreAudioInputStreamCount;
 @property AudioObjectID coreAudioTapID;
 @property AudioObjectID coreAudioAggregateDeviceID;
 @property AudioDeviceIOProcID coreAudioIOProcID;
@@ -1407,15 +1439,10 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
       }
 
       NSString *aggregateUID=[NSString stringWithFormat:@"local.codex.PresenterAI.system-audio.%@",description.UUID.UUIDString];
-      NSDictionary *tapEntry=@{
-        [NSString stringWithUTF8String:kAudioSubTapUIDKey]:tapUID,
-        [NSString stringWithUTF8String:kAudioSubTapDriftCompensationKey]:@YES
-      };
       NSDictionary *aggregateDescription=@{
         [NSString stringWithUTF8String:kAudioAggregateDeviceUIDKey]:aggregateUID,
         [NSString stringWithUTF8String:kAudioAggregateDeviceNameKey]:@"SA Cook Assistant System Audio",
         [NSString stringWithUTF8String:kAudioAggregateDeviceIsPrivateKey]:@YES,
-        [NSString stringWithUTF8String:kAudioAggregateDeviceTapListKey]:@[tapEntry],
         [NSString stringWithUTF8String:kAudioAggregateDeviceTapAutoStartKey]:@YES
       };
       AudioObjectID aggregateID=kAudioObjectUnknown;
@@ -1427,6 +1454,20 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
       }
       self.coreAudioAggregateDeviceID=aggregateID;
 
+      // Follow Apple's current Core Audio sample: create the aggregate first,
+      // then attach the tap through kAudioAggregateDevicePropertyTapList. On
+      // newer macOS releases, only describing the tap in the creation
+      // dictionary can leave the aggregate with no active input stream.
+      CFArrayRef tapList=(__bridge CFArrayRef)@[tapUID];
+      UInt32 tapListSize=sizeof(tapList);
+      AudioObjectPropertyAddress tapListAddress={kAudioAggregateDevicePropertyTapList,kAudioObjectPropertyScopeGlobal,kAudioObjectPropertyElementMain};
+      status=AudioObjectSetPropertyData(aggregateID,&tapListAddress,0,NULL,tapListSize,&tapList);
+      if(status!=noErr) {
+        if(error) *error=captureError(@"Không thể gắn System Audio tap vào thiết bị thu",status);
+        [self stopCoreAudioSystemTap];
+        return NO;
+      }
+
       __weak typeof(self) weak=self;
       AudioDeviceIOProcID ioProcID=NULL;
       status=AudioDeviceCreateIOProcIDWithBlock(&ioProcID,aggregateID,self.systemAudioQueue,^(const AudioTimeStamp *now,const AudioBufferList *input,const AudioTimeStamp *inputTime,AudioBufferList *output,const AudioTimeStamp *outputTime) {
@@ -1436,25 +1477,8 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
         if(!input || !input->mNumberBuffers || !input->mBuffers[0].mData || !input->mBuffers[0].mDataByteSize) return;
         strong.systemAudioRawBufferCount++;
         AVAudioFormat *captureFormat=strong.coreAudioTapFormat;
-        const AudioStreamBasicDescription *asbd=captureFormat.streamDescription;
-        UInt32 bytesPerFrame=asbd?asbd->mBytesPerFrame:0;
-        if(!captureFormat || !bytesPerFrame) return;
-        AVAudioFrameCount frameCount=(AVAudioFrameCount)(input->mBuffers[0].mDataByteSize/bytesPerFrame);
-        if(!frameCount) return;
-        AVAudioPCMBuffer *pcm=[[AVAudioPCMBuffer alloc] initWithPCMFormat:captureFormat frameCapacity:frameCount];
-        AudioBufferList *destination=pcm.mutableAudioBufferList;
-        if(!pcm || !destination) return;
-        UInt32 bufferCount=MIN(input->mNumberBuffers,destination->mNumberBuffers);
-        for(UInt32 index=0;index<bufferCount;index++) {
-          const AudioBuffer source=input->mBuffers[index];
-          AudioBuffer *target=&destination->mBuffers[index];
-          if(!source.mData || !target->mData) return;
-          UInt32 copySize=MIN(source.mDataByteSize,target->mDataByteSize);
-          if(!copySize) return;
-          memcpy(target->mData,source.mData,copySize);
-          target->mDataByteSize=copySize;
-        }
-        pcm.frameLength=frameCount;
+        AVAudioPCMBuffer *pcm=SCPCMBufferFromAudioBufferList(input,captureFormat);
+        if(!pcm) return;
         strong.systemAudioPCMBufferCount++;
         if(strong.systemAudioPCMBufferCount==1) {
           dispatch_async(dispatch_get_main_queue(),^{
@@ -1480,16 +1504,29 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
       }
       [self setAudioLevelText:@"○ Đã kết nối • chờ âm thanh" color:NSColor.systemOrangeColor toolTip:@"Core Audio đang chờ video hoặc cuộc họp phát âm thanh"];
       __weak typeof(self) diagnosticWeak=self;
-      dispatch_after(dispatch_time(DISPATCH_TIME_NOW,4*NSEC_PER_SEC),dispatch_get_main_queue(),^{
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW,2*NSEC_PER_SEC),dispatch_get_main_queue(),^{
         if(!diagnosticWeak || !diagnosticWeak.listening || !diagnosticWeak.usingCoreAudioTap || generation!=diagnosticWeak.recognitionGeneration || aggregateID!=diagnosticWeak.coreAudioAggregateDeviceID || diagnosticWeak.systemAudioPCMBufferCount) return;
         if(diagnosticWeak.systemAudioRawBufferCount) {
-          [diagnosticWeak setAudioLevelText:@"○ Không đọc được định dạng âm thanh" color:NSColor.systemRedColor toolTip:@"Core Audio có dữ liệu nhưng chưa chuyển được PCM"];
-          [diagnosticWeak setStatus:@"Không đọc được âm thanh hệ thống • thử lại" color:NSColor.systemRedColor];
+          [diagnosticWeak setAudioLevelText:@"○ Đang chuyển nguồn tương thích" color:NSColor.systemOrangeColor toolTip:@"Core Audio có gói dữ liệu nhưng chưa chuyển được PCM"];
         } else {
-          [diagnosticWeak setAudioLevelText:@"○ Chưa nhận System Audio" color:NSColor.systemRedColor toolTip:@"Bật quyền System Audio Recording cho SA Cook Assistant"];
-          [diagnosticWeak setStatus:@"Chưa nhận âm thanh • kiểm tra quyền System Audio Recording" color:NSColor.systemRedColor];
+          [diagnosticWeak setAudioLevelText:@"○ Đang chuyển nguồn tương thích" color:NSColor.systemOrangeColor toolTip:@"Core Audio chưa gửi buffer; app tự chuyển sang ScreenCaptureKit"];
         }
-        diagnosticWeak.listenButton.title=@"Dừng • Chưa có âm thanh";
+        [diagnosticWeak setStatus:@"● Đang kết nối lại âm thanh hệ thống" color:NSColor.systemOrangeColor];
+        // Some macOS/audio-device combinations create the Core Audio process
+        // tap successfully but never drive its aggregate IOProc. Do not leave
+        // the presenter stuck in a false "listening" state: transparently fall
+        // back to ScreenCaptureKit, which captures the same system mix without
+        // using the microphone. Remember the working path for the next launch
+        // so subsequent starts do not pay this two-second probe again.
+        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"PresenterAI.preferScreenCaptureSystemAudio.v1"];
+        // Restart the full capture session before opening ScreenCaptureKit.
+        // Starting it while the aggregate device is being torn down can leave
+        // getShareableContent waiting indefinitely on affected machines.
+        [diagnosticWeak stopListening];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.25*NSEC_PER_SEC)),dispatch_get_main_queue(),^{
+          if(!diagnosticWeak || diagnosticWeak.listening || ![diagnosticWeak isSystemAudioSelected]) return;
+          [diagnosticWeak startListening];
+        });
       });
       return YES;
     }
@@ -1587,9 +1624,13 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     if(!format || !format.sampleRate || !format.channelCount) return;
     AVAudioPCMBuffer *pcm=[[AVAudioPCMBuffer alloc] initWithPCMFormat:format frameCapacity:(AVAudioFrameCount)sampleCount];
     if(!pcm) return;
+    // AVAudioPCMBuffer exposes zero writable bytes until frameLength is set.
+    // ScreenCaptureKit therefore needs the same ordering as the Core Audio
+    // process-tap path or CMSampleBufferCopyPCMDataIntoAudioBufferList has no
+    // destination capacity and silently produces no recognisable audio.
+    pcm.frameLength=(AVAudioFrameCount)sampleCount;
     OSStatus status=CMSampleBufferCopyPCMDataIntoAudioBufferList(sampleBuffer,0,(int32_t)sampleCount,pcm.mutableAudioBufferList);
     if(status!=noErr) return;
-    pcm.frameLength=(AVAudioFrameCount)sampleCount;
     self.systemAudioPCMBufferCount++;
     if(self.systemAudioPCMBufferCount==1) {
       NSUInteger generation=self.recognitionGeneration;
@@ -1667,11 +1708,17 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     CFAbsoluteTime started=CFAbsoluteTimeGetCurrent(); self.lastLevelUpdate=started;
     if(systemAudio) {
       if(@available(macOS 14.2, *)) {
-        NSError *tapError=nil;
-        if(![self startCoreAudioSystemTapForGeneration:self.recognitionGeneration error:&tapError]) {
-          [self stopListening];
-          [self showErrorTitle:@"Không thể nghe âm thanh hệ thống" detail:[NSString stringWithFormat:@"%@\n\nMở System Settings → Privacy & Security → Screen & System Audio Recording, bật SA Cook Assistant rồi mở lại app.",tapError.localizedDescription ?: @"Core Audio System Tap không khởi động được."]];
-          return;
+        BOOL preferCompatibility=[[NSUserDefaults standardUserDefaults] boolForKey:@"PresenterAI.preferScreenCaptureSystemAudio.v1"];
+        if(preferCompatibility) {
+          [self startSystemAudioCaptureForGeneration:self.recognitionGeneration];
+        } else {
+          NSError *tapError=nil;
+          if(![self startCoreAudioSystemTapForGeneration:self.recognitionGeneration error:&tapError]) {
+            // A failed process tap is not fatal. ScreenCaptureKit is the
+            // compatibility path and still captures only system audio.
+            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"PresenterAI.preferScreenCaptureSystemAudio.v1"];
+            [self startSystemAudioCaptureForGeneration:self.recognitionGeneration];
+          }
         }
       } else {
         [self startSystemAudioCaptureForGeneration:self.recognitionGeneration];
@@ -1703,7 +1750,7 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
     NSArray<NSString *> *recognitionPriority=@[
       @"stock",@"grill",@"grilled",@"grilling",@"grill pan",@"stockpot",@"stock rotation",@"beef stock",@"chicken stock",@"fish stock",@"vegetable stock",
       @"mise en place",@"à la carte",@"table d'hôte",@"consommé",@"sous-vide",@"roux",@"béchamel",@"velouté",@"hollandaise",@"béarnaise",@"demi-glace",@"mirepoix",@"bouquet garni",@"bain-marie",@"beurre blanc",@"beurre manié",@"au gratin",@"confit",@"flambé",@"sauté",@"hors d'oeuvre",@"amuse-bouche",@"crème brûlée",@"crème pâtissière",@"julienne",@"brunoise",@"chiffonade",@"duxelles",@"en papillote",@"profiterole",@"vichyssoise",@"vol-au-vent",@"garde manger",@"chef de partie",@"commis chef",
-      @"chef de cuisine",@"saucier",@"poissonnier",@"pâtissier",@"jardinière",@"batonnet",@"déglacer",@"en croûte",@"meunière",@"court bouillon",@"pâte à choux",@"soufflé",@"croquembouche",@"mille-feuille",@"bœuf bourguignon",
+      @"chef de cuisine",@"saucier",@"poissonnier",@"pâtissier",@"jardinière",@"batonnet",@"déglacer",@"en croûte",@"meunière",@"court bouillon",@"pâte à choux",@"soufflé",@"croquembouche",@"mille-feuille",@"bœuf bourguignon",@"tourné",@"liaison",@"coulis",@"tuile",@"sommelier",@"rillettes",@"ratatouille",@"bouillabaisse",@"coq au vin",@"cassoulet",
       @"HACCP",@"FIFO",@"food safety plan",@"temperature danger zone",@"two-hour four-hour rule",@"cross-contamination",@"cross-contact",@"potentially hazardous food",@"probe thermometer",@"cleaning and sanitising",@"air-dry",@"allergen",@"anaphylaxis",@"coeliac",@"gluten-free",
       @"chef's knife",@"paring knife",@"boning knife",@"filleting knife",@"serrated knife",@"mandoline",@"colour-coded chopping board",@"personal protective equipment",
       @"standard recipe card",@"portion control",@"food cost percentage",@"yield test",@"cultural sensitivity",@"anti-discrimination"
@@ -1878,7 +1925,14 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
 - (NSString *)correctCulinaryTerms:(NSString *)text {
     if (!text.length) return @"";
     NSMutableString *result=[text mutableCopy];
-    NSDictionary *aliases=@{
+    // Partial recognition arrives many times for the same utterance. Building
+    // and compiling this large alias expression for every partial result adds
+    // avoidable latency, so keep the immutable matcher for the process life.
+    static NSDictionary<NSString *,NSString *> *aliases=nil;
+    static NSRegularExpression *culinaryAliasExpression=nil;
+    static dispatch_once_t culinaryAliasOnce;
+    dispatch_once(&culinaryAliasOnce, ^{
+      aliases=@{
       @"me's in place":@"mise en place",@"mees en place":@"mise en place",@"meez en place":@"mise en place",@"mis en place":@"mise en place",@"mise and place":@"mise en place",@"mise on place":@"mise en place",@"missing place":@"mise en place",@"means in place":@"mise en place",@"meat in place":@"mise en place",@"misan place":@"mise en place",@"mise place":@"mise en place",
       @"ala carte":@"à la carte",@"a la cart":@"à la carte",@"a la card":@"à la carte",@"a la cat":@"à la carte",
       @"sue vide":@"sous-vide",@"sous feed":@"sous-vide",@"sue feed":@"sous-vide",@"soup feed":@"sous-vide",
@@ -1907,45 +1961,59 @@ static OSStatus SCVisibilityHotKeyHandler(EventHandlerCallRef nextHandler,EventR
       @"eye oli":@"aioli",@"a oli":@"aioli",@"gremolada":@"gremolata",@"vol au vent":@"vol-au-vent",
       @"rotisseur":@"rôtisseur",@"roti sir":@"rôtisseur",@"sauce yay":@"saucier",@"poisson yay":@"poissonnier",@"grill ar din":@"grillardin",@"free tour yay":@"friturier",@"on tremet yay":@"entremetier",
       @"patissier":@"pâtissier",@"patiss yay":@"pâtissier",@"boo lon jay":@"boulanger",@"plon jur":@"plongeur",@"ah boy eur":@"aboyeur",
-      @"jardiniere":@"jardinière",@"garden air":@"jardinière",@"baton nay":@"batonnet",@"pay zan":@"paysanne",@"macedoine":@"macédoine",@"emince":@"émincé",@"a min say":@"émincé",
+      @"jardiniere":@"jardinière",@"garden air":@"jardinière",@"baton nay":@"batonnet",@"pay zan":@"paysanne",@"tour nay":@"tourné",@"paris yen":@"parisienne",@"macedoine":@"macédoine",@"emince":@"émincé",@"a min say":@"émincé",
       @"deglacer":@"déglacer",@"de glaze":@"déglacer",@"en croute":@"en croûte",@"on croat":@"en croûte",@"meuniere":@"meunière",@"moon yair":@"meunière",@"a la minute":@"à la minute",@"ah la minute":@"à la minute",
       @"say nyon":@"saignant",@"a point":@"à point",@"ah pwan":@"à point",@"byen kwee":@"bien cuit",@"mon tay oh burr":@"monter au beurre",@"foo may":@"fumet",@"core bullion":@"court bouillon",@"espan yol":@"espagnole",
-      @"bear noisette":@"beurre noisette",@"remoulade":@"rémoulade",@"ray moo lad":@"rémoulade",@"puree":@"purée",@"pat bree zay":@"pâte brisée",@"pat sue cray":@"pâte sucrée",@"pat fwayetay":@"pâte feuilletée",@"pat a shoe":@"pâte à choux",
-      @"creme chantilly":@"crème chantilly",@"creme caramel":@"crème caramel",@"souffle":@"soufflé",@"genoise":@"génoise",@"eclair":@"éclair",@"crepe":@"crêpe",@"croc em boosh":@"croquembouche",@"mill foy":@"mille-feuille",@"tart ta tan":@"tarte Tatin",
+      @"bear noisette":@"beurre noisette",@"lee ay zon":@"liaison",@"remoulade":@"rémoulade",@"ray moo lad":@"rémoulade",@"koo lee":@"coulis",@"puree":@"purée",@"po tazh":@"potage",@"pat bree zay":@"pâte brisée",@"pat sue cray":@"pâte sucrée",@"pat fwayetay":@"pâte feuilletée",@"pat a shoe":@"pâte à choux",
+      @"creme chantilly":@"crème chantilly",@"creme caramel":@"crème caramel",@"souffle":@"soufflé",@"tweel":@"tuile",@"genoise":@"génoise",@"eclair":@"éclair",@"crepe":@"crêpe",@"bav a wah":@"bavarois",@"croc em boosh":@"croquembouche",@"mill foy":@"mille-feuille",@"tart ta tan":@"tarte Tatin",
       @"pre fix":@"prix fixe",@"degustation":@"dégustation",@"day goo station":@"dégustation",@"plot do zhoor":@"plat du jour",@"oh cuisine":@"haute cuisine",@"new vell cuisine":@"nouvelle cuisine",@"maitre d":@"maître d'",@"may truh dee":@"maître d'",
-      @"aperitif":@"apéritif",@"ah pear a teef":@"apéritif",@"crudites":@"crudités",@"crew dee tay":@"crudités",@"crouton":@"croûton",@"crew ton":@"croûton",@"boeuf bourguignon":@"bœuf bourguignon",@"beef borg in yon":@"bœuf bourguignon",@"shin wah":@"chinois",@"ta mee":@"tamis",
+      @"som mel yay":@"sommelier",@"aperitif":@"apéritif",@"ah pear a teef":@"apéritif",@"crudites":@"crudités",@"crew dee tay":@"crudités",@"crouton":@"croûton",@"crew ton":@"croûton",@"ree yet":@"rillettes",@"rat a too ee":@"ratatouille",@"boo yah base":@"bouillabaisse",@"cock oh van":@"coq au vin",@"boeuf bourguignon":@"bœuf bourguignon",@"beef borg in yon":@"bœuf bourguignon",@"cass oo lay":@"cassoulet",@"vol oh von":@"vol-au-vent",@"shin wah":@"chinois",@"ta mee":@"tamis",
       @"sanitizing":@"sanitising",@"sanitize":@"sanitise",@"sanitizer":@"sanitiser",
       @"paltry":@"poultry",@"poetry seafood":@"poultry seafood",@"culture identity":@"cultural identity",@"culture background":@"cultural background",
       @"chief knife":@"chef knife",@"chef's nice":@"chef's knife",@"shift knife":@"chef knife",
       @"verseti":@"versatility",@"versa tea":@"versatility",@"versality":@"versatility"
-    };
-    // Whole phrases, one pass: "julienne" must not grow on each normalization.
-    NSArray *keys=[aliases.allKeys sortedArrayUsingComparator:^NSComparisonResult(NSString *a,NSString *b) {
-      if(a.length!=b.length) return a.length>b.length?NSOrderedAscending:NSOrderedDescending;
-      return [a compare:b];
-    }];
-    NSMutableArray *patterns=[NSMutableArray array];
-    for(NSString *key in keys) [patterns addObject:[NSRegularExpression escapedPatternForString:key]];
-    NSString *pattern=[NSString stringWithFormat:@"(?i)(?<![\\p{L}\\p{N}])(?:%@)(?![\\p{L}\\p{N}])",[patterns componentsJoinedByString:@"|"]];
-    NSRegularExpression *re=[NSRegularExpression regularExpressionWithPattern:pattern options:0 error:nil];
-    for(NSTextCheckingResult *match in [[re matchesInString:text options:0 range:NSMakeRange(0,text.length)] reverseObjectEnumerator]) {
+      };
+      // Whole phrases, one pass: "julienne" must not grow on each normalization.
+      NSArray *keys=[aliases.allKeys sortedArrayUsingComparator:^NSComparisonResult(NSString *a,NSString *b) {
+        if(a.length!=b.length) return a.length>b.length?NSOrderedAscending:NSOrderedDescending;
+        return [a compare:b];
+      }];
+      NSMutableArray *patterns=[NSMutableArray arrayWithCapacity:keys.count];
+      for(NSString *key in keys) [patterns addObject:[NSRegularExpression escapedPatternForString:key]];
+      NSString *pattern=[NSString stringWithFormat:@"(?i)(?<![\\p{L}\\p{N}])(?:%@)(?![\\p{L}\\p{N}])",[patterns componentsJoinedByString:@"|"]];
+      culinaryAliasExpression=[NSRegularExpression regularExpressionWithPattern:pattern options:0 error:nil];
+    });
+    for(NSTextCheckingResult *match in [[culinaryAliasExpression matchesInString:text options:0 range:NSMakeRange(0,text.length)] reverseObjectEnumerator]) {
       NSString *word=[[text substringWithRange:match.range] lowercaseString];
       [result replaceCharactersInRange:match.range withString:aliases[word]];
     }
     // Resolve a frequent acoustic error without rewriting a genuine animal
     // question. The grammar around the word tells us whether the intended form
     // is the verb/appliance "grill" or the adjective "grilled".
-    void (^replaceCapturedWord)(NSString *,NSString *)=^(NSString *expression,NSString *replacement) {
-      NSRegularExpression *regex=[NSRegularExpression regularExpressionWithPattern:expression options:NSRegularExpressionCaseInsensitive error:nil];
+    static NSArray<NSRegularExpression *> *grillExpressions=nil;
+    static NSArray<NSString *> *grillReplacements=nil;
+    static dispatch_once_t grillOnce;
+    dispatch_once(&grillOnce, ^{
+      NSArray<NSString *> *patterns=@[
+        @"\\b(?:do|does|did|can|could|would|should|will|may|might|must|to)\\s+(?:(?:you|we|i|they|he|she)\\s+)?(gorilla|guerrilla)\\b",
+        @"\\b(?:on|using|use|clean|cleaning|preheat|heat|scrub)\\s+(?:(?:a|the|an)\\s+)?(gorilla|guerrilla)\\b",
+        @"\\b(gorilla|guerrilla)\\b(?=\\s+(?:chicken|fish|steak|meat|vegetables?|poultry|seafood|lamb|beef|pork|salmon|barramundi|mushrooms?|sandwich|dish|or\\s+(?:roasted|fried|baked|poached|steamed)))"
+      ];
+      NSMutableArray *compiled=[NSMutableArray arrayWithCapacity:patterns.count];
+      for(NSString *pattern in patterns)
+        [compiled addObject:[NSRegularExpression regularExpressionWithPattern:pattern options:NSRegularExpressionCaseInsensitive error:nil]];
+      grillExpressions=compiled.copy;
+      grillReplacements=@[@"grill",@"grill",@"grilled"];
+    });
+    for(NSUInteger expressionIndex=0;expressionIndex<grillExpressions.count;expressionIndex++) {
+      NSRegularExpression *regex=grillExpressions[expressionIndex];
+      NSString *replacement=grillReplacements[expressionIndex];
       NSArray<NSTextCheckingResult *> *matches=[regex matchesInString:result options:0 range:NSMakeRange(0,result.length)];
       for(NSTextCheckingResult *match in matches.reverseObjectEnumerator) {
         NSRange wordRange=[match rangeAtIndex:1];
         if(wordRange.location!=NSNotFound) [result replaceCharactersInRange:wordRange withString:replacement];
       }
-    };
-    replaceCapturedWord(@"\\b(?:do|does|did|can|could|would|should|will|may|might|must|to)\\s+(?:(?:you|we|i|they|he|she)\\s+)?(gorilla|guerrilla)\\b",@"grill");
-    replaceCapturedWord(@"\\b(?:on|using|use|clean|cleaning|preheat|heat|scrub)\\s+(?:(?:a|the|an)\\s+)?(gorilla|guerrilla)\\b",@"grill");
-    replaceCapturedWord(@"\\b(gorilla|guerrilla)\\b(?=\\s+(?:chicken|fish|steak|meat|vegetables?|poultry|seafood|lamb|beef|pork|salmon|barramundi|mushrooms?|sandwich|dish|or\\s+(?:roasted|fried|baked|poached|steamed)))",@"grilled");
+    }
     // Apple Speech sometimes confuses the culinary noun “stock” with the
     // similar-sounding verb/noun “stuff”. Correct only stock-shaped phrases;
     // legitimate instructions such as “stuff the chicken” stay untouched.

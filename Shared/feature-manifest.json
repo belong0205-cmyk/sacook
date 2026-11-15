@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "featureVersion": "5.76.0",
+  "featureVersion": "5.77.0",
   "platforms": ["macOS", "Windows"],
   "answerPolicy": {
     "resource": "answer-policy.txt",
@@ -36,6 +36,9 @@
     "adaptiveSpaceAudioTail": true,
     "macOSDirectSystemAudio": true,
     "macOSCoreAudioSystemTap": true,
+    "macOSCoreAudioPacketCopyFix": true,
+    "macOSSystemAudioCompatibilityFallback": true,
+    "frenchCulinarySpeechLexicon": true,
     "fullContainsOnlyAdditionalDetails": true,
     "dualAnswerVariants": true,
     "keywordHighlighting": true

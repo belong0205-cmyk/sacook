@@ -79,6 +79,17 @@ int main(int argc, const char *argv[]) {
         [app loadBundledKnowledge];
         // Never use cached answers from another process or a previous release.
         app.answerCache=[NSMutableDictionary dictionary];
+        AVAudioFormat *tapFormat=[[AVAudioFormat alloc] initWithCommonFormat:AVAudioPCMFormatFloat32 sampleRate:48000 channels:2 interleaved:YES];
+        float tapSamples[]={0.25f,-0.25f,0.5f,-0.5f,0.75f,-0.75f,1.0f,-1.0f};
+        AudioBufferList tapInput={0};
+        tapInput.mNumberBuffers=1;
+        tapInput.mBuffers[0].mNumberChannels=2;
+        tapInput.mBuffers[0].mDataByteSize=sizeof(tapSamples);
+        tapInput.mBuffers[0].mData=tapSamples;
+        AVAudioPCMBuffer *tapPCM=SCPCMBufferFromAudioBufferList(&tapInput,tapFormat);
+        Check(tapPCM.frameLength==4,@"Core Audio system packets retain all frames when copied into AVAudioPCMBuffer");
+        Check(tapPCM.mutableAudioBufferList->mBuffers[0].mDataByteSize==sizeof(tapSamples),@"Core Audio destination exposes writable bytes before the packet copy");
+        Check(fabsf(tapPCM.floatChannelData[0][6]-1.0f)<0.0001f,@"Core Audio PCM copy preserves interleaved sample data");
         Check(app.qaEntries.count>1000,@"Load the complete bundled Q&A dataset through the resource hook");
         Check(app.speechHints.count>0,@"Load bundled speech vocabulary");
         Check([app.speechHints containsObject:@"stock"],@"Bundled speech vocabulary includes the standalone culinary word stock");
@@ -133,24 +144,33 @@ int main(int argc, const char *argv[]) {
         Equal([app correctCulinaryTerms:@"How do you grill chicken?"],@"How do you grill chicken?",@"Correctly heard grill is never changed");
         NSDictionary<NSString *,NSString *> *frenchCorrections=@{
           @"How do you make demi glass?":@"demi-glace",@"What is mirror paw?":@"mirepoix",@"Explain bouquet garney":@"bouquet garni",@"Use a ban marie":@"bain-marie",@"Serve with bear blank":@"beurre blanc",@"Prepare horse derv":@"hors d'oeuvre",@"Make cream brulee":@"crème brûlée",@"Cut a chiffon aid":@"chiffonade",@"What does a commie chef do?":@"commis chef",@"Cook it on pap ee oat":@"en papillote",
-          @"What does a sauce yay prepare?":@"saucier",@"What does the poisson yay do?":@"poissonnier",@"Cut it garden air":@"jardinière",@"Make baton nay cuts":@"batonnet",@"How do you de glaze the pan?":@"déglacer",@"Cook salmon on croat":@"en croûte",@"Prepare fish moon yair":@"meunière",@"Use core bullion":@"court bouillon",@"Finish with bear noisette":@"beurre noisette",@"Make pat a shoe":@"pâte à choux",@"Build a croc em boosh":@"croquembouche",@"Slice the mill foy":@"mille-feuille",@"Explain beef borg in yon":@"bœuf bourguignon",@"Pass it through a shin wah":@"chinois",@"Use a ta mee":@"tamis"
+          @"What does a sauce yay prepare?":@"saucier",@"What does the poisson yay do?":@"poissonnier",@"Cut it garden air":@"jardinière",@"Make baton nay cuts":@"batonnet",@"Make a tour nay potato":@"tourné",@"Prepare paris yen vegetables":@"parisienne",@"How do you de glaze the pan?":@"déglacer",@"Cook salmon on croat":@"en croûte",@"Prepare fish moon yair":@"meunière",@"Use core bullion":@"court bouillon",@"Finish with bear noisette":@"beurre noisette",@"Add a lee ay zon":@"liaison",@"Serve raspberry koo lee":@"coulis",@"What is po tazh?":@"potage",@"Make pat a shoe":@"pâte à choux",@"Shape a tweel":@"tuile",@"Prepare bav a wah":@"bavarois",@"Build a croc em boosh":@"croquembouche",@"Slice the mill foy":@"mille-feuille",@"Ask the som mel yay":@"sommelier",@"Serve ree yet with toast":@"rillettes",@"Make rat a too ee":@"ratatouille",@"Explain boo yah base":@"bouillabaisse",@"Prepare cock oh van":@"coq au vin",@"Explain beef borg in yon":@"bœuf bourguignon",@"Cook cass oo lay":@"cassoulet",@"Fill the vol oh von":@"vol-au-vent",@"Pass it through a shin wah":@"chinois",@"Use a ta mee":@"tamis"
         };
         [frenchCorrections enumerateKeysAndObjectsUsingBlock:^(NSString *heard,NSString *canonical,BOOL *stop) {
             Has([app correctCulinaryTerms:heard],canonical,[NSString stringWithFormat:@"Correct French culinary speech variant: %@",heard]);
         }];
         NSArray *contextual=[app recognitionContextualStrings];
         Check(contextual.count<=100 && contextual.count>=80,@"Speech recognizer receives a legal, high-value set of contextual phrases");
+        Check([NSOrderedSet orderedSetWithArray:contextual].count==contextual.count,@"Apple contextual phrases are unique, so none of the 100 slots is wasted");
+        Equal([contextual componentsJoinedByString:@"\n"],[[app recognitionContextualStrings] componentsJoinedByString:@"\n"],@"Apple contextual phrase ordering is deterministic across restarted speech tasks");
+        for(NSString *term in contextual) {
+            NSArray<NSString *> *words=[term componentsSeparatedByCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+            NSUInteger wordCount=0; for(NSString *word in words) if(word.length) wordCount++;
+            Check(term.length>0 && term.length<=48 && wordCount<=4 && [term rangeOfString:@"?"].location==NSNotFound,
+                  [NSString stringWithFormat:@"Apple contextual hint stays short and phrase-shaped: %@",term]);
+        }
         Check([contextual.firstObject isEqualToString:@"stock"] && [contextual indexOfObject:@"chicken stock"]<20 && [contextual indexOfObject:@"beef stock"]<20,@"Stock vocabulary is inside the recognizer's highest-priority context");
         NSArray<NSString *> *highestPriority=[contextual subarrayWithRange:NSMakeRange(0,MIN((NSUInteger)15,contextual.count))];
         for(NSString *term in @[@"grill",@"grilled",@"grilling"])
             Check([highestPriority containsObject:term],[NSString stringWithFormat:@"%@ is inside the first 15 recognition hints",term]);
-        for(NSString *term in @[@"mise en place",@"béarnaise",@"beurre manié",@"duxelles",@"en papillote",@"crème pâtissière",@"saucier",@"pâte à choux"])
+        for(NSString *term in @[@"mise en place",@"béarnaise",@"beurre manié",@"duxelles",@"en papillote",@"crème pâtissière",@"saucier",@"pâte à choux",@"tourné",@"liaison",@"coulis",@"tuile",@"sommelier",@"rillettes",@"ratatouille",@"bouillabaisse",@"coq au vin",@"cassoulet"])
             Check([contextual containsObject:term],[NSString stringWithFormat:@"French term is prioritised for recognition: %@",term]);
         for(NSString *term in @[@"HACCP",@"cross-contamination",@"allergen",@"chef's knife",@"boning knife",@"cultural sensitivity"])
             Check([contextual containsObject:term],[NSString stringWithFormat:@"Balanced recognition vocabulary retains common assessment term: %@",term]);
         NSString *cloudPrompt=[app autoTranscriptionPrompt];
-        for(NSString *term in @[@"poissonnier",@"croquembouche",@"bœuf bourguignon",@"tamis"])
-            Has(cloudPrompt,term,[NSString stringWithFormat:@"Cloud transcription prompt includes rare Word-document term: %@",term]);
+        for(NSString *term in app.frenchSpeechHints)
+            Has(cloudPrompt,term,[NSString stringWithFormat:@"Cloud transcription prompt includes French Word-document term: %@",term]);
+        Check(cloudPrompt.length<12000,@"The complete French cloud prompt stays compact enough for the low-latency transcription request");
         Check([cloudPrompt rangeOfString:@"/ˌ"].location==NSNotFound,@"IPA notation is not sent as a speech hint");
         Equal([app preferredCulinaryAlternativeForPrimary:@"How do you cook chicken on a gorilla?"
                                              alternatives:@[@"How do you cook chicken on a gorilla?",@"How do you cook chicken on a grill?"]],
@@ -161,6 +181,17 @@ int main(int argc, const char *argv[]) {
         Equal([app preferredCulinaryAlternativeForPrimary:@"What temperature should chicken reach?"
                                              alternatives:@[@"What temperature should chicken reach?",@"What temperature should turkey reach?"]],
               @"What temperature should chicken reach?",@"Unrelated recognition alternatives cannot rewrite the primary");
+        NSDictionary<NSString *,NSString *> *appleFrenchAlternatives=@{
+          @"How do you make demi glass?":@"How do you make demi-glace?",
+          @"Explain bouquet garney":@"Explain bouquet garni",
+          @"Use a ban marie":@"Use a bain-marie",
+          @"Cut a chiffon aid":@"Cut a chiffonade",
+          @"What does a sauce yay prepare?":@"What does a saucier prepare?"
+        };
+        [appleFrenchAlternatives enumerateKeysAndObjectsUsingBlock:^(NSString *primary,NSString *canonical,BOOL *stop) {
+            Equal([app preferredCulinaryAlternativeForPrimary:primary alternatives:@[primary,canonical]],canonical,
+                  [NSString stringWithFormat:@"Prefer Apple's canonical French alternative over phonetic text: %@",primary]);
+        }];
         NSMutableArray<NSString *> *vocabulary=[app.speechHints mutableCopy] ?: [NSMutableArray array];
         for (NSDictionary *entry in app.qaEntries) [vocabulary addObject:entry[@"question"] ?: @""];
         for (NSString *text in vocabulary) {

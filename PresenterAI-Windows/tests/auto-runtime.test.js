@@ -39,8 +39,20 @@ for (const [heard, expected] of [
   ['Cook salmon on croat.', 'en croûte'], ['Prepare fish moon yair.', 'meunière'],
   ['Use core bullion.', 'court bouillon'], ['Make pat a shoe.', 'pâte à choux'],
   ['Build a croc em boosh.', 'croquembouche'], ['Slice the mill foy.', 'mille-feuille'],
-  ['Explain beef borg in yon.', 'bœuf bourguignon'], ['Pass it through a shin wah.', 'chinois'], ['Use a ta mee.', 'tamis']
+  ['Make a tour nay potato.', 'tourné'], ['Add a lee ay zon.', 'liaison'], ['Serve raspberry koo lee.', 'coulis'],
+  ['Shape a tweel.', 'tuile'], ['Ask the som mel yay.', 'sommelier'], ['Serve ree yet with toast.', 'rillettes'],
+  ['Make rat a too ee.', 'ratatouille'], ['Explain boo yah base.', 'bouillabaisse'], ['Prepare cock oh van.', 'coq au vin'],
+  ['Explain beef borg in yon.', 'bœuf bourguignon'], ['Cook cass oo lay.', 'cassoulet'], ['Fill the vol oh von.', 'vol-au-vent'],
+  ['Pass it through a shin wah.', 'chinois'], ['Use a ta mee.', 'tamis']
 ]) assert(f.ctx.cleanSpeech(heard).includes(expected), `French speech alias should resolve to ${expected}`);
+const promptContext = vm.createContext({
+  speechHints: [], frenchDocumentHints: () => frenchSpeechHints,
+  lanes: {auto: {records: []}, manual: {records: []}}
+});
+vm.runInContext(applicationFunction('transcriptionPrompt'), promptContext);
+const frenchPrompt = promptContext.transcriptionPrompt('auto');
+for (const term of ['tourné', 'liaison', 'coulis', 'tuile', 'sommelier', 'rillettes', 'ratatouille', 'bouillabaisse', 'coq au vin', 'cassoulet'])
+  assert(frenchPrompt.includes(term), `Cloud transcription prompt should prioritise ${term}`);
 assert(f.ctx.isLikelyCompleteQuestion('What is stock?'), 'Three-word culinary questions must be accepted');
 assert(f.ctx.isLikelyCompleteQuestion('How can we use a thermometer?'), 'Embedded we use is not an answer');
 assert(f.ctx.isLikelyCompleteQuestion('Bạn ngăn ngừa nhiễm chéo như thế nào?'), 'Vietnamese AUTO questions must be accepted');
@@ -93,7 +105,7 @@ console.log('AUTO runtime regression tests passed.');
 
 (async () => {
   const requests = [];
-  const context = vm.createContext({FormData, Blob, speechHints: [], frenchDocumentHints: () => [], cleanSpeech: value => value,
+  const context = vm.createContext({FormData, Blob, speechHints: [], frenchDocumentHints: () => frenchSpeechHints, cleanSpeech: value => value,
     transcriptionPrompt: () => 'Cooking interview',
     api: async (_, form) => {
       requests.push(form);
@@ -102,6 +114,10 @@ console.log('AUTO runtime regression tests passed.');
     }});
   vm.runInContext('async ' + applicationFunction('transcribeBlob'), context);
   assert.strictEqual(await context.transcribeBlob(new Blob(['audio'], {type: 'audio/wav'}), 'auto'), 'What is stock?');
+  const keywords = requests[0].getAll('keywords[]');
+  assert(keywords.length <= 100, 'gpt-transcribe must receive no more than 100 keyword hints');
+  for (const term of ['tourné', 'liaison', 'coulis', 'tuile', 'sommelier', 'rillettes', 'ratatouille', 'bouillabaisse', 'coq au vin', 'cassoulet'])
+    assert(keywords.includes(term), `gpt-transcribe keyword list should prioritise ${term}`);
   assert(!requests[0].has('languages[]') && !requests[0].has('language'), 'AUTO lets the transcription model detect Vietnamese or English');
   assert(!requests[1].has('languages[]') && !requests[1].has('language'), 'AUTO fallback also keeps language auto-detection');
   assert.strictEqual(await context.transcribeBlob(new Blob(['audio'], {type: 'audio/wav'}), 'manual'), 'What is stock?');
